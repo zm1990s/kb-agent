@@ -5,7 +5,7 @@ M0 阶段只提供健康检查；业务路由在 M1/M2/M3 挂载。
 
 from fastapi import FastAPI
 
-from app.api import auth, categories, documents, workspaces
+from app.api import auth, categories, chat, documents, workspaces
 
 app = FastAPI(title="KB-Agent", version="0.1.0")
 
@@ -13,6 +13,7 @@ app.include_router(auth.router)
 app.include_router(workspaces.router)
 app.include_router(categories.router)
 app.include_router(documents.router)
+app.include_router(chat.router)
 
 
 @app.get("/health")
