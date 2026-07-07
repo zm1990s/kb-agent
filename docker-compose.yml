@@ -1,0 +1,36 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: kbagent
+      POSTGRES_PASSWORD: kbagent
+      POSTGRES_DB: kbagent
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kbagent"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  backend:
+    build: ./backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      # 本地开发请先 `cp .env.example .env` 并填值；缺失时不阻断工具链。
+      - path: .env
+        required: false
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      # 本地存储目录（原始文件落盘处，不入 git）
+      - ./local_storage:/app/local_storage
+
+volumes:
+  pgdata:
