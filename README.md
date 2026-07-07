@@ -25,15 +25,21 @@
 # lint + 类型检查
 ./scripts/lint.sh
 
-# 启动本地开发环境（首次自动生成 .env，起 postgres+backend，应用迁移）
+# 启动本地开发环境（前端+后端+DB，单端口入口，应用迁移）
 ./scripts/dev.sh
-# 之后：
-curl http://localhost:8000/health     # {"status":"ok"}
-open http://localhost:8000/docs        # Swagger UI
-docker compose logs -f backend         # 看日志
-docker compose down                    # 停止
+# 之后（用户只访问一个端口 :80）：
+open http://localhost/                 # 前端（登录/对话/文档/管理）
+curl http://localhost/api/health       # {"status":"ok"}（经前端反代到后端）
+open http://localhost/api/docs          # Swagger UI
+docker compose logs -f frontend backend # 看日志
+docker compose down                     # 停止
+
+# 前端 e2e 冒烟（需先起栈）
+./scripts/e2e.sh
 ```
 
+> **单端口**：用户只访问 `:80`（Next.js），后端不对宿主暴露，`/api/*` 由前端反代。
+>
 > **注意**：`.env` 存密钥，不入 git（已 gitignore）。`dev.sh` 首次会生成一份本地默认值，
 > 请务必修改 `JWT_SECRET`，并把 `CLAUDE_CLI_PATH` 指向可用的 `claude` CLI（归类/问答需要）。
 > 端到端跑通归类与问答，需容器内能访问 `claude` CLI 且已配置凭据。
