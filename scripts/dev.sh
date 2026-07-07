@@ -45,8 +45,9 @@ for f in infra/postgres/migrations/*.sql; do
 done
 
 echo ""
-echo ">> 就绪。"
-echo "   健康检查: curl http://localhost:8000/health"
-echo "   API 文档: http://localhost:8000/docs"
-echo "   查看日志: docker compose logs -f backend"
+echo ">> 就绪（单端口入口，用户只访问 :80）。"
+echo "   前端:     http://localhost/"
+echo "   健康检查: curl http://localhost/api/health   # 经前端反代到后端"
+echo "   API 文档: http://localhost/api/docs"
+echo "   查看日志: docker compose logs -f frontend backend"
 echo "   停止:     docker compose down"

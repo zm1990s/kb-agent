@@ -25,12 +25,28 @@ services:
       # 本地开发请先 `cp .env.example .env` 并填值；缺失时不阻断工具链。
       - path: .env
         required: false
-    ports:
-      - "8000:8000"
+    # 单端口暴露：后端不再对宿主暴露端口，仅 compose 网络内可达（由 frontend 反代）。
+    expose:
+      - "8000"
     volumes:
       - ./backend:/app
       # 本地存储目录（原始文件落盘处，不入 git）
       - ./local_storage:/app/local_storage
+
+  frontend:
+    build: ./frontend
+    depends_on:
+      - backend
+    environment:
+      # 反代目标：compose 网络内的后端服务名
+      BACKEND_URL: http://backend:8000
+    # 用户唯一入口：宿主 80 -> 前端 80
+    ports:
+      - "80:80"
+    volumes:
+      - ./frontend:/app
+      # 保留容器内 node_modules，不被宿主目录覆盖
+      - /app/node_modules
 
 volumes:
   pgdata:
