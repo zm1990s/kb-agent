@@ -8,6 +8,7 @@ from app.core.deps import get_current_user
 from app.core.security import create_access_token
 from app.models.auth import User
 from app.schemas.auth import (
+    ChangePasswordRequest,
     LoginRequest,
     RegisterRequest,
     TokenResponse,
@@ -16,7 +17,9 @@ from app.schemas.auth import (
 from app.services.user_service import (
     DomainNotAllowedError,
     EmailExistsError,
+    InvalidCredentialsError,
     authenticate,
+    change_password,
     register_user,
 )
 
@@ -67,3 +70,23 @@ async def login(
 @router.get("/me", response_model=UserPublic)
 async def me(current_user: User = Depends(get_current_user)) -> UserPublic:
     return UserPublic.model_validate(current_user)
+
+
+@router.post("/change-password", status_code=status.HTTP_204_NO_CONTENT)
+async def change_own_password(
+    body: ChangePasswordRequest,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> None:
+    try:
+        await change_password(
+            session,
+            user=current_user,
+            current_password=body.current_password,
+            new_password=body.new_password,
+        )
+    except InvalidCredentialsError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="当前密码错误",
+        ) from exc

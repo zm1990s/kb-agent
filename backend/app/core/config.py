@@ -22,6 +22,10 @@ class Settings(BaseSettings):
     # 注册域名白名单，逗号分隔。完整域名相等匹配（不使用 endswith）。
     allowed_email_domains: str = Field("", alias="ALLOWED_EMAIL_DOMAINS")
 
+    # 首个管理员种子（启动时幂等创建）。留空则不种子。
+    admin_email: str = Field("", alias="ADMIN_EMAIL")
+    admin_password: str = Field("", alias="ADMIN_PASSWORD")
+
     # ── Agent 引擎（唯一 LLM 出口）────────────────────────
     engine_backend: str = Field("claude_cli", alias="ENGINE_BACKEND")
     claude_cli_path: str = Field("claude", alias="CLAUDE_CLI_PATH")

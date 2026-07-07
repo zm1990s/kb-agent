@@ -14,6 +14,10 @@ from app.core.security import hash_password, verify_password
 from app.models.auth import User
 
 
+class InvalidCredentialsError(Exception):
+    """当前密码校验失败。"""
+
+
 class DomainNotAllowedError(Exception):
     """邮箱域名不在白名单内。"""
 
@@ -42,6 +46,44 @@ async def get_user_by_email(session: AsyncSession, email: str) -> User | None:
 
 async def get_user_by_id(session: AsyncSession, user_id: uuid.UUID) -> User | None:
     return await session.get(User, user_id)
+
+
+async def change_password(
+    session: AsyncSession, *, user: User, current_password: str, new_password: str
+) -> None:
+    """修改登录用户自己的密码。当前密码不符抛 InvalidCredentialsError。"""
+    if not verify_password(current_password, user.password_hash):
+        raise InvalidCredentialsError()
+    user.password_hash = hash_password(new_password)
+    await session.commit()
+
+
+async def seed_admin(session: AsyncSession) -> User | None:
+    """按配置幂等创建首个管理员。
+
+    读取 ADMIN_EMAIL / ADMIN_PASSWORD；已存在同邮箱用户则跳过（不覆盖密码，
+    以免抹掉用户后续自行修改的密码）。密码以 bcrypt 存库。
+    """
+    settings = get_settings()
+    email = settings.admin_email.strip().lower()
+    password = settings.admin_password
+    if not email or not password:
+        return None
+
+    existing = await get_user_by_email(session, email)
+    if existing is not None:
+        return existing  # 幂等：已存在则不动（尊重用户改过的密码）
+
+    admin = User(
+        id=uuid.uuid4(),
+        email=email,
+        password_hash=hash_password(password),
+        role="admin",
+    )
+    session.add(admin)
+    await session.commit()
+    await session.refresh(admin)
+    return admin
 
 
 async def authenticate(

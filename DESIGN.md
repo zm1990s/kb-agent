@@ -80,6 +80,7 @@ class StorageProtocol(Protocol):
 | POST | /auth/register | 注册（**邮箱域名后缀须在白名单内**） | {email, password} | 201 {id, email} / 403 域名不允许 / 409 已存在 |
 | POST | /auth/login | 登录 | {email, password} | {access_token, role} |
 | GET  | /auth/me | 当前用户 | - | {id, email, role} |
+| POST | /auth/change-password | 改自己的密码 | {current_password, new_password} | 204 / 400 当前密码错 / 401 |
 | GET  | /workspaces | 我可见的空间列表 | - | [{id, name, role_in_ws}] |
 | POST | /workspaces | 建空间（管理员） | {name, description} | {id, ...} |
 | POST | /workspaces/{id}/members | 加成员（管理员） | {user_id, role} | {ok} |
@@ -120,7 +121,9 @@ class StorageProtocol(Protocol):
 | role | TEXT | NOT NULL, CHECK in ('admin','internal','partner') | 全局角色 |
 | created_at | TIMESTAMPTZ | NOT NULL default now() | |
 
-> **注册白名单**：配置项 `ALLOWED_EMAIL_DOMAINS`（如 `company.com,partner-a.com`）。`POST /auth/register` 校验邮箱域名后缀，不在白名单返 403。首个 admin 通过种子脚本/配置创建。
+> **注册白名单**：配置项 `ALLOWED_EMAIL_DOMAINS`（如 `company.com,partner-a.com`）。`POST /auth/register` 校验邮箱域名后缀，不在白名单返 403。
+>
+> **首个管理员**：配置 `ADMIN_EMAIL` / `ADMIN_PASSWORD`，应用启动时（lifespan）**幂等种子**创建 role=admin 用户，密码 bcrypt 存库。已存在则跳过（尊重用户后续改过的密码）。用户经 `POST /auth/change-password` 自行改密。
 
 ### workspaces（隔离边界）
 | 字段 | 类型 | 约束 | 说明 |

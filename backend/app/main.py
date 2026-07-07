@@ -1,13 +1,26 @@
 """KB-Agent FastAPI 应用入口。
 
-M0 阶段只提供健康检查；业务路由在 M1/M2/M3 挂载。
+启动时按配置幂等种子首个管理员；业务路由在 M1/M2/M3 挂载。
 """
+
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
 from app.api import auth, categories, chat, documents, workspaces
+from app.core.db import SessionLocal
+from app.services.user_service import seed_admin
 
-app = FastAPI(title="KB-Agent", version="0.1.0")
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    # 幂等创建首个管理员（读 ADMIN_EMAIL/ADMIN_PASSWORD）
+    async with SessionLocal() as session:
+        await seed_admin(session)
+    yield
+
+
+app = FastAPI(title="KB-Agent", version="0.1.0", lifespan=lifespan)
 
 app.include_router(auth.router)
 app.include_router(workspaces.router)
