@@ -68,7 +68,8 @@ async def test_require_ws_member_admin_not_auto_member(db_session):
 # ── M1 集成：注册→登录→建空间→加成员→列表 全链路 ──────────
 
 
-async def test_m1_end_to_end(client, seed_user):
+async def test_m1_end_to_end(client, seed_user, seed_domain):
+    await seed_domain("company.com")
     # 管理员建空间
     admin_id, admin_headers = await seed_user("admin")
     ws = await client.post(

@@ -17,6 +17,20 @@ USER_ROLES = ("admin", "internal", "partner")
 WS_ROLES = ("owner", "editor", "viewer")
 
 
+class AllowedDomain(Base):
+    """注册域名白名单（由管理员维护）。完整域名相等匹配。"""
+
+    __tablename__ = "allowed_domains"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    domain: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
 class User(Base):
     __tablename__ = "users"
 

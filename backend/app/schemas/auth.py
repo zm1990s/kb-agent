@@ -65,3 +65,14 @@ class WorkspaceWithRole(WorkspacePublic):
 class MemberAddRequest(BaseModel):
     user_id: uuid.UUID
     role_in_ws: Literal["owner", "editor", "viewer"]
+
+
+class AllowedDomainCreate(BaseModel):
+    domain: str = Field(min_length=3, max_length=253)
+
+
+class AllowedDomainPublic(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    domain: str

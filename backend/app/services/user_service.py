@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.security import hash_password, verify_password
-from app.models.auth import User
+from app.models.auth import AllowedDomain, User
 
 
 class InvalidCredentialsError(Exception):
@@ -31,12 +31,45 @@ def _email_domain(email: str) -> str:
     return email.rsplit("@", 1)[-1].lower()
 
 
-def is_domain_allowed(email: str) -> bool:
-    """完整域名相等匹配白名单。白名单为空时拒绝所有（安全默认）。"""
-    allowed = get_settings().allowed_email_domains_set
-    if not allowed:
+async def is_domain_allowed(session: AsyncSession, email: str) -> bool:
+    """完整域名相等匹配 DB 白名单。白名单为空时拒绝所有（安全默认）。"""
+    domain = _email_domain(email)
+    result = await session.execute(
+        select(AllowedDomain.id).where(AllowedDomain.domain == domain)
+    )
+    return result.scalar_one_or_none() is not None
+
+
+async def list_allowed_domains(session: AsyncSession) -> list[AllowedDomain]:
+    result = await session.execute(
+        select(AllowedDomain).order_by(AllowedDomain.domain)
+    )
+    return list(result.scalars().all())
+
+
+async def add_allowed_domain(session: AsyncSession, *, domain: str) -> AllowedDomain:
+    """新增白名单域名（幂等：已存在则返回现有）。"""
+    domain = domain.strip().lower()
+    existing = await session.execute(
+        select(AllowedDomain).where(AllowedDomain.domain == domain)
+    )
+    found = existing.scalar_one_or_none()
+    if found is not None:
+        return found
+    row = AllowedDomain(id=uuid.uuid4(), domain=domain)
+    session.add(row)
+    await session.commit()
+    await session.refresh(row)
+    return row
+
+
+async def remove_allowed_domain(session: AsyncSession, *, domain_id: uuid.UUID) -> bool:
+    row = await session.get(AllowedDomain, domain_id)
+    if row is None:
         return False
-    return _email_domain(email) in allowed
+    await session.delete(row)
+    await session.commit()
+    return True
 
 
 async def get_user_by_email(session: AsyncSession, email: str) -> User | None:
@@ -108,7 +141,7 @@ async def register_user(
     """注册新用户。域名不合法抛 DomainNotAllowedError，重复抛 EmailExistsError。"""
     email = email.lower()
 
-    if not is_domain_allowed(email):
+    if not await is_domain_allowed(session, email):
         raise DomainNotAllowedError(email)
 
     if await get_user_by_email(session, email) is not None:

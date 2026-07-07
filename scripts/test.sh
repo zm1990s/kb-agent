@@ -21,7 +21,6 @@ echo ">> 运行 pytest..."
 docker compose run --rm --no-deps \
   -e DATABASE_URL="postgresql+asyncpg://kbagent:kbagent@postgres:5432/kbagent" \
   -e JWT_SECRET="test-secret-not-for-prod" \
-  -e ALLOWED_EMAIL_DOMAINS="company.com" \
   -e LOCAL_STORAGE_DIR="/tmp/kbstore" \
   -e CLAUDE_CLI_PATH="/bin/false" \
   backend pytest "$@"

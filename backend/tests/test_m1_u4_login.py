@@ -11,7 +11,8 @@ async def _register(client, email="user@company.com", password="longenough1"):
     )
 
 
-async def test_login_correct_credentials_returns_jwt(client):
+async def test_login_correct_credentials_returns_jwt(client, seed_domain):
+    await seed_domain("company.com")
     await _register(client)
     resp = await client.post(
         "/auth/login",
@@ -41,7 +42,8 @@ async def test_login_unknown_email_returns_401(client):
     assert resp.status_code == 401
 
 
-async def test_me_with_token_returns_user(client):
+async def test_me_with_token_returns_user(client, seed_domain):
+    await seed_domain("company.com")
     await _register(client)
     login = await client.post(
         "/auth/login",

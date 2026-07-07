@@ -6,7 +6,7 @@ import NavBar from "@/components/NavBar";
 import { api, ApiError } from "@/lib/api";
 import { isAdmin } from "@/lib/auth";
 import { useAuthGuard } from "@/lib/useAuthGuard";
-import type { Category, Workspace } from "@/lib/types";
+import type { AllowedDomain, Category, Workspace } from "@/lib/types";
 
 export default function AdminPage() {
   const ready = useAuthGuard();
@@ -16,11 +16,14 @@ export default function AdminPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [error, setError] = useState<string | null>(null);
 
+  const [domains, setDomains] = useState<AllowedDomain[]>([]);
+
   // 表单状态
   const [wsName, setWsName] = useState("");
   const [catName, setCatName] = useState("");
   const [memberId, setMemberId] = useState("");
   const [memberRole, setMemberRole] = useState("viewer");
+  const [domainName, setDomainName] = useState("");
 
   const loadWorkspaces = useCallback(async () => {
     const ws = await api.get<Workspace[]>("/workspaces");
@@ -38,9 +41,20 @@ export default function AdminPage() {
     }
   }, [selected]);
 
+  const loadDomains = useCallback(async () => {
+    try {
+      setDomains(await api.get<AllowedDomain[]>("/auth/allowed-domains"));
+    } catch {
+      setDomains([]);
+    }
+  }, []);
+
   useEffect(() => {
-    if (ready && isAdmin()) loadWorkspaces();
-  }, [ready, loadWorkspaces]);
+    if (ready && isAdmin()) {
+      loadWorkspaces();
+      loadDomains();
+    }
+  }, [ready, loadWorkspaces, loadDomains]);
 
   useEffect(() => {
     loadCategories();
@@ -85,6 +99,22 @@ export default function AdminPage() {
     setCatName("");
     await loadCategories();
   });
+
+  const addDomain = wrap(async () => {
+    await api.post("/auth/allowed-domains", { domain: domainName });
+    setDomainName("");
+    await loadDomains();
+  });
+
+  async function deleteDomain(id: string) {
+    setError(null);
+    try {
+      await api.del(`/auth/allowed-domains/${id}`);
+      await loadDomains();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "删除失败");
+    }
+  }
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -174,6 +204,45 @@ export default function AdminPage() {
             ))}
             {categories.length === 0 && (
               <li className="text-gray-400">暂无分类</li>
+            )}
+          </ul>
+        </section>
+
+        {/* 注册域名白名单 */}
+        <section className="rounded border bg-white p-4">
+          <h2 className="mb-1 text-sm font-medium">注册域名白名单</h2>
+          <p className="mb-3 text-xs text-gray-400">
+            空 = 全拒绝注册。仅列出的域名邮箱可注册（完整域名相等匹配）。
+          </p>
+          <form onSubmit={addDomain} className="mb-3 flex gap-2">
+            <input
+              value={domainName}
+              onChange={(e) => setDomainName(e.target.value)}
+              placeholder="例如 company.com"
+              required
+              className="flex-1 rounded border px-3 py-2 text-sm"
+            />
+            <button className="rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700">
+              添加域名
+            </button>
+          </form>
+          <ul className="space-y-1 text-sm text-gray-700">
+            {domains.map((d) => (
+              <li
+                key={d.id}
+                className="flex items-center justify-between rounded bg-gray-50 px-3 py-1.5"
+              >
+                <span>{d.domain}</span>
+                <button
+                  onClick={() => deleteDomain(d.id)}
+                  className="text-xs text-red-600 hover:underline"
+                >
+                  删除
+                </button>
+              </li>
+            ))}
+            {domains.length === 0 && (
+              <li className="text-gray-400">暂无域名（当前无人可注册）</li>
             )}
           </ul>
         </section>

@@ -13,6 +13,11 @@ export interface TokenResponse {
   role: string;
 }
 
+export interface AllowedDomain {
+  id: string;
+  domain: string;
+}
+
 export interface Workspace {
   id: string;
   name: string;

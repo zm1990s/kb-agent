@@ -19,8 +19,7 @@ class Settings(BaseSettings):
     # ── 认证 ───────────────────────────────────────────
     jwt_secret: str = Field(..., alias="JWT_SECRET")
     jwt_expire_min: int = Field(60, alias="JWT_EXPIRE_MIN")
-    # 注册域名白名单，逗号分隔。完整域名相等匹配（不使用 endswith）。
-    allowed_email_domains: str = Field("", alias="ALLOWED_EMAIL_DOMAINS")
+    # 注：注册域名白名单已迁到 DB（allowed_domains 表），由管理员在应用内维护。
 
     # 首个管理员种子（启动时幂等创建）。留空则不种子。
     admin_email: str = Field("", alias="ADMIN_EMAIL")
@@ -36,16 +35,6 @@ class Settings(BaseSettings):
     storage_backend: str = Field("local", alias="STORAGE_BACKEND")
     local_storage_dir: str = Field("./local_storage", alias="LOCAL_STORAGE_DIR")
     download_url_ttl_sec: int = Field(300, alias="DOWNLOAD_URL_TTL_SEC")
-
-    @property
-    def allowed_email_domains_set(self) -> set[str]:
-        """解析为小写域名集合，供注册白名单精确匹配使用。"""
-        return {
-            d.strip().lower()
-            for d in self.allowed_email_domains.split(",")
-            if d.strip()
-        }
-
 
 @lru_cache
 def get_settings() -> Settings:

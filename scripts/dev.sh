@@ -11,7 +11,6 @@ if [ ! -f .env ]; then
 DATABASE_URL=postgresql+asyncpg://kbagent:kbagent@postgres:5432/kbagent
 JWT_SECRET=dev-only-change-me
 JWT_EXPIRE_MIN=60
-ALLOWED_EMAIL_DOMAINS=company.com
 ADMIN_EMAIL=admin@company.com
 ADMIN_PASSWORD=ChangeMe_Admin123
 ENGINE_BACKEND=claude_cli
