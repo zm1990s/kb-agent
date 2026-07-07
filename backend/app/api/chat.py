@@ -11,16 +11,21 @@ from app.models.auth import User
 from app.schemas.chat import (
     ChatRequest,
     ChatResponse,
+    ConversationCreate,
     ConversationHistory,
+    ConversationSummary,
     MessagePublic,
     SourceRef,
 )
 from app.services.answer_service import answer_question
 from app.services.chat_service import (
     add_message,
+    create_conversation,
     get_conversation_for_user,
     get_or_create_conversation,
+    list_conversations,
     list_messages,
+    recent_history,
 )
 from app.services.workspace_service import is_member
 
@@ -45,12 +50,18 @@ async def chat(
         workspace_id=body.workspace_id,
         user_id=current_user.id,
     )
+    # 先取历史（不含本轮提问），供 Agent 理解上下文
+    history = await recent_history(session, conversation_id=conv.id)
+
     await add_message(
         session, conversation_id=conv.id, role="user", content=body.message
     )
 
     result = await answer_question(
-        session, workspace_id=body.workspace_id, question=body.message
+        session,
+        workspace_id=body.workspace_id,
+        question=body.message,
+        history=history,
     )
 
     await add_message(
@@ -66,6 +77,42 @@ async def chat(
         sources=[SourceRef(**s) for s in result.sources],
         conversation_id=conv.id,
     )
+
+
+@router.get("/conversations", response_model=list[ConversationSummary])
+async def get_conversations(
+    workspace_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> list[ConversationSummary]:
+    if not await is_member(
+        session, workspace_id=workspace_id, user_id=current_user.id
+    ):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "无权访问该空间")
+    convs = await list_conversations(
+        session, workspace_id=workspace_id, user_id=current_user.id
+    )
+    return [ConversationSummary.model_validate(c) for c in convs]
+
+
+@router.post(
+    "/conversations",
+    response_model=ConversationSummary,
+    status_code=status.HTTP_201_CREATED,
+)
+async def new_conversation(
+    body: ConversationCreate,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> ConversationSummary:
+    if not await is_member(
+        session, workspace_id=body.workspace_id, user_id=current_user.id
+    ):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "无权访问该空间")
+    conv = await create_conversation(
+        session, workspace_id=body.workspace_id, user_id=current_user.id
+    )
+    return ConversationSummary.model_validate(conv)
 
 
 @router.get("/conversations/{conversation_id}", response_model=ConversationHistory)

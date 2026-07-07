@@ -21,13 +21,13 @@ NO_MATCH_ANSWER = "未找到相关文档。"
 
 _ANSWER_PROMPT = """你是知识库问答助手。请**仅依据**下面提供的文档原文回答用户问题。
 若文档中没有相关信息，直接回答“未找到相关文档。”，不要编造。
-
+{history}
 用户问题：{question}
 
 可参考的文档原文：
 {context}
 
-请用中文简洁作答。"""
+请用中文简洁作答，可使用 Markdown 格式。"""
 
 
 @dataclass
@@ -46,14 +46,27 @@ async def _build_source(doc: Document) -> dict:
     }
 
 
+def _format_history(history: list[tuple[str, str]] | None) -> str:
+    """把 (role, content) 历史格式化进 prompt；空则返回空串。"""
+    if not history:
+        return ""
+    lines = ["\n对话历史（供理解上下文）："]
+    for role, content in history:
+        who = "用户" if role == "user" else "助手"
+        lines.append(f"{who}：{content}")
+    lines.append("")
+    return "\n".join(lines)
+
+
 async def answer_question(
     session: AsyncSession,
     *,
     workspace_id: uuid.UUID,
     question: str,
     category_id: uuid.UUID | None = None,
+    history: list[tuple[str, str]] | None = None,
 ) -> AnswerResult:
-    """检索 → 取原文交 engine 生成答案 → 返回 answer + sources。"""
+    """检索 → 取原文（+可选对话历史）交 engine 生成答案 → 返回 answer + sources。"""
     hits = await search_documents(
         session, workspace_id=workspace_id, query=question, category_id=category_id
     )
@@ -71,7 +84,9 @@ async def answer_question(
 
     engine = get_engine(await get_engine_backend(session))
     result = await engine.complete(
-        _ANSWER_PROMPT.format(question=question, context=context)
+        _ANSWER_PROMPT.format(
+            question=question, context=context, history=_format_history(history)
+        )
     )
 
     sources = [await _build_source(doc) for doc in hits]

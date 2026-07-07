@@ -77,3 +77,45 @@ async def list_messages(
     )
     result = await session.execute(stmt)
     return list(result.scalars().all())
+
+
+async def recent_history(
+    session: AsyncSession, *, conversation_id: uuid.UUID, max_turns: int = 6
+) -> list[tuple[str, str]]:
+    """取会话最近 max_turns 条消息，按时间正序返回 (role, content)，供 Agent 上下文。"""
+    stmt = (
+        select(Message)
+        .where(Message.conversation_id == conversation_id)
+        .order_by(Message.created_at.desc())
+        .limit(max_turns)
+    )
+    result = await session.execute(stmt)
+    msgs = list(result.scalars().all())
+    msgs.reverse()
+    return [(m.role, m.content) for m in msgs]
+
+
+async def create_conversation(
+    session: AsyncSession, *, workspace_id: uuid.UUID, user_id: uuid.UUID
+) -> Conversation:
+    conv = Conversation(id=uuid.uuid4(), workspace_id=workspace_id, user_id=user_id)
+    session.add(conv)
+    await session.commit()
+    await session.refresh(conv)
+    return conv
+
+
+async def list_conversations(
+    session: AsyncSession, *, workspace_id: uuid.UUID, user_id: uuid.UUID
+) -> list[Conversation]:
+    """列出当前用户在某空间的会话（最近优先）。"""
+    stmt = (
+        select(Conversation)
+        .where(
+            Conversation.workspace_id == workspace_id,
+            Conversation.user_id == user_id,
+        )
+        .order_by(Conversation.created_at.desc())
+    )
+    result = await session.execute(stmt)
+    return list(result.scalars().all())
