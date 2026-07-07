@@ -71,6 +71,16 @@ async def client(db_engine):
 
 
 @pytest_asyncio.fixture
+async def db_session(db_engine):
+    """产出一个绑定到测试 engine 的 async 会话（供直接调用 service/deps 使用）。"""
+    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
+    maker = async_sessionmaker(bind=db_engine, class_=AsyncSession, expire_on_commit=False)
+    async with maker() as session:
+        yield session
+
+
+@pytest_asyncio.fixture
 async def seed_user(db_engine):
     """直接向 DB 插入指定角色用户，返回 (user_id, auth_headers) 的工厂。
 

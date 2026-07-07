@@ -55,3 +55,27 @@ async def require_admin(current_user: User = Depends(get_current_user)) -> User:
             detail="需要管理员权限",
         )
     return current_user
+
+
+async def require_ws_member(
+    workspace_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> User:
+    """要求当前用户是路径中 workspace_id 所指空间的成员；否则 403。
+
+    这是 workspace 隔离/越权校验（SECURITY #4）的通用地基：
+    M2 文档等空间资源端点挂此依赖即可强制成员校验。
+    管理员不自动获得所有空间访问权——需显式加入成员。
+    """
+    from app.services.workspace_service import is_member
+
+    ok = await is_member(
+        session, workspace_id=workspace_id, user_id=current_user.id
+    )
+    if not ok:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="无权访问该空间",
+        )
+    return current_user
