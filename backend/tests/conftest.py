@@ -1,4 +1,4 @@
-"""测试夹具：在导入应用前注入最小必需的环境变量。"""
+"""测试夹具：在导入应用前注入最小必需的环境变量，并提供 DB / HTTP client。"""
 
 import os
 import tempfile
@@ -8,3 +8,63 @@ os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://kbagent:kbagent@loca
 os.environ.setdefault("JWT_SECRET", "test-secret-not-for-prod")
 os.environ.setdefault("ALLOWED_EMAIL_DOMAINS", "company.com")
 os.environ.setdefault("LOCAL_STORAGE_DIR", tempfile.mkdtemp(prefix="kb_test_store_"))
+
+import pytest  # noqa: E402
+import pytest_asyncio  # noqa: E402
+from httpx import ASGITransport, AsyncClient  # noqa: E402
+
+
+def _db_available() -> bool:
+    return "@postgres" in os.environ["DATABASE_URL"] or "@localhost" in os.environ["DATABASE_URL"]
+
+
+@pytest_asyncio.fixture
+async def db_engine():
+    """为每个用到 DB 的测试建表、结束后清理（独立 schema，隔离测试）。"""
+    from sqlalchemy.ext.asyncio import create_async_engine
+
+    from app.core.db import Base
+    from app.models import auth as _auth  # noqa: F401  # 注册模型到 metadata
+
+    engine = create_async_engine(os.environ["DATABASE_URL"])
+    try:
+        async with engine.begin() as conn:
+            await conn.exec_driver_sql('CREATE EXTENSION IF NOT EXISTS "uuid-ossp"')
+            await conn.run_sync(Base.metadata.drop_all)
+            await conn.run_sync(Base.metadata.create_all)
+    except Exception as exc:  # noqa: BLE001
+        await engine.dispose()
+        pytest.skip(f"无可用数据库，跳过 DB 测试: {exc}")
+
+    yield engine
+
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
+    await engine.dispose()
+
+
+@pytest_asyncio.fixture
+async def client(db_engine):
+    """基于建好表的 DB 的 httpx 异步客户端。
+
+    覆盖 get_session 依赖，让应用与测试共用同一 engine（同一事件循环），
+    避免模块级 engine 在多测试事件循环间复用 asyncpg 连接导致的错误。
+    """
+    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
+    from app.core.db import get_session
+    from app.main import app
+
+    test_sessionmaker = async_sessionmaker(
+        bind=db_engine, class_=AsyncSession, expire_on_commit=False
+    )
+
+    async def _override_get_session():
+        async with test_sessionmaker() as session:
+            yield session
+
+    app.dependency_overrides[get_session] = _override_get_session
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as c:
+        yield c
+    app.dependency_overrides.clear()

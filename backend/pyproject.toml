@@ -35,6 +35,9 @@ select = ["E", "F", "I", "UP", "B", "S"]
 # 测试中：S101 assert、S105/S106 测试用假密码
 "backend/tests/*" = ["S101", "S105", "S106"]
 "tests/*" = ["S101", "S105", "S106"]
+# FastAPI 的 Depends() 默认参数是官方惯用法，B008 在此为误报
+"backend/app/api/*" = ["B008"]
+"app/api/*" = ["B008"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
