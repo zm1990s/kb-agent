@@ -15,8 +15,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.db import get_session
 from app.core.deps import get_current_user
 from app.models.auth import User
-from app.schemas.document import DocumentUploadAccepted
-from app.services.document_service import upload_document
+from app.models.document import Document
+from app.schemas.document import (
+    DocumentUploadAccepted,
+    ProcessingTaskPublic,
+    ReprocessAccepted,
+)
+from app.services.document_service import (
+    create_reprocess_task,
+    list_document_tasks,
+    upload_document,
+)
 from app.services.workspace_service import is_member
 from app.tasks.worker import enqueue_classification
 
@@ -26,6 +35,18 @@ router = APIRouter(tags=["documents"])
 async def _ensure_member(session: AsyncSession, ws_id: uuid.UUID, user: User) -> None:
     if not await is_member(session, workspace_id=ws_id, user_id=user.id):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "无权访问该空间")
+
+
+async def _get_doc_for_member(
+    session: AsyncSession, document_id: uuid.UUID, user: User
+) -> Document:
+    """取文档并校验当前用户是其所属空间成员；否则 404（不泄漏存在性）。"""
+    doc = await session.get(Document, document_id)
+    if doc is None or not await is_member(
+        session, workspace_id=doc.workspace_id, user_id=user.id
+    ):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "文档不存在")
+    return doc
 
 
 @router.post(
@@ -56,3 +77,33 @@ async def upload(
     # 触发后台归类 worker（进程内 asyncio，见 tasks/worker.py）
     enqueue_classification(task.id)
     return DocumentUploadAccepted(id=doc.id, status=doc.status, task_id=task.id)
+
+
+@router.get("/documents/{document_id}/tasks", response_model=list[ProcessingTaskPublic])
+async def list_tasks(
+    document_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> list[ProcessingTaskPublic]:
+    await _get_doc_for_member(session, document_id, current_user)
+    tasks = await list_document_tasks(session, document_id=document_id)
+    return [ProcessingTaskPublic.model_validate(t) for t in tasks]
+
+
+@router.post(
+    "/documents/{document_id}/reprocess",
+    response_model=ReprocessAccepted,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def reprocess(
+    document_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> ReprocessAccepted:
+    # 重试为管理员操作，且须为该文档所属空间成员
+    if current_user.role != "admin":
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "需要管理员权限")
+    await _get_doc_for_member(session, document_id, current_user)
+    task = await create_reprocess_task(session, document_id=document_id)
+    enqueue_classification(task.id)
+    return ReprocessAccepted(task_id=task.id, status="queued")

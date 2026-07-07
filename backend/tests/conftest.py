@@ -64,11 +64,23 @@ async def client(db_engine):
         async with test_sessionmaker() as session:
             yield session
 
+    # 端点触发的后台归类 worker 在 HTTP 测试中改为 no-op：
+    # worker 逻辑已在 test_m2_u5_classify 直接覆盖，此处避免 fire-and-forget
+    # 任务与测试 teardown 竞争产生噪声。
+    import app.api.documents as _documents_api
+
+    def _noop_enqueue(_task_id):
+        return None
+
+    _orig_enqueue = _documents_api.enqueue_classification
+    _documents_api.enqueue_classification = _noop_enqueue
+
     app.dependency_overrides[get_session] = _override_get_session
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as c:
         yield c
     app.dependency_overrides.clear()
+    _documents_api.enqueue_classification = _orig_enqueue
 
 
 @pytest_asyncio.fixture

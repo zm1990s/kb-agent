@@ -58,3 +58,29 @@ async def get_document_in_workspace(
     )
     result = await session.execute(stmt)
     return result.scalar_one_or_none()
+
+
+async def list_document_tasks(
+    session: AsyncSession, *, document_id: uuid.UUID
+) -> list[ProcessingTask]:
+    stmt = (
+        select(ProcessingTask)
+        .where(ProcessingTask.document_id == document_id)
+        .order_by(ProcessingTask.created_at)
+    )
+    result = await session.execute(stmt)
+    return list(result.scalars().all())
+
+
+async def create_reprocess_task(
+    session: AsyncSession, *, document_id: uuid.UUID
+) -> ProcessingTask:
+    """为文档新建一个 queued 的归类任务，并把文档置回 processing。"""
+    doc = await session.get(Document, document_id)
+    if doc is not None:
+        doc.status = "processing"
+    task = ProcessingTask(id=uuid.uuid4(), document_id=document_id, kind="classify")
+    session.add(task)
+    await session.commit()
+    await session.refresh(task)
+    return task

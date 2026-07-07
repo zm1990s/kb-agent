@@ -43,3 +43,23 @@ class DocumentPublic(BaseModel):
     tags: list[str]
     status: str
     created_at: datetime
+
+
+class ProcessingTaskPublic(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    document_id: uuid.UUID
+    kind: str
+    status: str
+    attempts: int
+    max_attempts: int
+    error: str | None
+    logs: list
+    created_at: datetime
+    updated_at: datetime
+
+
+class ReprocessAccepted(BaseModel):
+    task_id: uuid.UUID
+    status: str
