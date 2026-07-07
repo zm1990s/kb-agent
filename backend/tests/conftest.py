@@ -68,3 +68,32 @@ async def client(db_engine):
     async with AsyncClient(transport=transport, base_url="http://test") as c:
         yield c
     app.dependency_overrides.clear()
+
+
+@pytest_asyncio.fixture
+async def seed_user(db_engine):
+    """直接向 DB 插入指定角色用户，返回 (user_id, auth_headers) 的工厂。
+
+    用于需要 admin / partner 等非 internal 角色的测试（注册端点只产 internal）。
+    """
+    import uuid
+
+    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
+    from app.core.security import create_access_token, hash_password
+    from app.models.auth import User
+
+    maker = async_sessionmaker(bind=db_engine, class_=AsyncSession, expire_on_commit=False)
+
+    async def _make(role: str = "internal", email: str | None = None):
+        uid = uuid.uuid4()
+        email = email or f"{role}-{uid.hex[:8]}@company.com"
+        async with maker() as session:
+            session.add(
+                User(id=uid, email=email, password_hash=hash_password("longenough1"), role=role)
+            )
+            await session.commit()
+        token = create_access_token(user_id=uid, role=role)
+        return uid, {"Authorization": f"Bearer {token}"}
+
+    return _make
