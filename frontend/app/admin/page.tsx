@@ -1,64 +1,24 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import NavBar from "@/components/NavBar";
-import { api, ApiError } from "@/lib/api";
+import SystemSettings from "@/components/admin/SystemSettings";
+import WorkspaceAdmin from "@/components/admin/WorkspaceAdmin";
 import { isAdmin } from "@/lib/auth";
 import { useAuthGuard } from "@/lib/useAuthGuard";
-import type { AllowedDomain, Category, Workspace } from "@/lib/types";
+
+type Tab = "workspace" | "system";
+
+const TABS: { id: Tab; label: string }[] = [
+  { id: "workspace", label: "空间管理" },
+  { id: "system", label: "系统设置" },
+];
 
 export default function AdminPage() {
   const ready = useAuthGuard();
   const router = useRouter();
-  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
-  const [selected, setSelected] = useState<string | null>(null);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [error, setError] = useState<string | null>(null);
-
-  const [domains, setDomains] = useState<AllowedDomain[]>([]);
-
-  // 表单状态
-  const [wsName, setWsName] = useState("");
-  const [catName, setCatName] = useState("");
-  const [memberId, setMemberId] = useState("");
-  const [memberRole, setMemberRole] = useState("viewer");
-  const [domainName, setDomainName] = useState("");
-
-  const loadWorkspaces = useCallback(async () => {
-    const ws = await api.get<Workspace[]>("/workspaces");
-    setWorkspaces(ws);
-    if (ws.length > 0 && !selected) setSelected(ws[0].id);
-  }, [selected]);
-
-  const loadCategories = useCallback(async () => {
-    if (!selected) return;
-    try {
-      const cats = await api.get<Category[]>(`/categories?workspace=${selected}`);
-      setCategories(cats);
-    } catch {
-      setCategories([]);
-    }
-  }, [selected]);
-
-  const loadDomains = useCallback(async () => {
-    try {
-      setDomains(await api.get<AllowedDomain[]>("/auth/allowed-domains"));
-    } catch {
-      setDomains([]);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (ready && isAdmin()) {
-      loadWorkspaces();
-      loadDomains();
-    }
-  }, [ready, loadWorkspaces, loadDomains]);
-
-  useEffect(() => {
-    loadCategories();
-  }, [loadCategories]);
+  const [tab, setTab] = useState<Tab>("workspace");
 
   if (!ready) return null;
   if (!isAdmin()) {
@@ -66,188 +26,29 @@ export default function AdminPage() {
     return null;
   }
 
-  function wrap(fn: () => Promise<void>) {
-    return async (e: React.FormEvent) => {
-      e.preventDefault();
-      setError(null);
-      try {
-        await fn();
-      } catch (err) {
-        setError(err instanceof ApiError ? err.message : "操作失败");
-      }
-    };
-  }
-
-  const createWs = wrap(async () => {
-    await api.post<Workspace>("/workspaces", { name: wsName });
-    setWsName("");
-    await loadWorkspaces();
-  });
-
-  const addMember = wrap(async () => {
-    if (!selected) return;
-    await api.post(`/workspaces/${selected}/members`, {
-      user_id: memberId,
-      role_in_ws: memberRole,
-    });
-    setMemberId("");
-  });
-
-  const createCat = wrap(async () => {
-    if (!selected) return;
-    await api.post(`/categories?workspace_id=${selected}`, { name: catName });
-    setCatName("");
-    await loadCategories();
-  });
-
-  const addDomain = wrap(async () => {
-    await api.post("/auth/allowed-domains", { domain: domainName });
-    setDomainName("");
-    await loadDomains();
-  });
-
-  async function deleteDomain(id: string) {
-    setError(null);
-    try {
-      await api.del(`/auth/allowed-domains/${id}`);
-      await loadDomains();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "删除失败");
-    }
-  }
-
   return (
     <div className="flex min-h-screen flex-col">
       <NavBar />
-      <main className="mx-auto w-full max-w-3xl flex-1 space-y-6 p-4">
-        <h1 className="text-lg font-semibold">空间与成员管理</h1>
+      <main className="mx-auto w-full max-w-3xl flex-1 p-4">
+        <h1 className="mb-4 text-lg font-semibold">管理后台</h1>
 
-        {/* 建空间 */}
-        <section className="rounded border bg-white p-4">
-          <h2 className="mb-3 text-sm font-medium">创建空间</h2>
-          <form onSubmit={createWs} className="flex gap-2">
-            <input
-              value={wsName}
-              onChange={(e) => setWsName(e.target.value)}
-              placeholder="空间名称"
-              required
-              className="flex-1 rounded border px-3 py-2 text-sm"
-            />
-            <button className="rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700">
-              创建
-            </button>
-          </form>
-        </section>
-
-        {/* 选择空间 */}
-        <section className="rounded border bg-white p-4">
-          <h2 className="mb-3 text-sm font-medium">选择空间</h2>
-          <select
-            value={selected ?? ""}
-            onChange={(e) => setSelected(e.target.value)}
-            className="w-full rounded border px-2 py-1.5 text-sm"
-          >
-            {workspaces.map((w) => (
-              <option key={w.id} value={w.id}>
-                {w.name}
-              </option>
-            ))}
-          </select>
-        </section>
-
-        {/* 加成员 */}
-        <section className="rounded border bg-white p-4">
-          <h2 className="mb-3 text-sm font-medium">添加成员（按 user_id）</h2>
-          <form onSubmit={addMember} className="flex gap-2">
-            <input
-              value={memberId}
-              onChange={(e) => setMemberId(e.target.value)}
-              placeholder="用户 UUID"
-              required
-              className="flex-1 rounded border px-3 py-2 text-sm"
-            />
-            <select
-              value={memberRole}
-              onChange={(e) => setMemberRole(e.target.value)}
-              className="rounded border px-2 text-sm"
+        <div className="mb-4 flex gap-1 border-b">
+          {TABS.map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={`px-4 py-2 text-sm ${
+                tab === t.id
+                  ? "border-b-2 border-blue-600 font-medium text-blue-700"
+                  : "text-gray-500 hover:text-gray-800"
+              }`}
             >
-              <option value="viewer">viewer</option>
-              <option value="editor">editor</option>
-              <option value="owner">owner</option>
-            </select>
-            <button className="rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700">
-              添加
+              {t.label}
             </button>
-          </form>
-        </section>
+          ))}
+        </div>
 
-        {/* 分类 */}
-        <section className="rounded border bg-white p-4">
-          <h2 className="mb-3 text-sm font-medium">分类体系</h2>
-          <form onSubmit={createCat} className="mb-3 flex gap-2">
-            <input
-              value={catName}
-              onChange={(e) => setCatName(e.target.value)}
-              placeholder="新分类名称"
-              required
-              className="flex-1 rounded border px-3 py-2 text-sm"
-            />
-            <button className="rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700">
-              新建分类
-            </button>
-          </form>
-          <ul className="space-y-1 text-sm text-gray-700">
-            {categories.map((c) => (
-              <li key={c.id} className="rounded bg-gray-50 px-3 py-1.5">
-                {c.name}
-              </li>
-            ))}
-            {categories.length === 0 && (
-              <li className="text-gray-400">暂无分类</li>
-            )}
-          </ul>
-        </section>
-
-        {/* 注册域名白名单 */}
-        <section className="rounded border bg-white p-4">
-          <h2 className="mb-1 text-sm font-medium">注册域名白名单</h2>
-          <p className="mb-3 text-xs text-gray-400">
-            空 = 全拒绝注册。仅列出的域名邮箱可注册（完整域名相等匹配）。
-          </p>
-          <form onSubmit={addDomain} className="mb-3 flex gap-2">
-            <input
-              value={domainName}
-              onChange={(e) => setDomainName(e.target.value)}
-              placeholder="例如 company.com"
-              required
-              className="flex-1 rounded border px-3 py-2 text-sm"
-            />
-            <button className="rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700">
-              添加域名
-            </button>
-          </form>
-          <ul className="space-y-1 text-sm text-gray-700">
-            {domains.map((d) => (
-              <li
-                key={d.id}
-                className="flex items-center justify-between rounded bg-gray-50 px-3 py-1.5"
-              >
-                <span>{d.domain}</span>
-                <button
-                  onClick={() => deleteDomain(d.id)}
-                  className="text-xs text-red-600 hover:underline"
-                >
-                  删除
-                </button>
-              </li>
-            ))}
-            {domains.length === 0 && (
-              <li className="text-gray-400">暂无域名（当前无人可注册）</li>
-            )}
-          </ul>
-        </section>
-
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {tab === "workspace" ? <WorkspaceAdmin /> : <SystemSettings />}
       </main>
     </div>
   );

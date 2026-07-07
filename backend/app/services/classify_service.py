@@ -79,8 +79,10 @@ async def run_classification(session: AsyncSession, task_id: uuid.UUID) -> None:
             categories=", ".join(cat_names) if cat_names else "（无预定义分类）"
         )
 
-        # 经 engine 让 CLI 读原文（唯一 LLM 出口）
-        engine = get_engine()
+        # 经 engine 让 CLI 读原文（唯一 LLM 出口）；引擎后端取管理员在应用内的选择
+        from app.services.settings_service import get_engine_backend
+
+        engine = get_engine(await get_engine_backend(session))
         from app.storage.base import get_storage
 
         path = await get_storage().open_path(doc.storage_key)

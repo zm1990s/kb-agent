@@ -53,7 +53,7 @@ async def test_answer_with_hit_returns_answer_and_sources(db_session, monkeypatc
     doc = await _ready_doc(db_session, ws.id, title="防火墙指南", content="firewall policy")
 
     fake = _FakeEngine("根据文档，防火墙策略如下……")
-    monkeypatch.setattr(answer_service, "get_engine", lambda: fake)
+    monkeypatch.setattr(answer_service, "get_engine", lambda *a, **k: fake)
 
     res = await answer_question(db_session, workspace_id=ws.id, question="firewall")
     assert fake.called
@@ -70,7 +70,7 @@ async def test_answer_no_hit_does_not_call_engine(db_session, monkeypatch):
     await db_session.commit()
 
     fake = _FakeEngine("不应被调用")
-    monkeypatch.setattr(answer_service, "get_engine", lambda: fake)
+    monkeypatch.setattr(answer_service, "get_engine", lambda *a, **k: fake)
 
     res = await answer_question(db_session, workspace_id=ws.id, question="nonexistent")
     # 无命中：不编造、不调用引擎

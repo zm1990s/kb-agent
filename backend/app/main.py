@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from app.api import auth, categories, chat, documents, workspaces
+from app.api import auth, categories, chat, documents, settings, workspaces
 from app.core.db import SessionLocal
 from app.services.user_service import seed_admin
 
@@ -27,6 +27,7 @@ app.include_router(workspaces.router)
 app.include_router(categories.router)
 app.include_router(documents.router)
 app.include_router(chat.router)
+app.include_router(settings.router)
 
 
 @app.get("/health")

@@ -67,7 +67,9 @@ async def answer_question(
         context_parts.append(f"[文档{i}] 标题：{doc.title}\n{body}")
     context = "\n\n".join(context_parts)
 
-    engine = get_engine()
+    from app.services.settings_service import get_engine_backend
+
+    engine = get_engine(await get_engine_backend(session))
     result = await engine.complete(
         _ANSWER_PROMPT.format(question=question, context=context)
     )

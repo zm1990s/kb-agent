@@ -55,7 +55,8 @@ class EngineProtocol(Protocol):
 - **单端口**：用户只与 Next.js 交互；所有后端调用走相对路径 `/api/*`，由 rewrites 反代到 FastAPI。规避 CORS，收敛公网暴露面（SECURITY #8）。
 - **鉴权**：登录拿 JWT，前端 `lib/auth` 存取；`lib/api` 统一在请求头注入 `Authorization: Bearer`。路由守卫拦截未登录访问。
 - **角色显隐**：上传/建空间/建分类/reprocess 等管理功能仅对 admin 显示（仅体验层；后端仍是强制防线）。
-- **页面**：①登录/注册 ②对话查询（答案 + 每条来源的原文下载链接）③文档管理（上传、归类状态、列表、下载）④空间与成员管理。
+- **页面**：①登录/注册 ②对话查询（答案 + 每条来源的原文下载链接）③文档管理（上传、归类状态、列表、下载）④管理后台（分两个 Tab：**空间管理**=建空间/成员/分类；**系统设置**=注册域名白名单 + 引擎选择）。
+- **引擎选择**：管理员在系统设置切换 Agent 引擎，选择持久化于 `app_settings`（键 `engine_backend`），归类/问答运行时按此解析。Claude CLI 可用；Codex / OpenClaw 前端灰显、后端拒绝（`available=false`），为未来预留。
 - **XSS**：LLM 产物（summary/answer）渲染必须净化（SECURITY #6）。
 
 ## 存储抽象层（MVP 本地，未来云）

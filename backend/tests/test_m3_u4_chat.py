@@ -64,7 +64,7 @@ async def test_chat_with_hit_returns_answer_and_sources(
     _, admin = await seed_user("admin")
     ws_id = await _ws(client, admin)
     await _make_ready_doc(db_session, ws_id, title="防火墙", content="firewall policy")
-    monkeypatch.setattr(answer_service, "get_engine", lambda: _FakeEngine())
+    monkeypatch.setattr(answer_service, "get_engine", lambda *a, **k: _FakeEngine())
 
     resp = await client.post(
         "/chat", json={"workspace_id": ws_id, "message": "firewall"}, headers=admin

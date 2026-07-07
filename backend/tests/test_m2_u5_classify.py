@@ -56,7 +56,7 @@ async def test_classification_success(db_session, monkeypatch):
         '{"category": "产品文档", "summary": "一份产品规格", '
         '"tags": ["产品", "规格"], "content_text": "全文内容"}'
     )
-    monkeypatch.setattr(classify_service, "get_engine", lambda: fake)
+    monkeypatch.setattr(classify_service, "get_engine", lambda *a, **k: fake)
 
     await classify_service.run_classification(db_session, task.id)
 
@@ -77,7 +77,7 @@ async def test_classification_unknown_category_sets_null(db_session, monkeypatch
         '{"category": "不存在的类", "summary": "s", "tags": ["a"], '
         '"content_text": "t"}'
     )
-    monkeypatch.setattr(classify_service, "get_engine", lambda: fake)
+    monkeypatch.setattr(classify_service, "get_engine", lambda *a, **k: fake)
 
     await classify_service.run_classification(db_session, task.id)
     await db_session.refresh(doc)
@@ -88,7 +88,7 @@ async def test_classification_unknown_category_sets_null(db_session, monkeypatch
 async def test_classification_bad_json_fails_and_records_error(db_session, monkeypatch):
     ws, doc, task = await _seed_doc(db_session)
     monkeypatch.setattr(
-        classify_service, "get_engine", lambda: _FakeEngine("not json at all")
+        classify_service, "get_engine", lambda *a, **k: _FakeEngine("not json at all")
     )
 
     await classify_service.run_classification(db_session, task.id)
@@ -102,7 +102,7 @@ async def test_classification_bad_json_fails_and_records_error(db_session, monke
 
 async def test_classification_engine_failure_is_retriable(db_session, monkeypatch):
     ws, doc, task = await _seed_doc(db_session)
-    monkeypatch.setattr(classify_service, "get_engine", lambda: _BoomEngine())
+    monkeypatch.setattr(classify_service, "get_engine", lambda *a, **k: _BoomEngine())
 
     # 第一次失败
     await classify_service.run_classification(db_session, task.id)
@@ -114,7 +114,7 @@ async def test_classification_engine_failure_is_retriable(db_session, monkeypatc
     fake = _FakeEngine(
         '{"category": null, "summary": "s", "tags": ["a"], "content_text": "t"}'
     )
-    monkeypatch.setattr(classify_service, "get_engine", lambda: fake)
+    monkeypatch.setattr(classify_service, "get_engine", lambda *a, **k: fake)
     await classify_service.run_classification(db_session, task.id)
     await db_session.refresh(doc)
     await db_session.refresh(task)
