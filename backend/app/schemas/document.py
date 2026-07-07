@@ -4,6 +4,7 @@
 """
 
 import uuid
+from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -20,3 +21,25 @@ class CategoryPublic(BaseModel):
     workspace_id: uuid.UUID
     name: str
     parent_id: uuid.UUID | None
+
+
+class DocumentUploadAccepted(BaseModel):
+    """上传受理响应（202）。"""
+
+    id: uuid.UUID
+    status: str
+    task_id: uuid.UUID
+
+
+class DocumentPublic(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    workspace_id: uuid.UUID
+    title: str
+    mime_type: str
+    category_id: uuid.UUID | None
+    summary: str | None
+    tags: list[str]
+    status: str
+    created_at: datetime
