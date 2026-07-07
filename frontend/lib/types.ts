@@ -69,3 +69,22 @@ export interface ChatResponse {
   sources: SourceRef[];
   conversation_id: string;
 }
+
+export interface ConversationSummary {
+  id: string;
+  workspace_id: string;
+  created_at: string;
+}
+
+export interface Message {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  sources: SourceRef[];
+  created_at: string;
+}
+
+export interface ConversationHistory {
+  conversation_id: string;
+  messages: Message[];
+}

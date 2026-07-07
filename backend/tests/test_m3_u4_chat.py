@@ -86,7 +86,9 @@ async def test_chat_non_member_403(client, seed_user):
     assert resp.status_code == 403
 
 
-async def test_chat_persists_messages(client, seed_user):
+async def test_chat_persists_messages(client, seed_user, monkeypatch):
+    # 第二轮有历史 → 无命中也会调引擎，用 stub 避免真实 CLI
+    monkeypatch.setattr(answer_service, "get_engine", lambda *a, **k: _FakeEngine())
     _, admin = await seed_user("admin")
     ws_id = await _ws(client, admin)
     first = await client.post(

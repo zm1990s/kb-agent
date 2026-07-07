@@ -74,6 +74,24 @@ async def test_history_is_passed_to_engine(client, seed_user, db_session, monkey
     assert "firewall" in cap.last_prompt
 
 
+async def test_no_hit_with_history_still_answers(db_session, monkeypatch):
+    """无命中但有历史（追问/元问题）：仍调 engine 依历史作答，不 dead-end。"""
+    from app.services.answer_service import answer_question
+
+    cap = _CapturingEngine()
+    monkeypatch.setattr(answer_service, "get_engine", lambda *a, **k: cap)
+
+    res = await answer_question(
+        db_session,
+        workspace_id=uuid.uuid4(),
+        question="我刚才问了什么？",
+        history=[("user", "介绍防火墙"), ("assistant", "防火墙是…")],
+    )
+    assert cap.last_prompt is not None  # 引擎被调用了
+    assert res.answer == "答案"
+    assert res.sources == []  # 无命中 → 无来源
+
+
 async def test_create_and_list_conversations(client, seed_user):
     _, admin = await seed_user("admin")
     ws_id = await _ws(client, admin)

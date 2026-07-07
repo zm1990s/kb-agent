@@ -4,7 +4,21 @@ import uuid
 
 import pytest
 
+from app.engine.base import EngineResult
+from app.services import answer_service
+
 pytestmark = pytest.mark.asyncio
+
+
+class _StubEngine:
+    async def complete(self, prompt, *, files=None, system=None):
+        return EngineResult(text="stub 答案")
+
+
+@pytest.fixture(autouse=True)
+def _stub_engine(monkeypatch):
+    # 无命中但有历史的轮次会调用引擎；用 stub 避免真实 CLI。
+    monkeypatch.setattr(answer_service, "get_engine", lambda *a, **k: _StubEngine())
 
 
 async def _ws(client, headers, name="ws"):

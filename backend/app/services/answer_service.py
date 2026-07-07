@@ -70,7 +70,10 @@ async def answer_question(
     hits = await search_documents(
         session, workspace_id=workspace_id, query=question, category_id=category_id
     )
-    if not hits:
+    # 无命中且无历史：直接返回“未找到”，不编造（原文优先，降低幻觉）。
+    # 无命中但有历史：可能是追问/元问题（如“刚才我问了什么”），仍交 engine
+    # 依据对话历史作答，但不提供文档来源。
+    if not hits and not history:
         return AnswerResult(answer=NO_MATCH_ANSWER, sources=[])
 
     # 拼接命中文档原文作为上下文（原文优先，降低幻觉）
@@ -78,7 +81,7 @@ async def answer_question(
     for i, doc in enumerate(hits, start=1):
         body = doc.content_text or doc.summary or ""
         context_parts.append(f"[文档{i}] 标题：{doc.title}\n{body}")
-    context = "\n\n".join(context_parts)
+    context = "\n\n".join(context_parts) if hits else "（本次未检索到相关文档）"
 
     from app.services.settings_service import get_engine_backend
 
