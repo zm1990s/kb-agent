@@ -41,3 +41,17 @@ async def get_current_user(
     if user is None:
         raise _UNAUTHENTICATED
     return user
+
+
+# require_auth 是 get_current_user 的语义别名（任何已认证用户）。
+require_auth = get_current_user
+
+
+async def require_admin(current_user: User = Depends(get_current_user)) -> User:
+    """要求全局管理员角色；非管理员返 403。"""
+    if current_user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="需要管理员权限",
+        )
+    return current_user
