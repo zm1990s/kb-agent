@@ -43,11 +43,14 @@ class ClaudeCliEngine:
         argv: list[str] = [self._cli_path, "-p", full_prompt]
         if self._model:
             argv += ["--model", self._model]
-        # 授权每个文件所在目录，并仅放行 Read 工具（精确授权，无需跳过全部权限）
+        # 授权每个文件所在目录，供工具访问
         for f in files:
             argv += ["--add-dir", str(f.parent)]
         if files:
-            argv += ["--allowedTools", "Read"]
+            # 放开全部工具（含 Bash，用于 pdftotext 等抽取大文件）。
+            # 按项目决策：工具不做限制、假设平台可信（见 SECURITY.md #2）。
+            # 注意：该 flag 拒绝 root 运行，容器以非 root 用户启动。
+            argv += ["--dangerously-skip-permissions"]
         return argv
 
     async def complete(

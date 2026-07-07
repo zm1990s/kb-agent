@@ -29,9 +29,8 @@ def test_argv_with_file_embeds_path_and_adds_dir():
     assert str(f) in prompt
     assert "总结这份文档" in prompt
 
-    # 授权目录 + 仅放行 Read 工具，且绝不使用 --file
+    # 授权目录 + 放开全部工具（跳过权限），且绝不使用 --file
     assert "--add-dir" in argv
     assert str(f.parent) in argv
-    assert "--allowedTools" in argv
-    assert "Read" in argv
+    assert "--dangerously-skip-permissions" in argv
     assert "--file" not in argv
