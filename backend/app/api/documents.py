@@ -10,6 +10,7 @@ from fastapi import (
     UploadFile,
     status,
 )
+from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_session
@@ -17,6 +18,7 @@ from app.core.deps import get_current_user
 from app.models.auth import User
 from app.models.document import Document
 from app.schemas.document import (
+    DocumentPublic,
     DocumentUploadAccepted,
     ProcessingTaskPublic,
     ReprocessAccepted,
@@ -24,9 +26,11 @@ from app.schemas.document import (
 from app.services.document_service import (
     create_reprocess_task,
     list_document_tasks,
+    list_documents,
     upload_document,
 )
 from app.services.workspace_service import is_member
+from app.storage.base import get_storage
 from app.tasks.worker import enqueue_classification
 
 router = APIRouter(tags=["documents"])
@@ -77,6 +81,59 @@ async def upload(
     # 触发后台归类 worker（进程内 asyncio，见 tasks/worker.py）
     enqueue_classification(task.id)
     return DocumentUploadAccepted(id=doc.id, status=doc.status, task_id=task.id)
+
+
+@router.get(
+    "/workspaces/{workspace_id}/documents", response_model=list[DocumentPublic]
+)
+async def list_ws_documents(
+    workspace_id: uuid.UUID,
+    category: uuid.UUID | None = None,
+    tag: str | None = None,
+    page: int = 1,
+    size: int = 50,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> list[DocumentPublic]:
+    await _ensure_member(session, workspace_id, current_user)
+    docs = await list_documents(
+        session,
+        workspace_id=workspace_id,
+        category_id=category,
+        tag=tag,
+        limit=size,
+        offset=(max(page, 1) - 1) * size,
+    )
+    return [DocumentPublic.model_validate(d) for d in docs]
+
+
+@router.get("/documents/{document_id}", response_model=DocumentPublic)
+async def get_document_detail(
+    document_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> DocumentPublic:
+    doc = await _get_doc_for_member(session, document_id, current_user)
+    return DocumentPublic.model_validate(doc)
+
+
+@router.get("/documents/{document_id}/download")
+async def download_document(
+    document_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> Response:
+    """下载原文。JWT + 空间成员校验（Q7）；强制 attachment + nosniff（SECURITY #5）。"""
+    doc = await _get_doc_for_member(session, document_id, current_user)
+    data = await get_storage().read_bytes(doc.storage_key)
+    return Response(
+        content=data,
+        media_type=doc.mime_type,
+        headers={
+            "Content-Disposition": f'attachment; filename="{doc.title}"',
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
 
 
 @router.get("/documents/{document_id}/tasks", response_model=list[ProcessingTaskPublic])

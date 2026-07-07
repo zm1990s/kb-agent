@@ -72,6 +72,27 @@ async def list_document_tasks(
     return list(result.scalars().all())
 
 
+async def list_documents(
+    session: AsyncSession,
+    *,
+    workspace_id: uuid.UUID,
+    category_id: uuid.UUID | None = None,
+    tag: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> list[Document]:
+    """列出空间内文档，可按分类/标签过滤。强制 workspace 过滤（SECURITY #4）。"""
+    stmt = select(Document).where(Document.workspace_id == workspace_id)
+    if category_id is not None:
+        stmt = stmt.where(Document.category_id == category_id)
+    if tag is not None:
+        # ARRAY 包含：tags @> ARRAY[tag]
+        stmt = stmt.where(Document.tags.contains([tag]))
+    stmt = stmt.order_by(Document.created_at.desc()).limit(limit).offset(offset)
+    result = await session.execute(stmt)
+    return list(result.scalars().all())
+
+
 async def create_reprocess_task(
     session: AsyncSession, *, document_id: uuid.UUID
 ) -> ProcessingTask:
