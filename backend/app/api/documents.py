@@ -18,6 +18,7 @@ from app.models.auth import User
 from app.schemas.document import DocumentUploadAccepted
 from app.services.document_service import upload_document
 from app.services.workspace_service import is_member
+from app.tasks.worker import enqueue_classification
 
 router = APIRouter(tags=["documents"])
 
@@ -52,5 +53,6 @@ async def upload(
         data=data,
         uploaded_by=current_user.id,
     )
-    # M2-U5 将在此处触发后台归类 worker（进程内 asyncio）。
+    # 触发后台归类 worker（进程内 asyncio，见 tasks/worker.py）
+    enqueue_classification(task.id)
     return DocumentUploadAccepted(id=doc.id, status=doc.status, task_id=task.id)
