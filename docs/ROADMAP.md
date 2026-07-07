@@ -7,6 +7,7 @@
 | M1 | 认证与空间 | 登录/JWT、workspace、成员、鉴权中间件 | P0 | M0 |
 | M2 | 文档入库与归类 | 上传、本地存储、后台归类(CLI读原文)、任务可观测、分类体系 | P0 | M0,M1 |
 | M3 | 对话式检索取件 | 全文检索、engine 生成答案+原文链接、会话 | P0 | M1,M2 |
+| MF | 前端（单端口入口） | Next.js+Tailwind、登录/对话/文档/空间页 | P0 | M1,M2,M3 |
 | M4 | Skill 插拔框架 | SkillBase 抽象、registry、invoke、审批契约 | P1（预留） | M1 |
 | M5 | SCM 示范 skill | PANW 配置生成，pending_approval→approve→下发 | P1（预留） | M4 |
 
@@ -89,6 +90,25 @@
 
 ---
 
+## 模块 MF · 前端（单端口入口）
+
+**目标**：Next.js（App Router）+ TS + Tailwind 前端，作为用户唯一入口，反代后端 API。
+
+**产出契约**：frontend/ 项目；rewrites `/api/*`→后端；四个页面；lib/api（统一注入 token）+ lib/auth（token 存取 + 路由守卫）；docker-compose 增加 frontend 服务。
+
+| Unit ID | 名称 | 内容 | 预估改动 | 验收 |
+|---------|------|------|---------|------|
+| MF-U1 | 脚手架 + 单端口 | Next.js+TS+Tailwind 初始化；next.config rewrites `/api/*`→backend；compose 加 frontend | ~120 行 | 前端起在单端口；/api/health 经反代返 200 |
+| MF-U2 | api client + auth | lib/api（fetch 封装，注入 Bearer，401 处理）+ lib/auth（token 存取、路由守卫） | ~120 行 | 未登录跳登录；请求自动带 token |
+| MF-U3 | 登录/注册页 | 表单、错误提示、成功后跳转 | ~150 行 | 登录成功进主界面；注册域名外报错 |
+| MF-U4 | 对话查询页 | 聊天 UI；答案 + 来源原文链接；无命中提示；LLM 产物净化渲染 | ~200 行 | 提问得答案+可下载来源；Markdown 已 sanitize |
+| MF-U5 | 文档管理页 | 上传、列表、归类状态轮询、下载（admin） | ~200 行 | 上传→processing→ready；可下载 |
+| MF-U6 | 空间/成员/分类管理页 | 建空间、加成员、维护分类；管理功能按角色显隐 | ~200 行 | admin 可操作；非 admin 隐藏入口 |
+
+**MF DoD**：用户仅访问一个端口即可完成 登录→(管理员)建空间/上传→归类完成→对话查询取原文 全流程；前端无硬编码后端地址；LLM 产物渲染已净化（无 XSS）；非 admin 看不到管理入口。
+
+---
+
 ## 模块 M4 · Skill 插拔框架（预留，P1）
 
 **目标**：定义 skill 抽象与注册/调用/审批契约，不实现具体 skill。
@@ -118,7 +138,8 @@
 
 - **Phase 1**：M0 全部 → M1 全部
 - **Phase 2**：M2 全部
-- **Phase 3**：M3 全部（MVP 到此可用）
-- **Phase 4（未来）**：M4 → M5
+- **Phase 3**：M3 全部（后端 MVP 到此可用）
+- **Phase 4**：MF 前端全部（用户可用的完整 MVP）
+- **Phase 5（未来）**：M4 → M5
 
 每完成一个 Unit，建议 `git tag M<N>-U<N>-done`，方便回退。

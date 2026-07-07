@@ -14,7 +14,7 @@
 - Agent 引擎: **封装 Claude CLI 子进程**，通过 `EngineProtocol` 抽象层调用；预留 OpenClaw / Codex 等未来后端
 - 认证: **自建用户表 + 邮箱密码**，注册时按 **域名后缀白名单** 控制准入
 - 异步处理: 归类走 **后台任务**（含处理任务表 + 详细日志 + 失败可重试）
-- 前端: MVP 阶段无独立前端（先 API + 最小静态页 / Swagger 验收），后续再定
+- 前端: **Next.js（App Router）+ TypeScript + Tailwind**。**只对用户暴露一个端口**——Next.js 作统一入口，经 rewrites 把 `/api/*` 反代到后端 FastAPI，用户不直接访问后端端口
 - 部署: **云上部署**（本地开发用 Docker Compose；对象存储 MVP 暂用本地路径）
 
 ## 目录约定
@@ -31,6 +31,11 @@ backend/
     storage/      # StorageProtocol + LocalStorage（MVP 本地路径），未来加 S3/OSS 实现
     tasks/        # 后台任务：归类 worker、任务状态与重试
   tests/
+frontend/         # Next.js（App Router）+ TS + Tailwind，用户唯一入口
+  app/            # 路由页面：登录/对话/文档/空间
+  lib/            # api client（统一走 /api）、auth（token 存取、路由守卫）
+  components/     # 复用 UI 组件
+  next.config.js  # rewrites: /api/* -> 后端 FastAPI（单端口暴露）
 infra/
   postgres/init.sql   # 严格按 DESIGN.md 建表
 docs/                 # PRD / DESIGN / ROADMAP / WORKFLOW
@@ -45,6 +50,12 @@ prompts/              # 分步系统提示词
 - 禁止在业务层直接拼本地文件路径读写 —— 文件存取只走 `app/storage/`（StorageProtocol）
 - 禁止跳过域名白名单校验创建用户 —— 注册必须过白名单
 - 禁止让归类失败静默 —— 处理任务必须落错误日志且可重试
+
+### 前端（frontend/）
+- 禁止在前端硬编码后端地址 —— 一律走相对路径 `/api/*`，由 Next.js rewrites 反代（单端口）
+- 禁止用 `dangerouslySetInnerHTML` 渲染未净化内容 —— LLM 产物（summary/answer）含攻击者可控文本，Markdown 渲染必须 sanitize（如 DOMPurify）（SECURITY #6 存储型 XSS）
+- 禁止把 JWT 明文散落多处 —— 统一经 `lib/auth` 存取；请求统一经 `lib/api` 注入 Authorization
+- 禁止在前端做权限判定作为唯一防线 —— 后端已强制鉴权，前端仅做显隐/体验
 - 禁止修改已建好的数据库表结构（只做 additive 增量迁移）
 - 禁止跨 workspace 读取文档 —— 所有文档查询必须带 workspace 权限过滤
 

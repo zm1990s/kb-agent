@@ -40,6 +40,24 @@ class EngineProtocol(Protocol):
 ```
 约束：所有对 LLM 的调用都经 `EngineProtocol`，业务层不得感知底层是 CLI 还是 SDK。
 
+## 前端架构（单端口入口）
+
+```
+       用户浏览器
+          │  仅访问一个端口（Next.js，如 :3000 / 生产 :80）
+          ▼
+   Next.js (frontend/)  ── App Router 页面 + lib/api + lib/auth
+          │  next.config.js rewrites: /api/:path*  ->  http://backend:8000/:path*
+          ▼
+   FastAPI (backend)   ── 不对用户直接暴露端口（仅内网/compose 网络可达）
+```
+
+- **单端口**：用户只与 Next.js 交互；所有后端调用走相对路径 `/api/*`，由 rewrites 反代到 FastAPI。规避 CORS，收敛公网暴露面（SECURITY #8）。
+- **鉴权**：登录拿 JWT，前端 `lib/auth` 存取；`lib/api` 统一在请求头注入 `Authorization: Bearer`。路由守卫拦截未登录访问。
+- **角色显隐**：上传/建空间/建分类/reprocess 等管理功能仅对 admin 显示（仅体验层；后端仍是强制防线）。
+- **页面**：①登录/注册 ②对话查询（答案 + 每条来源的原文下载链接）③文档管理（上传、归类状态、列表、下载）④空间与成员管理。
+- **XSS**：LLM 产物（summary/answer）渲染必须净化（SECURITY #6）。
+
 ## 存储抽象层（MVP 本地，未来云）
 
 ```python
