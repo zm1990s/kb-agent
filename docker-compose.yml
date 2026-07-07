@@ -25,6 +25,18 @@ services:
       # 本地开发请先 `cp .env.example .env` 并填值；缺失时不阻断工具链。
       - path: .env
         required: false
+    # Claude CLI 认证凭据：从 .env 透传（支持 API key / 网关 / Bedrock 等不同方式）。
+    # 未设置的变量不会注入，按实际认证方式在 .env 里填对应项即可。
+    environment:
+      - ANTHROPIC_API_KEY
+      - ANTHROPIC_AUTH_TOKEN
+      - ANTHROPIC_BASE_URL
+      - ANTHROPIC_MODEL
+      - CLAUDE_CODE_USE_BEDROCK
+      - AWS_ACCESS_KEY_ID
+      - AWS_SECRET_ACCESS_KEY
+      - AWS_SESSION_TOKEN
+      - AWS_REGION
     # 单端口暴露：后端不再对宿主暴露端口，仅 compose 网络内可达（由 frontend 反代）。
     expose:
       - "8000"

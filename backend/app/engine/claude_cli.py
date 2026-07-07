@@ -26,13 +26,28 @@ class ClaudeCliEngine:
         self._timeout = settings.engine_timeout_sec
 
     def _build_argv(self, prompt: str, files: list[Path] | None) -> list[str]:
-        """构造 argv 列表；参数以独立元素传入，避免 shell 解析。"""
-        argv: list[str] = [self._cli_path, "-p", prompt]
+        """构造 argv 列表；参数以独立元素传入，避免 shell 解析。
+
+        文件通过“把路径写进 prompt + --add-dir 授权目录”让 CLI 用 Read 工具读原文
+        （CLI 的 --file 是 file_id:path 远程资源语义，不适用于本地路径）。
+        headless 下用 --permission-mode 跳过交互授权（平台可信，见 SECURITY #2）。
+        """
+        files = files or []
+        full_prompt = prompt
+        if files:
+            listing = "\n".join(f"- {f}" for f in files)
+            full_prompt = (
+                f"{prompt}\n\n请阅读以下本地文件后作答：\n{listing}"
+            )
+
+        argv: list[str] = [self._cli_path, "-p", full_prompt]
         if self._model:
             argv += ["--model", self._model]
-        # 附加文件路径作为独立参数（不拼接进命令字符串）
-        for f in files or []:
-            argv += ["--file", str(f)]
+        # 授权每个文件所在目录，并仅放行 Read 工具（精确授权，无需跳过全部权限）
+        for f in files:
+            argv += ["--add-dir", str(f.parent)]
+        if files:
+            argv += ["--allowedTools", "Read"]
         return argv
 
     async def complete(
