@@ -1,0 +1,23 @@
+# 环境与密钥
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# 本地存储的原始文件（不入库）
+storage/
+local_storage/
+
+# 编辑器 / 系统
+.DS_Store
+.idea/
+.vscode/
