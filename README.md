@@ -14,13 +14,29 @@
 
 ## 快速启动
 
-> 骨架尚未生成（当前处于 step-0 契约初始化阶段）。以下为规划中的启动方式。
+前置：本机已安装 Docker。
 
 ```bash
-cp .env.example .env      # 填入配置
-make dev                  # 启动本地依赖 + 后端
-make test                 # 运行测试
+# 运行测试（自带测试环境变量，无需 .env）
+./scripts/test.sh                     # 全部
+./scripts/test.sh tests/test_m3_u4_chat.py   # 指定文件
+./scripts/test.sh -k chat             # 传任意 pytest 参数
+
+# lint + 类型检查
+./scripts/lint.sh
+
+# 启动本地开发环境（首次自动生成 .env，起 postgres+backend，应用迁移）
+./scripts/dev.sh
+# 之后：
+curl http://localhost:8000/health     # {"status":"ok"}
+open http://localhost:8000/docs        # Swagger UI
+docker compose logs -f backend         # 看日志
+docker compose down                    # 停止
 ```
+
+> **注意**：`.env` 存密钥，不入 git（已 gitignore）。`dev.sh` 首次会生成一份本地默认值，
+> 请务必修改 `JWT_SECRET`，并把 `CLAUDE_CLI_PATH` 指向可用的 `claude` CLI（归类/问答需要）。
+> 端到端跑通归类与问答，需容器内能访问 `claude` CLI 且已配置凭据。
 
 ## 目录说明
 
