@@ -32,12 +32,14 @@ target-version = "py311"
 select = ["E", "F", "I", "UP", "B", "S"]
 # S101: assert 用于测试；测试目录单独放宽
 [tool.ruff.lint.per-file-ignores]
-# 测试中：S101 assert、S105/S106 测试用假密码
-"backend/tests/*" = ["S101", "S105", "S106"]
-"tests/*" = ["S101", "S105", "S106"]
+# 测试中：S101 assert、S105/S106/S107 测试用假密码
+"backend/tests/*" = ["S101", "S105", "S106", "S107"]
+"tests/*" = ["S101", "S105", "S106", "S107"]
 # FastAPI 的 Depends() 默认参数是官方惯用法，B008 在此为误报
 "backend/app/api/*" = ["B008"]
 "app/api/*" = ["B008"]
+"backend/app/core/deps.py" = ["B008"]
+"app/core/deps.py" = ["B008"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
