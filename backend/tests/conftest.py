@@ -26,6 +26,7 @@ async def db_engine():
     from app.models import auth as _auth  # noqa: F401  # 注册模型到 metadata
     from app.models import chat as _chat  # noqa: F401  # 注册模型到 metadata
     from app.models import document as _document  # noqa: F401  # 注册模型到 metadata
+    from app.models import rbac as _rbac  # noqa: F401  # 注册模型到 metadata
     from app.models import settings as _settings  # noqa: F401  # 注册模型到 metadata
 
     engine = create_async_engine(os.environ["DATABASE_URL"])

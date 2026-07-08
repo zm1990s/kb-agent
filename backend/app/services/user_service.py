@@ -126,6 +126,8 @@ async def authenticate(
     user = await get_user_by_email(session, email)
     if user is None:
         return None
+    if not user.is_active:
+        return None  # 已禁用用户不能登录
     if not verify_password(password, user.password_hash):
         return None
     return user
@@ -156,4 +158,9 @@ async def register_user(
     session.add(user)
     await session.commit()
     await session.refresh(user)
+
+    # 注册时按规则自动入组
+    from app.services.rbac_service import sync_user_groups
+
+    await sync_user_groups(session, user=user)
     return user

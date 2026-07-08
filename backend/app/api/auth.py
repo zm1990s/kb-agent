@@ -79,6 +79,17 @@ async def me(current_user: User = Depends(get_current_user)) -> UserPublic:
     return UserPublic.model_validate(current_user)
 
 
+@router.get("/my-permissions")
+async def my_permissions(
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, str]:
+    """当前用户对各模块的有效权限（admin 全 write；否则取所属组权限并集最高）。"""
+    from app.services.rbac_service import effective_permissions
+
+    return await effective_permissions(session, user=current_user)
+
+
 @router.post("/change-password", status_code=status.HTTP_204_NO_CONTENT)
 async def change_own_password(
     body: ChangePasswordRequest,

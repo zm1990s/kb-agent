@@ -3,6 +3,7 @@
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_session
@@ -20,7 +21,10 @@ from app.services.workspace_service import (
     WorkspaceNotFoundError,
     add_member,
     create_workspace,
+    grant_group,
+    list_group_grants,
     list_my_workspaces,
+    revoke_group,
 )
 
 router = APIRouter(prefix="/workspaces", tags=["workspaces"])
@@ -77,3 +81,62 @@ async def add_workspace_member(
     except AlreadyMemberError as exc:
         raise HTTPException(status.HTTP_409_CONFLICT, "用户已是该空间成员") from exc
     return {"status": "ok"}
+
+
+# ── F7 空间按组授权 ────────────────────────────────────
+
+class GroupGrantRequest(BaseModel):
+    group_id: uuid.UUID
+    role_in_ws: str
+
+
+class GroupGrantPublic(BaseModel):
+    workspace_id: uuid.UUID
+    group_id: uuid.UUID
+    role_in_ws: str
+
+    model_config = {"from_attributes": True}
+
+
+@router.get("/{workspace_id}/group-grants", response_model=list[GroupGrantPublic])
+async def list_ws_group_grants(
+    workspace_id: uuid.UUID,
+    admin: User = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+) -> list[GroupGrantPublic]:
+    grants = await list_group_grants(session, workspace_id=workspace_id)
+    return [GroupGrantPublic.model_validate(g) for g in grants]
+
+
+@router.post("/{workspace_id}/group-grants", status_code=status.HTTP_201_CREATED)
+async def grant_ws_to_group(
+    workspace_id: uuid.UUID,
+    body: GroupGrantRequest,
+    admin: User = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, str]:
+    if body.role_in_ws not in ("owner", "editor", "viewer"):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "非法角色")
+    await grant_group(
+        session,
+        workspace_id=workspace_id,
+        group_id=body.group_id,
+        role_in_ws=body.role_in_ws,
+    )
+    return {"status": "ok"}
+
+
+@router.delete(
+    "/{workspace_id}/group-grants/{group_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def revoke_ws_from_group(
+    workspace_id: uuid.UUID,
+    group_id: uuid.UUID,
+    admin: User = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+) -> None:
+    if not await revoke_group(
+        session, workspace_id=workspace_id, group_id=group_id
+    ):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "授权不存在")

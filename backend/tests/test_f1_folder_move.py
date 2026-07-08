@@ -1,6 +1,5 @@
 """F1：目录移动（改层级）+ 防环。"""
 
-import uuid
 
 import pytest
 

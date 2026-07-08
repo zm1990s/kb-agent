@@ -73,20 +73,97 @@ async def add_member(
 async def list_my_workspaces(
     session: AsyncSession, *, user: User
 ) -> list[tuple[Workspace, str]]:
-    """列出当前用户是成员的空间，附带其在空间内的角色。"""
-    stmt = (
+    """列出当前用户可见的空间（个人成员 ∪ 所属组被授权），附带空间内角色。"""
+    from app.models.rbac import GroupMember, WorkspaceGroupGrant
+
+    seen: dict[uuid.UUID, tuple[Workspace, str]] = {}
+
+    # 个人成员
+    direct = await session.execute(
         select(Workspace, WorkspaceMember.role_in_ws)
         .join(WorkspaceMember, WorkspaceMember.workspace_id == Workspace.id)
         .where(WorkspaceMember.user_id == user.id)
-        .order_by(Workspace.created_at)
     )
-    result = await session.execute(stmt)
-    return [(ws, role) for ws, role in result.all()]
+    for ws, role in direct.all():
+        seen[ws.id] = (ws, role)
+
+    # 组授权（个人成员已存在则不覆盖）
+    via_group = await session.execute(
+        select(Workspace, WorkspaceGroupGrant.role_in_ws)
+        .join(WorkspaceGroupGrant, WorkspaceGroupGrant.workspace_id == Workspace.id)
+        .join(GroupMember, GroupMember.group_id == WorkspaceGroupGrant.group_id)
+        .where(GroupMember.user_id == user.id)
+    )
+    for ws, role in via_group.all():
+        seen.setdefault(ws.id, (ws, role))
+
+    return list(seen.values())
+
+
+async def grant_group(
+    session: AsyncSession,
+    *,
+    workspace_id: uuid.UUID,
+    group_id: uuid.UUID,
+    role_in_ws: str,
+):
+    """把空间授权给某个组（幂等 upsert）。"""
+    from app.models.rbac import WorkspaceGroupGrant
+
+    grant = await session.get(WorkspaceGroupGrant, (workspace_id, group_id))
+    if grant is None:
+        grant = WorkspaceGroupGrant(
+            workspace_id=workspace_id, group_id=group_id, role_in_ws=role_in_ws
+        )
+        session.add(grant)
+    else:
+        grant.role_in_ws = role_in_ws
+    await session.commit()
+    return grant
+
+
+async def revoke_group(
+    session: AsyncSession, *, workspace_id: uuid.UUID, group_id: uuid.UUID
+) -> bool:
+    from app.models.rbac import WorkspaceGroupGrant
+
+    grant = await session.get(WorkspaceGroupGrant, (workspace_id, group_id))
+    if grant is None:
+        return False
+    await session.delete(grant)
+    await session.commit()
+    return True
+
+
+async def list_group_grants(session: AsyncSession, *, workspace_id: uuid.UUID):
+    from app.models.rbac import WorkspaceGroupGrant
+
+    result = await session.execute(
+        select(WorkspaceGroupGrant).where(
+            WorkspaceGroupGrant.workspace_id == workspace_id
+        )
+    )
+    return list(result.scalars().all())
 
 
 async def is_member(
     session: AsyncSession, *, workspace_id: uuid.UUID, user_id: uuid.UUID
 ) -> bool:
-    """当前用户是否为该空间成员（供 require_ws_member 使用）。"""
+    """当前用户是否有该空间访问权：个人成员 ∪ 所属组被授权（F7）。"""
     member = await session.get(WorkspaceMember, (workspace_id, user_id))
-    return member is not None
+    if member is not None:
+        return True
+    # 通过所属组的空间授权获得访问权
+    from app.models.rbac import GroupMember, WorkspaceGroupGrant
+
+    stmt = (
+        select(WorkspaceGroupGrant.group_id)
+        .join(GroupMember, GroupMember.group_id == WorkspaceGroupGrant.group_id)
+        .where(
+            WorkspaceGroupGrant.workspace_id == workspace_id,
+            GroupMember.user_id == user_id,
+        )
+        .limit(1)
+    )
+    result = await session.execute(stmt)
+    return result.first() is not None

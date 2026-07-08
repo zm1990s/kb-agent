@@ -8,6 +8,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.api import (
+    admin,
     auth,
     categories,
     chat,
@@ -37,6 +38,7 @@ app.include_router(folders.router)
 app.include_router(documents.router)
 app.include_router(chat.router)
 app.include_router(settings.router)
+app.include_router(admin.router)
 
 
 @app.get("/health")
