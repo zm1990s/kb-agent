@@ -1,8 +1,10 @@
 """对话检索路由。仅限所属空间；串起检索→生成→落库。"""
 
+import json
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_session
@@ -17,7 +19,12 @@ from app.schemas.chat import (
     MessagePublic,
     SourceRef,
 )
-from app.services.answer_service import answer_question
+from app.services.answer_service import (
+    AnswerResult,
+    Stage,
+    answer_question,
+    answer_question_streamed,
+)
 from app.services.chat_service import (
     add_message,
     create_conversation,
@@ -76,6 +83,70 @@ async def chat(
         answer=result.answer,
         sources=[SourceRef(**s) for s in result.sources],
         conversation_id=conv.id,
+    )
+
+
+@router.post("/chat/stream")
+async def chat_stream(
+    body: ChatRequest,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> StreamingResponse:
+    """SSE 流式对话：先推送 Agent 工作阶段，最后推送答案+来源。"""
+    if not await is_member(
+        session, workspace_id=body.workspace_id, user_id=current_user.id
+    ):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "无权访问该空间")
+
+    conv = await get_or_create_conversation(
+        session,
+        conversation_id=body.conversation_id,
+        workspace_id=body.workspace_id,
+        user_id=current_user.id,
+    )
+    history = await recent_history(session, conversation_id=conv.id)
+    await add_message(
+        session, conversation_id=conv.id, role="user", content=body.message
+    )
+
+    def sse(event: str, data: dict) -> str:
+        return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
+
+    async def gen():
+        final: AnswerResult | None = None
+        async for item in answer_question_streamed(
+            session,
+            workspace_id=body.workspace_id,
+            question=body.message,
+            history=history,
+        ):
+            if isinstance(item, Stage):
+                yield sse("stage", {"stage": item.stage, "message": item.message})
+            elif isinstance(item, AnswerResult):
+                final = item
+        if final is None:
+            final = AnswerResult(answer="（无响应）", sources=[])
+        # 落库助手消息
+        await add_message(
+            session,
+            conversation_id=conv.id,
+            role="assistant",
+            content=final.answer,
+            sources=final.sources,
+        )
+        yield sse(
+            "done",
+            {
+                "answer": final.answer,
+                "sources": final.sources,
+                "conversation_id": str(conv.id),
+            },
+        )
+
+    return StreamingResponse(
+        gen(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
 
 

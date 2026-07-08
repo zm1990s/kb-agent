@@ -1,15 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import ConversationSidebar from "@/components/ConversationSidebar";
-import Markdown from "@/components/Markdown";
+import MessageBubble from "@/components/MessageBubble";
 import NavBar from "@/components/NavBar";
+import ThinkingBubble from "@/components/ThinkingBubble";
 import WorkspacePicker from "@/components/WorkspacePicker";
 import { api, ApiError } from "@/lib/api";
 import { getToken } from "@/lib/auth";
 import { useAuthGuard } from "@/lib/useAuthGuard";
 import type {
-  ChatResponse,
   ConversationHistory,
   ConversationSummary,
   SourceRef,
@@ -21,6 +21,12 @@ interface Turn {
   sources?: SourceRef[];
 }
 
+interface DonePayload {
+  answer: string;
+  sources: SourceRef[];
+  conversation_id: string;
+}
+
 export default function ChatPage() {
   const ready = useAuthGuard();
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
@@ -29,7 +35,9 @@ export default function ChatPage() {
   const [turns, setTurns] = useState<Turn[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
+  const [stage, setStage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   const loadConversations = useCallback(async () => {
     if (!workspaceId) return;
@@ -44,12 +52,16 @@ export default function ChatPage() {
     }
   }, [workspaceId]);
 
-  // 切换空间：刷新会话列表，清空当前会话
   useEffect(() => {
     setConversationId(null);
     setTurns([]);
     loadConversations();
   }, [workspaceId, loadConversations]);
+
+  // 新消息或阶段变化时滚到底部
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
+  }, [turns, stage, busy]);
 
   async function selectConversation(id: string) {
     setError(null);
@@ -69,7 +81,6 @@ export default function ChatPage() {
   }
 
   function newConversation() {
-    // 新会话延迟到首次发消息时由后端创建（conversation_id=null）
     setConversationId(null);
     setTurns([]);
     setError(null);
@@ -80,28 +91,41 @@ export default function ChatPage() {
   async function send(e: React.FormEvent) {
     e.preventDefault();
     const message = input.trim();
-    if (!message || !workspaceId) return;
+    if (!message || !workspaceId || busy) return;
     setError(null);
     setInput("");
     setTurns((t) => [...t, { role: "user", content: message }]);
     setBusy(true);
+    setStage("正在准备…");
+
+    const isNew = conversationId === null;
     try {
-      const res = await api.post<ChatResponse>("/chat", {
-        workspace_id: workspaceId,
-        message,
-        conversation_id: conversationId,
-      });
-      const isNew = conversationId === null;
-      setConversationId(res.conversation_id);
-      setTurns((t) => [
-        ...t,
-        { role: "assistant", content: res.answer, sources: res.sources },
-      ]);
+      await api.stream(
+        "/chat/stream",
+        {
+          workspace_id: workspaceId,
+          message,
+          conversation_id: conversationId,
+        },
+        (event, data) => {
+          if (event === "stage") {
+            setStage((data as { message: string }).message);
+          } else if (event === "done") {
+            const d = data as DonePayload;
+            setConversationId(d.conversation_id);
+            setTurns((t) => [
+              ...t,
+              { role: "assistant", content: d.answer, sources: d.sources },
+            ]);
+          }
+        }
+      );
       if (isNew) await loadConversations();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "请求失败");
     } finally {
       setBusy(false);
+      setStage(null);
     }
   }
 
@@ -140,64 +164,39 @@ export default function ChatPage() {
           onNew={newConversation}
         />
 
-        <main className="flex flex-1 flex-col overflow-hidden">
-          <div className="flex-1 space-y-4 overflow-y-auto p-4">
-            {turns.length === 0 && (
+        <main className="flex flex-1 flex-col overflow-hidden bg-gray-50">
+          <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto p-6">
+            {turns.length === 0 && !busy && (
               <p className="mt-8 text-center text-sm text-gray-400">
-                向知识库提问，回答将附带原文来源。
+                向知识库提问，AI 会基于文档智能作答并附上原文来源。
               </p>
             )}
             {turns.map((t, i) => (
-              <div
+              <MessageBubble
                 key={i}
-                className={t.role === "user" ? "text-right" : "text-left"}
-              >
-                <div
-                  className={`inline-block max-w-[85%] rounded-lg px-4 py-2 text-sm ${
-                    t.role === "user"
-                      ? "whitespace-pre-wrap bg-blue-600 text-white"
-                      : "bg-white text-gray-800 shadow-sm"
-                  }`}
-                >
-                  {t.role === "assistant" ? (
-                    // 助手回答用 Markdown 渲染（react-markdown 不解析裸 HTML，防 XSS）
-                    <Markdown content={t.content} />
-                  ) : (
-                    t.content
-                  )}
-                </div>
-                {t.sources && t.sources.length > 0 && (
-                  <div className="mt-1 space-y-1 text-left">
-                    <p className="text-xs text-gray-400">来源：</p>
-                    {t.sources.map((s) => (
-                      <button
-                        key={s.doc_id}
-                        onClick={() => download(s)}
-                        className="mr-2 rounded bg-gray-100 px-2 py-1 text-xs text-blue-700 hover:bg-gray-200"
-                      >
-                        ↓ {s.title}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
+                role={t.role}
+                content={t.content}
+                sources={t.sources}
+                onDownload={download}
+              />
             ))}
+            {busy && <ThinkingBubble stage={stage} />}
           </div>
 
-          {error && <p className="px-4 text-sm text-red-600">{error}</p>}
+          {error && <p className="px-6 text-sm text-red-600">{error}</p>}
 
-          <form onSubmit={send} className="flex gap-2 border-t p-4">
+          <form onSubmit={send} className="flex gap-2 border-t bg-white p-4">
             <input
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder={workspaceId ? "输入问题…" : "请先选择空间"}
               disabled={!workspaceId || busy}
-              className="flex-1 rounded border px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+              className="flex-1 rounded-full border px-4 py-2 text-sm focus:border-blue-500 focus:outline-none"
             />
             <button
               type="submit"
               disabled={!workspaceId || busy || !input.trim()}
-              className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+              className="rounded-full bg-blue-600 px-5 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
             >
               {busy ? "…" : "发送"}
             </button>

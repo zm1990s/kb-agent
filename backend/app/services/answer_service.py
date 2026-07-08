@@ -113,6 +113,67 @@ def _parse_engine_json(text: str) -> dict:
     return json.loads(text[start : end + 1])
 
 
+@dataclass
+class Stage:
+    """流式工作阶段事件（供前端展示 Agent 进展）。"""
+
+    stage: str  # 阶段标识：indexing / thinking / parsing / done
+    message: str
+
+
+async def answer_question_streamed(
+    session: AsyncSession,
+    *,
+    workspace_id: uuid.UUID,
+    question: str,
+    category_id: uuid.UUID | None = None,
+    history: list[tuple[str, str]] | None = None,
+):
+    """生成器：先 yield 若干 Stage 事件，最后 yield 一个 AnswerResult。
+
+    供 SSE 端点消费；answer_question() 是它的收敛封装。
+    """
+    yield Stage("indexing", "正在检索知识库索引…")
+    index = await _load_index(session, workspace_id)
+
+    if not index and not history:
+        yield Stage("done", "空间暂无文档")
+        yield AnswerResult(answer=NO_DOCS_ANSWER, sources=[])
+        return
+
+    if index:
+        yield Stage("indexing", f"已载入 {len(index)} 篇文档索引")
+    catalog = _build_catalog(index) if index else "（本空间暂无已归类文档）"
+
+    from app.services.settings_service import get_engine_backend
+
+    yield Stage("thinking", "Agent 正在阅读索引并组织回答…")
+    engine = get_engine(await get_engine_backend(session))
+    result = await engine.complete(
+        _ANSWER_PROMPT.format(
+            question=question, catalog=catalog, history=_format_history(history)
+        )
+    )
+
+    yield Stage("parsing", "正在整理答案与相关文档…")
+    try:
+        parsed = _parse_engine_json(result.text)
+        answer = str(parsed.get("answer") or "").strip()
+        doc_numbers = parsed.get("doc_numbers") or []
+    except (ValueError, json.JSONDecodeError):
+        yield Stage("done", "完成")
+        yield AnswerResult(answer=result.text.strip(), sources=[])
+        return
+
+    sources = []
+    for num in doc_numbers:
+        if isinstance(num, int) and 1 <= num <= len(index):
+            sources.append(await _build_source(index[num - 1][0]))
+
+    yield Stage("done", "完成")
+    yield AnswerResult(answer=answer or result.text.strip(), sources=sources)
+
+
 async def answer_question(
     session: AsyncSession,
     *,
@@ -121,37 +182,15 @@ async def answer_question(
     category_id: uuid.UUID | None = None,
     history: list[tuple[str, str]] | None = None,
 ) -> AnswerResult:
-    """喂全空间知识索引 → Claude 智能作答 + 选相关文档 → 返回 answer + sources。"""
-    index = await _load_index(session, workspace_id)
-
-    # 空间无任何已归类文档且无历史上下文：无从作答。
-    if not index and not history:
-        return AnswerResult(answer=NO_DOCS_ANSWER, sources=[])
-
-    catalog = _build_catalog(index) if index else "（本空间暂无已归类文档）"
-
-    from app.services.settings_service import get_engine_backend
-
-    engine = get_engine(await get_engine_backend(session))
-    result = await engine.complete(
-        _ANSWER_PROMPT.format(
-            question=question, catalog=catalog, history=_format_history(history)
-        )
-    )
-
-    # 解析 Claude 输出：answer + 选中的文档编号
-    try:
-        parsed = _parse_engine_json(result.text)
-        answer = str(parsed.get("answer") or "").strip()
-        doc_numbers = parsed.get("doc_numbers") or []
-    except (ValueError, json.JSONDecodeError):
-        # 兜底：解析失败时把原文当答案，不带来源
-        return AnswerResult(answer=result.text.strip(), sources=[])
-
-    # 按编号映射回真实文档（服务端控制，防 ID 幻觉）
-    sources = []
-    for num in doc_numbers:
-        if isinstance(num, int) and 1 <= num <= len(index):
-            sources.append(await _build_source(index[num - 1][0]))
-
-    return AnswerResult(answer=answer or result.text.strip(), sources=sources)
+    """非流式封装：消费流式生成器，返回最终 AnswerResult。"""
+    result = AnswerResult(answer=NO_DOCS_ANSWER, sources=[])
+    async for item in answer_question_streamed(
+        session,
+        workspace_id=workspace_id,
+        question=question,
+        category_id=category_id,
+        history=history,
+    ):
+        if isinstance(item, AnswerResult):
+            result = item
+    return result
