@@ -1,9 +1,9 @@
-"""M3-U4：/chat 端点，含隔离、落库、无命中。"""
+"""M3-U4：/chat 端点，含隔离、落库、空间无文档。"""
 
+import json
 import uuid
 
 import pytest
-from sqlalchemy import func, update
 
 from app.engine.base import EngineResult
 from app.models.document import Document
@@ -13,8 +13,15 @@ pytestmark = pytest.mark.asyncio
 
 
 class _FakeEngine:
+    """返回 Agent 式 JSON（answer + doc_numbers）。"""
+
+    def __init__(self, answer="基于文档的回答", doc_numbers=None):
+        self._payload = json.dumps(
+            {"answer": answer, "doc_numbers": doc_numbers or []}
+        )
+
     async def complete(self, prompt, *, files=None, system=None):
-        return EngineResult(text="基于文档的回答")
+        return EngineResult(text=self._payload)
 
 
 async def _ws(client, headers, name="ws"):
@@ -29,31 +36,27 @@ async def _make_ready_doc(db_session, ws_id, *, title, content):
         title=title,
         storage_key=f"{ws_id}/{uuid.uuid4().hex}",
         mime_type="text/plain",
+        summary=content,
+        tags=["t"],
         content_text=content,
         status="ready",
     )
     db_session.add(doc)
     await db_session.commit()
-    await db_session.execute(
-        update(Document)
-        .where(Document.id == doc.id)
-        .values(search_tsv=func.to_tsvector("simple", func.concat_ws(" ", title, content)))
-    )
-    await db_session.commit()
     return doc
 
 
-async def test_chat_no_match_returns_no_hallucination(client, seed_user):
+async def test_chat_empty_workspace_no_docs(client, seed_user):
     _, admin = await seed_user("admin")
     ws_id = await _ws(client, admin)
     resp = await client.post(
         "/chat",
-        json={"workspace_id": ws_id, "message": "不存在的问题xyz"},
+        json={"workspace_id": ws_id, "message": "任意问题"},
         headers=admin,
     )
     assert resp.status_code == 200
     body = resp.json()
-    assert body["answer"] == answer_service.NO_MATCH_ANSWER
+    assert body["answer"] == answer_service.NO_DOCS_ANSWER
     assert body["sources"] == []
     assert "conversation_id" in body
 
@@ -64,7 +67,10 @@ async def test_chat_with_hit_returns_answer_and_sources(
     _, admin = await seed_user("admin")
     ws_id = await _ws(client, admin)
     await _make_ready_doc(db_session, ws_id, title="防火墙", content="firewall policy")
-    monkeypatch.setattr(answer_service, "get_engine", lambda *a, **k: _FakeEngine())
+    # Claude 选中第 1 篇文档
+    monkeypatch.setattr(
+        answer_service, "get_engine", lambda *a, **k: _FakeEngine(doc_numbers=[1])
+    )
 
     resp = await client.post(
         "/chat", json={"workspace_id": ws_id, "message": "firewall"}, headers=admin

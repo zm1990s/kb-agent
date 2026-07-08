@@ -1,33 +1,47 @@
-"""答案生成 service：把命中文档的原文交给 engine 生成答案，附来源链接。
+"""Agent 式问答 service：把整个空间的知识索引交给 Claude，由它智能理解、
+组织答案，并挑出相关文档作为可下载来源。
 
 原则：
-- 无命中时明确返回“未找到”，禁止编造（降低幻觉，原文优先）。
+- 不做关键词硬匹配；喂结构化索引（标题/分类/标签/摘要）让 Claude 智能判断。
 - LLM 只经 app/engine/（唯一出口）。
-- sources 每项含 doc_id + title + download_url（限时下载端点）。
+- 文档来源由 Claude 按“索引编号”选择，服务端据编号映射回真实文档，防止 ID 幻觉。
+- 索引数量设上限保护；超限截断并记录，不静默（SECURITY 原则）。
 """
 
+import json
+import logging
 import uuid
 from dataclasses import dataclass, field
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.engine.base import get_engine
-from app.models.document import Document
-from app.services.search_service import search_documents
+from app.models.document import Category, Document
 from app.storage.base import get_storage
 
-NO_MATCH_ANSWER = "未找到相关文档。"
+logger = logging.getLogger(__name__)
 
-_ANSWER_PROMPT = """你是知识库问答助手。请**仅依据**下面提供的文档原文回答用户问题。
-若文档中没有相关信息，直接回答“未找到相关文档。”，不要编造。
+NO_DOCS_ANSWER = "当前空间还没有已归类的文档，暂时无法回答。"
+
+# 单次喂给 Claude 的索引条目上限（控制 token）；超出则按最近优先截断并 log。
+MAX_INDEX_DOCS = 200
+
+_ANSWER_PROMPT = """你是企业知识库的智能问答助手。下面是本知识库中所有文档的索引\
+（编号、标题、分类、标签、摘要）。请理解用户的问题，基于这些索引智能作答：
+- 综合相关文档给出有帮助的回答，可使用 Markdown 格式。
+- 挑出与问题最相关的文档编号（可为空），供用户下载原文。
+- 若索引中确无相关内容，如实说明，不要编造。
 {history}
 用户问题：{question}
 
-可参考的文档原文：
-{context}
+文档索引：
+{catalog}
 
-请用中文简洁作答，可使用 Markdown 格式。"""
+请只输出一个 JSON 对象，格式：
+{{"answer": "给用户看的 Markdown 回答", "doc_numbers": [相关文档的编号数组]}}
+不要输出 JSON 以外的内容。"""
 
 
 @dataclass
@@ -47,7 +61,6 @@ async def _build_source(doc: Document) -> dict:
 
 
 def _format_history(history: list[tuple[str, str]] | None) -> str:
-    """把 (role, content) 历史格式化进 prompt；空则返回空串。"""
     if not history:
         return ""
     lines = ["\n对话历史（供理解上下文）："]
@@ -58,6 +71,48 @@ def _format_history(history: list[tuple[str, str]] | None) -> str:
     return "\n".join(lines)
 
 
+async def _load_index(
+    session: AsyncSession, workspace_id: uuid.UUID
+) -> list[tuple[Document, str | None]]:
+    """加载空间内所有 ready 文档及其分类名（最近优先，带上限保护）。"""
+    stmt = (
+        select(Document, Category.name)
+        .outerjoin(Category, Category.id == Document.category_id)
+        .where(Document.workspace_id == workspace_id, Document.status == "ready")
+        .order_by(Document.created_at.desc())
+        .limit(MAX_INDEX_DOCS + 1)
+    )
+    rows = (await session.execute(stmt)).all()
+    if len(rows) > MAX_INDEX_DOCS:
+        logger.warning(
+            "workspace %s 文档数超过索引上限 %d，本次问答按最近优先截断",
+            workspace_id,
+            MAX_INDEX_DOCS,
+        )
+        rows = rows[:MAX_INDEX_DOCS]
+    return [(doc, cat) for doc, cat in rows]
+
+
+def _build_catalog(index: list[tuple[Document, str | None]]) -> str:
+    lines = []
+    for n, (doc, cat) in enumerate(index, start=1):
+        tags = "、".join(doc.tags or []) or "无"
+        summary = (doc.summary or "").replace("\n", " ")
+        lines.append(
+            f"[{n}] 标题：{doc.title} | 分类：{cat or '未分类'} | "
+            f"标签：{tags}\n    摘要：{summary}"
+        )
+    return "\n".join(lines)
+
+
+def _parse_engine_json(text: str) -> dict:
+    start = text.find("{")
+    end = text.rfind("}")
+    if start == -1 or end == -1 or end < start:
+        raise ValueError("引擎输出中未找到 JSON 对象")
+    return json.loads(text[start : end + 1])
+
+
 async def answer_question(
     session: AsyncSession,
     *,
@@ -66,31 +121,37 @@ async def answer_question(
     category_id: uuid.UUID | None = None,
     history: list[tuple[str, str]] | None = None,
 ) -> AnswerResult:
-    """检索 → 取原文（+可选对话历史）交 engine 生成答案 → 返回 answer + sources。"""
-    hits = await search_documents(
-        session, workspace_id=workspace_id, query=question, category_id=category_id
-    )
-    # 无命中且无历史：直接返回“未找到”，不编造（原文优先，降低幻觉）。
-    # 无命中但有历史：可能是追问/元问题（如“刚才我问了什么”），仍交 engine
-    # 依据对话历史作答，但不提供文档来源。
-    if not hits and not history:
-        return AnswerResult(answer=NO_MATCH_ANSWER, sources=[])
+    """喂全空间知识索引 → Claude 智能作答 + 选相关文档 → 返回 answer + sources。"""
+    index = await _load_index(session, workspace_id)
 
-    # 拼接命中文档原文作为上下文（原文优先，降低幻觉）
-    context_parts = []
-    for i, doc in enumerate(hits, start=1):
-        body = doc.content_text or doc.summary or ""
-        context_parts.append(f"[文档{i}] 标题：{doc.title}\n{body}")
-    context = "\n\n".join(context_parts) if hits else "（本次未检索到相关文档）"
+    # 空间无任何已归类文档且无历史上下文：无从作答。
+    if not index and not history:
+        return AnswerResult(answer=NO_DOCS_ANSWER, sources=[])
+
+    catalog = _build_catalog(index) if index else "（本空间暂无已归类文档）"
 
     from app.services.settings_service import get_engine_backend
 
     engine = get_engine(await get_engine_backend(session))
     result = await engine.complete(
         _ANSWER_PROMPT.format(
-            question=question, context=context, history=_format_history(history)
+            question=question, catalog=catalog, history=_format_history(history)
         )
     )
 
-    sources = [await _build_source(doc) for doc in hits]
-    return AnswerResult(answer=result.text.strip(), sources=sources)
+    # 解析 Claude 输出：answer + 选中的文档编号
+    try:
+        parsed = _parse_engine_json(result.text)
+        answer = str(parsed.get("answer") or "").strip()
+        doc_numbers = parsed.get("doc_numbers") or []
+    except (ValueError, json.JSONDecodeError):
+        # 兜底：解析失败时把原文当答案，不带来源
+        return AnswerResult(answer=result.text.strip(), sources=[])
+
+    # 按编号映射回真实文档（服务端控制，防 ID 幻觉）
+    sources = []
+    for num in doc_numbers:
+        if isinstance(num, int) and 1 <= num <= len(index):
+            sources.append(await _build_source(index[num - 1][0]))
+
+    return AnswerResult(answer=answer or result.text.strip(), sources=sources)

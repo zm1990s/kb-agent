@@ -1,79 +1,112 @@
-"""M3-U3：答案生成，用假引擎替换 CLI。"""
+"""M3-U3/U7：Agent 式索引问答。Claude 基于全空间索引作答并选相关文档。"""
 
+import json
 import uuid
 
 import pytest
-from sqlalchemy import func, update
 
 from app.engine.base import EngineResult
 from app.models.auth import Workspace
 from app.models.document import Document
 from app.services import answer_service
-from app.services.answer_service import NO_MATCH_ANSWER, answer_question
+from app.services.answer_service import NO_DOCS_ANSWER, answer_question
 
 pytestmark = pytest.mark.asyncio
 
 
 class _FakeEngine:
-    def __init__(self, text):
-        self._text = text
+    """按预设 JSON 回应；记录收到的 catalog 以便断言。"""
+
+    def __init__(self, answer="这是答案", doc_numbers=None):
+        self._payload = json.dumps(
+            {"answer": answer, "doc_numbers": doc_numbers or []}
+        )
         self.called = False
+        self.last_prompt = None
 
     async def complete(self, prompt, *, files=None, system=None):
         self.called = True
         self.last_prompt = prompt
-        return EngineResult(text=self._text)
+        return EngineResult(text=self._payload)
 
 
-async def _ready_doc(session, ws_id, *, title, content):
+async def _ready_doc(session, ws_id, *, title, summary="摘要", tags=None):
     doc = Document(
         id=uuid.uuid4(),
         workspace_id=ws_id,
         title=title,
         storage_key=f"{ws_id}/{uuid.uuid4().hex}",
         mime_type="text/plain",
-        content_text=content,
+        summary=summary,
+        tags=tags or ["标签"],
+        content_text="正文",
         status="ready",
     )
     session.add(doc)
     await session.commit()
-    await session.execute(
-        update(Document)
-        .where(Document.id == doc.id)
-        .values(search_tsv=func.to_tsvector("simple", func.concat_ws(" ", title, content)))
-    )
-    await session.commit()
     return doc
 
 
-async def test_answer_with_hit_returns_answer_and_sources(db_session, monkeypatch):
+async def test_answer_feeds_full_index_and_selects_docs(db_session, monkeypatch):
     ws = Workspace(id=uuid.uuid4(), name="ws")
     db_session.add(ws)
     await db_session.commit()
-    doc = await _ready_doc(db_session, ws.id, title="防火墙指南", content="firewall policy")
+    await _ready_doc(db_session, ws.id, title="防火墙配置指南")
+    await _ready_doc(db_session, ws.id, title="报销流程")
 
-    fake = _FakeEngine("根据文档，防火墙策略如下……")
+    # Claude 选中第 1 篇（索引按 created_at 倒序，[1] 为最新创建的“报销流程”）
+    fake = _FakeEngine(answer="防火墙这样配置……", doc_numbers=[1])
     monkeypatch.setattr(answer_service, "get_engine", lambda *a, **k: fake)
 
-    res = await answer_question(db_session, workspace_id=ws.id, question="firewall")
+    res = await answer_question(db_session, workspace_id=ws.id, question="防火墙怎么配")
     assert fake.called
-    assert res.answer == "根据文档，防火墙策略如下……"
+    # 全空间索引都进了 prompt（两篇标题都在）
+    assert "防火墙配置指南" in fake.last_prompt
+    assert "报销流程" in fake.last_prompt
+    assert res.answer == "防火墙这样配置……"
+    # 编号 1 映射为一个可下载来源（编号→真实文档由服务端控制）
     assert len(res.sources) == 1
-    assert res.sources[0]["doc_id"] == str(doc.id)
-    assert res.sources[0]["title"] == "防火墙指南"
+    assert res.sources[0]["title"] == "报销流程"
     assert "download" in res.sources[0]["download_url"]
 
 
-async def test_answer_no_hit_does_not_call_engine(db_session, monkeypatch):
+async def test_answer_no_docs_selected_returns_no_sources(db_session, monkeypatch):
     ws = Workspace(id=uuid.uuid4(), name="ws")
     db_session.add(ws)
     await db_session.commit()
+    await _ready_doc(db_session, ws.id, title="报销流程")
 
-    fake = _FakeEngine("不应被调用")
+    fake = _FakeEngine(answer="没有找到防火墙相关文档。", doc_numbers=[])
     monkeypatch.setattr(answer_service, "get_engine", lambda *a, **k: fake)
 
-    res = await answer_question(db_session, workspace_id=ws.id, question="nonexistent")
-    # 无命中：不编造、不调用引擎
-    assert res.answer == NO_MATCH_ANSWER
+    res = await answer_question(db_session, workspace_id=ws.id, question="防火墙")
+    assert res.answer == "没有找到防火墙相关文档。"
     assert res.sources == []
+
+
+async def test_answer_empty_workspace_no_history(db_session, monkeypatch):
+    ws = Workspace(id=uuid.uuid4(), name="empty")
+    db_session.add(ws)
+    await db_session.commit()
+
+    fake = _FakeEngine()
+    monkeypatch.setattr(answer_service, "get_engine", lambda *a, **k: fake)
+
+    res = await answer_question(db_session, workspace_id=ws.id, question="任意问题")
+    # 空间无文档且无历史：不调用引擎，直接提示
+    assert res.answer == NO_DOCS_ANSWER
     assert fake.called is False
+
+
+async def test_answer_hallucinated_doc_number_ignored(db_session, monkeypatch):
+    """Claude 返回越界编号时，服务端忽略（防 ID 幻觉）。"""
+    ws = Workspace(id=uuid.uuid4(), name="ws")
+    db_session.add(ws)
+    await db_session.commit()
+    await _ready_doc(db_session, ws.id, title="唯一文档")
+
+    fake = _FakeEngine(answer="见文档", doc_numbers=[99])  # 越界
+    monkeypatch.setattr(answer_service, "get_engine", lambda *a, **k: fake)
+
+    res = await answer_question(db_session, workspace_id=ws.id, question="q")
+    assert res.sources == []  # 越界编号被丢弃
