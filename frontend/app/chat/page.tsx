@@ -165,7 +165,7 @@ export default function ChatPage() {
         />
 
         <main className="flex flex-1 flex-col overflow-hidden bg-gray-50">
-          <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto p-6">
+          <div ref={scrollRef} className="flex-1 space-y-6 overflow-y-auto p-6">
             {turns.length === 0 && !busy && (
               <p className="mt-8 text-center text-sm text-gray-400">
                 向知识库提问，AI 会基于文档智能作答并附上原文来源。
