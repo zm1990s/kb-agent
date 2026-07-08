@@ -38,11 +38,34 @@ class DocumentPublic(BaseModel):
     workspace_id: uuid.UUID
     title: str
     mime_type: str
+    folder_id: uuid.UUID | None
     category_id: uuid.UUID | None
     summary: str | None
     tags: list[str]
     status: str
     created_at: datetime
+
+
+class FolderCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    parent_id: uuid.UUID | None = None
+
+
+class FolderRename(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+
+
+class FolderPublic(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    workspace_id: uuid.UUID
+    name: str
+    parent_id: uuid.UUID | None
+
+
+class DocumentMove(BaseModel):
+    folder_id: uuid.UUID | None = None
 
 
 class ProcessingTaskPublic(BaseModel):

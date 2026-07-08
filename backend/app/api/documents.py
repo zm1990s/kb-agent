@@ -6,6 +6,7 @@ from fastapi import (
     APIRouter,
     Depends,
     File,
+    Form,
     HTTPException,
     UploadFile,
     status,
@@ -18,6 +19,7 @@ from app.core.deps import get_current_user
 from app.models.auth import User
 from app.models.document import Document
 from app.schemas.document import (
+    DocumentMove,
     DocumentPublic,
     DocumentUploadAccepted,
     ProcessingTaskPublic,
@@ -25,10 +27,14 @@ from app.schemas.document import (
 )
 from app.services.document_service import (
     create_reprocess_task,
+    delete_document,
     list_document_tasks,
     list_documents,
+    move_document,
+    replace_document_content,
     upload_document,
 )
+from app.services.folder_service import get_folder_in_workspace
 from app.services.workspace_service import is_member
 from app.storage.base import get_storage
 from app.tasks.worker import enqueue_classification
@@ -61,6 +67,7 @@ async def _get_doc_for_member(
 async def upload(
     workspace_id: uuid.UUID,
     file: UploadFile = File(...),
+    folder_id: uuid.UUID | None = Form(default=None),
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> DocumentUploadAccepted:
@@ -68,6 +75,13 @@ async def upload(
     if current_user.role != "admin":
         raise HTTPException(status.HTTP_403_FORBIDDEN, "需要管理员权限")
     await _ensure_member(session, workspace_id, current_user)
+
+    if folder_id is not None:
+        folder = await get_folder_in_workspace(
+            session, folder_id=folder_id, workspace_id=workspace_id
+        )
+        if folder is None:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "目录不存在")
 
     data = await file.read()
     doc, task = await upload_document(
@@ -77,6 +91,7 @@ async def upload(
         mime_type=file.content_type or "application/octet-stream",
         data=data,
         uploaded_by=current_user.id,
+        folder_id=folder_id,
     )
     # 触发后台归类 worker（进程内 asyncio，见 tasks/worker.py）
     enqueue_classification(task.id)
@@ -89,6 +104,7 @@ async def upload(
 async def list_ws_documents(
     workspace_id: uuid.UUID,
     category: uuid.UUID | None = None,
+    folder: uuid.UUID | None = None,
     tag: str | None = None,
     page: int = 1,
     size: int = 50,
@@ -100,6 +116,7 @@ async def list_ws_documents(
         session,
         workspace_id=workspace_id,
         category_id=category,
+        folder_id=folder,
         tag=tag,
         limit=size,
         offset=(max(page, 1) - 1) * size,
@@ -115,6 +132,63 @@ async def get_document_detail(
 ) -> DocumentPublic:
     doc = await _get_doc_for_member(session, document_id, current_user)
     return DocumentPublic.model_validate(doc)
+
+
+@router.delete("/documents/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_doc(
+    document_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> None:
+    doc = await _get_doc_for_member(session, document_id, current_user)
+    if current_user.role != "admin":
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "需要管理员权限")
+    await delete_document(session, doc=doc)
+
+
+@router.patch("/documents/{document_id}/move", response_model=DocumentPublic)
+async def move_doc(
+    document_id: uuid.UUID,
+    body: DocumentMove,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> DocumentPublic:
+    doc = await _get_doc_for_member(session, document_id, current_user)
+    # 目标目录须属于同一空间（None 表示移出目录）
+    if body.folder_id is not None:
+        folder = await get_folder_in_workspace(
+            session, folder_id=body.folder_id, workspace_id=doc.workspace_id
+        )
+        if folder is None:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "目标目录不存在")
+    doc = await move_document(session, doc=doc, folder_id=body.folder_id)
+    return DocumentPublic.model_validate(doc)
+
+
+@router.post(
+    "/documents/{document_id}/replace",
+    response_model=DocumentUploadAccepted,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def replace_doc(
+    document_id: uuid.UUID,
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> DocumentUploadAccepted:
+    doc = await _get_doc_for_member(session, document_id, current_user)
+    if current_user.role != "admin":
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "需要管理员权限")
+    data = await file.read()
+    task = await replace_document_content(
+        session,
+        doc=doc,
+        filename=file.filename or doc.title,
+        mime_type=file.content_type or "application/octet-stream",
+        data=data,
+    )
+    enqueue_classification(task.id)
+    return DocumentUploadAccepted(id=doc.id, status="processing", task_id=task.id)
 
 
 @router.get("/documents/{document_id}/download")

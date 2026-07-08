@@ -37,6 +37,30 @@ class Category(Base):
     )
 
 
+class Folder(Base):
+    """用户手动维护的目录（文件夹树），与 Agent 分类/标签无关。"""
+
+    __tablename__ = "folders"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    workspace_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("workspaces.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    parent_id: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("folders.id", ondelete="CASCADE"),
+        nullable=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        server_default=func.now(), nullable=False
+    )
+
+
 class Document(Base):
     __tablename__ = "documents"
 
@@ -51,6 +75,12 @@ class Document(Base):
     title: Mapped[str] = mapped_column(String, nullable=False)
     storage_key: Mapped[str] = mapped_column(String, nullable=False)
     mime_type: Mapped[str] = mapped_column(String, nullable=False)
+    # 用户手动目录（单归属，可空）
+    folder_id: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("folders.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     category_id: Mapped[uuid.UUID | None] = mapped_column(
         PGUUID(as_uuid=True),
         ForeignKey("categories.id", ondelete="SET NULL"),
@@ -78,6 +108,7 @@ class Document(Base):
         Index("ix_documents_search_tsv", "search_tsv", postgresql_using="gin"),
         Index("ix_documents_ws_category", "workspace_id", "category_id"),
         Index("ix_documents_ws_status", "workspace_id", "status"),
+        Index("ix_documents_folder", "folder_id"),
     )
 
 
