@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import NavBar from "@/components/NavBar";
+import TaskLogPanel from "@/components/TaskLogPanel";
 import WorkspacePicker from "@/components/WorkspacePicker";
 import { api, ApiError } from "@/lib/api";
 import { getToken, isAdmin } from "@/lib/auth";
@@ -30,6 +31,8 @@ export default function DocumentsPage() {
   const fileRef = useRef<HTMLInputElement>(null);
   const replaceRef = useRef<HTMLInputElement>(null);
   const [replacingId, setReplacingId] = useState<string | null>(null);
+  // 正在查看日志的文档
+  const [logDoc, setLogDoc] = useState<DocumentPublic | null>(null);
 
   const loadFolders = useCallback(async () => {
     if (!workspaceId) return;
@@ -131,6 +134,16 @@ export default function DocumentsPage() {
       await loadDocs();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "删除失败");
+    }
+  }
+
+  async function reprocessDoc(doc: DocumentPublic) {
+    setError(null);
+    try {
+      await api.post(`/documents/${doc.id}/reprocess`);
+      await loadDocs(); // 状态回到归类中，轮询会自动刷新
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "重试失败");
     }
   }
 
@@ -347,6 +360,20 @@ export default function DocumentsPage() {
                       >
                         下载
                       </button>
+                      <button
+                        onClick={() => setLogDoc(d)}
+                        className="mr-1 rounded bg-gray-100 px-2 py-1 text-xs text-gray-700 hover:bg-gray-200"
+                      >
+                        详情
+                      </button>
+                      {admin && d.status === "failed" && (
+                        <button
+                          onClick={() => reprocessDoc(d)}
+                          className="mr-1 rounded bg-amber-100 px-2 py-1 text-xs text-amber-700 hover:bg-amber-200"
+                        >
+                          重试
+                        </button>
+                      )}
                       {admin && (
                         <>
                           <button
@@ -371,6 +398,14 @@ export default function DocumentsPage() {
           </div>
         </main>
       </div>
+
+      {logDoc && (
+        <TaskLogPanel
+          documentId={logDoc.id}
+          title={logDoc.title}
+          onClose={() => setLogDoc(null)}
+        />
+      )}
     </div>
   );
 }

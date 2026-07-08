@@ -53,6 +53,12 @@ export interface Folder {
   parent_id: string | null;
 }
 
+export interface TaskLog {
+  stage: string;
+  message: string;
+  at: string;
+}
+
 export interface ProcessingTask {
   id: string;
   document_id: string;
@@ -61,7 +67,7 @@ export interface ProcessingTask {
   attempts: number;
   max_attempts: number;
   error: string | null;
-  logs: unknown[];
+  logs: TaskLog[];
   created_at: string;
   updated_at: string;
 }
