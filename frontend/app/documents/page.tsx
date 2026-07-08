@@ -8,7 +8,7 @@ import WorkspacePicker from "@/components/WorkspacePicker";
 import { api, ApiError } from "@/lib/api";
 import { getToken, isAdmin } from "@/lib/auth";
 import { useAuthGuard } from "@/lib/useAuthGuard";
-import type { DocumentPublic, Folder } from "@/lib/types";
+import type { Category, DocumentPublic, Folder } from "@/lib/types";
 
 const STATUS_LABEL: Record<string, string> = {
   processing: "归类中",
@@ -35,6 +35,20 @@ export default function DocumentsPage() {
   const [replacingId, setReplacingId] = useState<string | null>(null);
   // 正在查看日志的文档
   const [logDoc, setLogDoc] = useState<DocumentPublic | null>(null);
+  // 分类名映射（展示用）
+  const [categories, setCategories] = useState<Category[]>([]);
+  // 搜索关键词
+  const [query, setQuery] = useState("");
+  // 自定义展示列
+  const [cols, setCols] = useState<Record<string, boolean>>({
+    folder: true,
+    category: true,
+    tags: true,
+    type: false,
+    status: true,
+    summary: true,
+    created: false,
+  });
 
   const loadFolders = useCallback(async () => {
     if (!workspaceId) return;
@@ -42,6 +56,11 @@ export default function DocumentsPage() {
       setFolders(await api.get<Folder[]>(`/folders?workspace=${workspaceId}`));
     } catch {
       setFolders([]);
+    }
+    try {
+      setCategories(await api.get<Category[]>(`/categories?workspace=${workspaceId}`));
+    } catch {
+      setCategories([]); // 非管理员无权列分类，降级为空
     }
   }, [workspaceId]);
 
@@ -79,6 +98,34 @@ export default function DocumentsPage() {
 
   const folderName = (id: string | null) =>
     folders.find((f) => f.id === id)?.name ?? "—";
+  const categoryName = (id: string | null) =>
+    categories.find((c) => c.id === id)?.name ?? "—";
+
+  // 客户端搜索：标题/摘要/标签/分类名
+  const q = query.trim().toLowerCase();
+  const shownDocs = q
+    ? docs.filter((d) => {
+        const hay = [
+          d.title,
+          d.summary ?? "",
+          (d.tags ?? []).join(" "),
+          categoryName(d.category_id),
+        ]
+          .join(" ")
+          .toLowerCase();
+        return hay.includes(q);
+      })
+    : docs;
+
+  const COLS: { key: string; label: string }[] = [
+    { key: "folder", label: "目录" },
+    { key: "category", label: "分类" },
+    { key: "tags", label: "标签" },
+    { key: "type", label: "类型" },
+    { key: "status", label: "状态" },
+    { key: "summary", label: "摘要" },
+    { key: "created", label: "创建时间" },
+  ];
 
   async function createFolder(parentId: string | null) {
     const name = window.prompt(parentId ? "新建子目录名称" : "新目录名称");
@@ -391,26 +438,60 @@ export default function DocumentsPage() {
             onChange={onReplacePicked}
           />
 
+          {/* 工具栏：搜索 + 自定义列 */}
+          <div className="mb-3 flex flex-wrap items-center gap-3">
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="搜索标题/摘要/标签/分类…"
+              className="w-64 rounded-full border px-4 py-1.5 text-sm focus:border-blue-500 focus:outline-none"
+            />
+            <span className="text-xs text-gray-400">共 {shownDocs.length} 篇</span>
+            <details className="relative ml-auto text-sm">
+              <summary className="cursor-pointer rounded border px-3 py-1.5 text-gray-600 hover:bg-gray-100">
+                展示列
+              </summary>
+              <div className="absolute right-0 z-10 mt-1 w-36 rounded border bg-white p-2 shadow-lg">
+                {COLS.map((c) => (
+                  <label key={c.key} className="flex items-center gap-2 px-1 py-1 text-xs">
+                    <input
+                      type="checkbox"
+                      checked={cols[c.key]}
+                      onChange={(e) =>
+                        setCols((prev) => ({ ...prev, [c.key]: e.target.checked }))
+                      }
+                    />
+                    {c.label}
+                  </label>
+                ))}
+              </div>
+            </details>
+          </div>
+
           <div className="overflow-hidden rounded border bg-white">
             <table className="w-full text-sm">
               <thead className="bg-gray-50 text-left text-gray-500">
                 <tr>
                   <th className="px-4 py-2">标题</th>
-                  <th className="px-4 py-2">目录</th>
-                  <th className="px-4 py-2">状态</th>
-                  <th className="px-4 py-2">摘要</th>
+                  {cols.folder && <th className="px-4 py-2">目录</th>}
+                  {cols.category && <th className="px-4 py-2">分类</th>}
+                  {cols.tags && <th className="px-4 py-2">标签</th>}
+                  {cols.type && <th className="px-4 py-2">类型</th>}
+                  {cols.status && <th className="px-4 py-2">状态</th>}
+                  {cols.summary && <th className="px-4 py-2">摘要</th>}
+                  {cols.created && <th className="px-4 py-2">创建时间</th>}
                   <th className="px-4 py-2">操作</th>
                 </tr>
               </thead>
               <tbody>
-                {docs.length === 0 && (
+                {shownDocs.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="px-4 py-6 text-center text-gray-400">
-                      暂无文档
+                    <td colSpan={9} className="px-4 py-6 text-center text-gray-400">
+                      {docs.length === 0 ? "暂无文档" : "无匹配结果"}
                     </td>
                   </tr>
                 )}
-                {docs.map((d) => (
+                {shownDocs.map((d) => (
                   <tr
                     key={d.id}
                     className="border-t align-top"
@@ -426,52 +507,92 @@ export default function DocumentsPage() {
                       {admin && <span className="mr-1 cursor-grab text-gray-300">⠿</span>}
                       {d.title}
                     </td>
-                    <td className="px-4 py-2">
-                      {admin ? (
-                        <select
-                          value={d.folder_id ?? ""}
-                          onChange={async (e) => {
-                            setError(null);
-                            try {
-                              await api.patch(`/documents/${d.id}/move`, {
-                                folder_id: e.target.value || null,
-                              });
-                              await loadDocs();
-                            } catch (err) {
-                              setError(
-                                err instanceof ApiError ? err.message : "移动失败"
-                              );
-                            }
-                          }}
-                          className="rounded border px-1 py-0.5 text-xs"
-                        >
-                          <option value="">（无目录）</option>
-                          {folders.map((f) => (
-                            <option key={f.id} value={f.id}>
-                              {f.name}
-                            </option>
+                    {cols.folder && (
+                      <td className="px-4 py-2">
+                        {admin ? (
+                          <select
+                            value={d.folder_id ?? ""}
+                            onChange={async (e) => {
+                              setError(null);
+                              try {
+                                await api.patch(`/documents/${d.id}/move`, {
+                                  folder_id: e.target.value || null,
+                                });
+                                await loadDocs();
+                              } catch (err) {
+                                setError(
+                                  err instanceof ApiError ? err.message : "移动失败"
+                                );
+                              }
+                            }}
+                            className="rounded border px-1 py-0.5 text-xs"
+                          >
+                            <option value="">（无目录）</option>
+                            {folders.map((f) => (
+                              <option key={f.id} value={f.id}>
+                                {f.name}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <span className="text-gray-500">
+                            {folderName(d.folder_id)}
+                          </span>
+                        )}
+                      </td>
+                    )}
+                    {cols.category && (
+                      <td className="px-4 py-2 text-gray-600">
+                        {categoryName(d.category_id)}
+                      </td>
+                    )}
+                    {cols.tags && (
+                      <td className="px-4 py-2">
+                        <div className="flex flex-wrap gap-1">
+                          {(d.tags ?? []).map((t) => (
+                            <span
+                              key={t}
+                              className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600"
+                            >
+                              {t}
+                            </span>
                           ))}
-                        </select>
-                      ) : (
-                        <span className="text-gray-500">{folderName(d.folder_id)}</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-2">
-                      <span
-                        className={
-                          d.status === "ready"
-                            ? "text-green-700"
-                            : d.status === "failed"
-                              ? "text-red-600"
-                              : "text-amber-600"
-                        }
-                      >
-                        {STATUS_LABEL[d.status] ?? d.status}
-                      </span>
-                    </td>
-                    <td className="max-w-xs truncate px-4 py-2 text-gray-600">
-                      {d.summary ?? "—"}
-                    </td>
+                          {(!d.tags || d.tags.length === 0) && (
+                            <span className="text-gray-400">—</span>
+                          )}
+                        </div>
+                      </td>
+                    )}
+                    {cols.type && (
+                      <td className="px-4 py-2 text-xs text-gray-500">
+                        {d.mime_type}
+                      </td>
+                    )}
+                    {cols.status && (
+                      <td className="px-4 py-2">
+                        <span
+                          className={
+                            d.status === "ready"
+                              ? "text-green-700"
+                              : d.status === "failed"
+                                ? "text-red-600"
+                                : "text-amber-600"
+                          }
+                        >
+                          {STATUS_LABEL[d.status] ?? d.status}
+                        </span>
+                      </td>
+                    )}
+                    {cols.summary && (
+                      <td className="max-w-xs truncate px-4 py-2 text-gray-600">
+                        {d.summary ?? "—"}
+                      </td>
+                    )}
+                    {cols.created && (
+                      <td className="whitespace-nowrap px-4 py-2 text-xs text-gray-500">
+                        {new Date(d.created_at).toLocaleString()}
+                      </td>
+                    )}
                     <td className="whitespace-nowrap px-4 py-2">
                       <button
                         onClick={() => download(d)}
