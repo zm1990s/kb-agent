@@ -8,6 +8,7 @@ const links = [
   { href: "/chat", label: "对话查询", adminOnly: false },
   { href: "/documents", label: "文档管理", adminOnly: false },
   { href: "/admin", label: "空间管理", adminOnly: true },
+  { href: "/settings", label: "系统设置", adminOnly: true },
 ];
 
 export default function NavBar() {

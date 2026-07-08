@@ -2,11 +2,11 @@
 
 import { useRouter } from "next/navigation";
 import NavBar from "@/components/NavBar";
-import WorkspaceAdmin from "@/components/admin/WorkspaceAdmin";
+import SystemSettings from "@/components/admin/SystemSettings";
 import { isAdmin } from "@/lib/auth";
 import { useAuthGuard } from "@/lib/useAuthGuard";
 
-export default function AdminPage() {
+export default function SettingsPage() {
   const ready = useAuthGuard();
   const router = useRouter();
 
@@ -20,8 +20,8 @@ export default function AdminPage() {
     <div className="flex min-h-screen flex-col">
       <NavBar />
       <main className="mx-auto w-full max-w-3xl flex-1 p-4">
-        <h1 className="mb-4 text-lg font-semibold">空间管理</h1>
-        <WorkspaceAdmin />
+        <h1 className="mb-4 text-lg font-semibold">系统设置</h1>
+        <SystemSettings />
       </main>
     </div>
   );
