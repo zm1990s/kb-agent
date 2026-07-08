@@ -101,10 +101,54 @@ class StorageProtocol(Protocol):
 ### 对话检索（M3）
 | 方法 | 路径 | 说明 | 请求体关键字段 | 返回关键字段 |
 |------|------|------|--------------|-------------|
-| POST | /chat | 对话式检索取件 | {workspace_id, message, [conversation_id]} | {answer, sources:[{doc_id, title, download_url}], conversation_id} |
+| POST | /chat | 对话式检索取件（非流式） | {workspace_id, message, [conversation_id]} | {answer, sources:[{doc_id, title, download_url}], conversation_id} |
+| POST | /chat/stream | SSE 流式：先推工作阶段，再推答案 | 同上 | event: stage / done |
+| GET  | /conversations | 我的会话列表 | ?workspace_id | [{id, workspace_id, created_at}] |
+| POST | /conversations | 新建空会话 | {workspace_id} | {id, ...} |
 | GET  | /conversations/{id} | 会话历史 | - | {messages:[...]} |
 
-### Skill（M4 预留，MVP 不实现，仅登记契约）
+### 目录 / 文档管理（M2 增强 · F1/F2/F8）
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET/POST | /folders | 列/建目录（层级，parent_id） |
+| PATCH | /folders/{id} | 重命名 |
+| PATCH | /folders/{id}/move | 改父级（防环） |
+| DELETE | /folders/{id} | 删目录（子级级联，文档移出不删） |
+| PATCH | /documents/{id}/move | 移动文档到目录 |
+| DELETE | /documents/{id} | 删除文档（存储+DB+任务+索引） |
+| POST | /documents/{id}/replace | 替换原文并重新归类 |
+
+### 用户管理 / 组 / RBAC（F4/F5/F6，均 admin-only）
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | /admin/users | 列出所有用户 |
+| PATCH | /admin/users/{id}/active | 启用/禁用 |
+| PATCH | /admin/users/{id}/role | 改角色 |
+| POST | /admin/users/{id}/reset-password | 重置密码 |
+| GET/POST | /admin/groups | 列/建用户组 |
+| DELETE | /admin/groups/{id} | 删组 |
+| GET/POST | /admin/groups/{id}/rules | 列/加入组规则 |
+| DELETE | /admin/rules/{id} | 删规则 |
+| GET | /admin/groups/{id}/members | 组成员 |
+| POST | /admin/recompute-memberships | 全量重算自动入组 |
+| GET/PUT | /admin/groups/{id}/permissions | 查/设组的模块权限 |
+| GET | /auth/my-permissions | 当前用户各模块有效权限（菜单显隐用） |
+
+### 空间按组授权（F7）
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | /workspaces/{ws}/group-grants | 列出空间的组授权 |
+| POST | /workspaces/{ws}/group-grants | 授权空间给组 {group_id, role_in_ws} |
+| DELETE | /workspaces/{ws}/group-grants/{group_id} | 撤销 |
+
+### 系统设置（管理员）
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET/PUT | /settings/engine | 查/设引擎后端（Claude 可用；Codex/OpenClaw 灰显） |
+| GET/POST | /auth/allowed-domains | 注册域名白名单（DB 维护） |
+| DELETE | /auth/allowed-domains/{id} | 删白名单域名 |
+
+### Skill（M4 预留，未实现，仅登记契约）
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | GET  | /skills | 列出已注册 skill |
@@ -201,8 +245,21 @@ class StorageProtocol(Protocol):
 | sources | JSONB | 引用的 doc_id 列表 |
 | created_at | TIMESTAMPTZ | default now() |
 
+### 增强批次新增表（migration 005–008）
+- **folders**（F1/F2）：`id, workspace_id(FK), name, parent_id(FK self, ON DELETE CASCADE), created_at`；`documents.folder_id`（FK, ON DELETE SET NULL）。用户手动目录树，与分类/标签解耦。
+- **allowed_domains**（M1-U9）：`id, domain(UNIQUE), created_at`。注册白名单迁到 DB。
+- **app_settings**（MF-U7）：`key(PK), value, updated_at`。如 `engine_backend`。
+- **groups**（F5）：`id, name(UNIQUE), description, created_at`。
+- **group_rules**（F5）：`id, group_id(FK), field(email_domain/email/role), op(equals/endswith/contains), value`。
+- **group_members**（F5）：`(group_id, user_id)` PK。
+- **group_permissions**（F6）：`(group_id, module)` PK, `level CHECK(none/read/write)`；module ∈ chat/documents/workspaces/users/settings。
+- **workspace_group_grants**（F7）：`(workspace_id, group_id)` PK, `role_in_ws CHECK(owner/editor/viewer)`。
+- **users**（F4）新增 `is_active BOOLEAN default true`。
+
 ## 关键技术选型的“为什么”
-- **不上向量库**：用户明确要求以原始文件为准、减少幻觉。检索用 PG 全文 + 元数据过滤定位到「文件」，再把原文交给 Claude 回答，避免向量切片召回不准引入的幻觉。预留在文档量上千后再评估 pgvector。
+- **不上向量库 / Agent 式索引问答**：以原文为准、减少幻觉。对话不做关键词硬匹配，而是把**整个空间的结构化索引**（标题/分类/标签/摘要）喂给 Claude，由它理解意图、组织答案、按编号挑相关文档（服务端映射回真实文档，防 ID 幻觉）。文档量上千后再评估 pgvector。
+- **RBAC 绑用户组 + admin 绕过**：权限挂在组上（组→模块→读写），用户取所属组并集最高；空间访问 = 个人成员 ∪ 组授权。admin 绕过一切，避免把管理员锁在外面。
+- **引擎认证经 .env 透传**：支持 API key / 公司网关 / AWS Bedrock，凭据不硬编码；引擎后端由管理员在系统设置持久化选择。
 - **封装 Claude CLI 而非直连 SDK**：复用 CLI 的 agent 能力与工具生态；用 `EngineProtocol` 隔离，未来平滑接入 OpenClaw/Codex。
 - **workspace 作为隔离边界**：Partner 与内部数据天然分空间，权限模型简单可审计，避免行级复杂 ACL。
 - **本地存储 + 存储抽象**：用户要求先不上云对象存储、保持简单。用 `StorageProtocol` 隔离，本地实现 `LocalStorage`，未来换 S3/OSS 不动业务层。

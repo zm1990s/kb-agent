@@ -32,13 +32,17 @@ backend/
     tasks/        # 后台任务：归类 worker、任务状态与重试
   tests/
 frontend/         # Next.js（App Router）+ TS + Tailwind，用户唯一入口
-  app/            # 路由页面：登录/对话/文档/空间
-  lib/            # api client（统一走 /api）、auth（token 存取、路由守卫）
-  components/     # 复用 UI 组件
+  app/            # 路由页面：login/chat/documents/admin/users/settings
+  lib/            # api client（统一走 /api，含 stream SSE）、auth、useAuthGuard
+  components/     # NavBar(RBAC 显隐) / MessageBubble / Markdown / FolderTree
+                  # / TaskLogPanel / admin(WorkspaceAdmin/SystemSettings/CategoryManager)
   next.config.js  # rewrites: /api/* -> 后端 FastAPI（单端口暴露）
 infra/
-  postgres/init.sql   # 严格按 DESIGN.md 建表
-docs/                 # PRD / DESIGN / ROADMAP / WORKFLOW
+  postgres/
+    init.sql          # CREATE EXTENSION
+    migrations/       # 001_m1_auth … 008_rbac，按序应用
+scripts/          # dev.sh / test.sh(独立库 kbagent_test) / lint.sh / e2e.sh
+docs/                 # PRD / DESIGN / ROADMAP / WORKFLOW / SECURITY
 prompts/              # 分步系统提示词
 ```
 
@@ -63,7 +67,14 @@ prompts/              # 分步系统提示词
 - 每个针对具体资源的端点（`/documents/{id}`、`/download`、`/tasks`、`/reprocess` 等）必须校验「当前用户是该资源所属 workspace 的成员」，禁止只校验「已登录」
 - workspace 过滤必须下沉到 **SQL 查询层**（`WHERE workspace_id IN (:my_ws)`），禁止「先查全量再在应用层过滤」
 - 资源 ID 用 UUID；即使 ID 被猜到/遍历，非成员也必须拿不到数据（返 403/404，不泄漏存在性）
-- 管理员端点（建空间/建分类/上传/reprocess）必须过 `require_admin`；空间内资源必须过 `require_ws_member`；每个端点都要有越权测试用例（成员可访问 + 非成员被拒）
+- 管理员端点（建空间/建分类/上传/reprocess/用户管理/组/RBAC）必须过 `require_admin`；空间内资源必须过 `require_ws_member`；每个端点都要有越权测试用例（成员可访问 + 非成员被拒）
+
+### 权限模型（RBAC，F4–F7）
+- **admin 绕过一切 RBAC**（`effective_permissions` 对 admin 返回全模块 write）——改动权限逻辑时保持这条不变，避免锁死管理员。
+- 权限绑**用户组**（组→模块→none/read/write）；用户取所属组权限并集最高。模块 = chat/documents/workspaces/users/settings。
+- 空间访问 = 个人成员 ∪ 所属组授权（`is_member`/`list_my_workspaces` 两者都要查）。
+- 自动入组规则：注册时 `sync_user_groups`；改规则后靠 `recompute-memberships` 全量重算。
+- 引擎工具：**已按决策放开 Claude 全部工具**（含 Bash，供 pdftotext 等）；容器以非 root 运行；提示词注入由外部 Guardrails 兜底。不要再收窄成 allowedTools 而破坏大文件抽取。
 
 ### 路径穿越 / 文件存取（storage 层强制）
 - 禁止用客户端提供的文件名当存储路径 —— `storage_key` 由服务端生成（UUID），原始文件名只存 DB 字段

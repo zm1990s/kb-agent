@@ -1,15 +1,18 @@
 # 实现路径 · KB-Agent
 
 ## 模块总览
-| 模块 ID | 模块名 | 核心职责 | 优先级 | 依赖模块 |
-|---------|-------|---------|--------|---------|
-| M0 | 骨架与引擎抽象 | 目录、配置、DB 连接、EngineProtocol+ClaudeCliEngine | P0 | - |
-| M1 | 认证与空间 | 登录/JWT、workspace、成员、鉴权中间件 | P0 | M0 |
-| M2 | 文档入库与归类 | 上传、本地存储、后台归类(CLI读原文)、任务可观测、分类体系 | P0 | M0,M1 |
-| M3 | 对话式检索取件 | 全文检索、engine 生成答案+原文链接、会话 | P0 | M1,M2 |
-| MF | 前端（单端口入口） | Next.js+Tailwind、登录/对话/文档/空间页 | P0 | M1,M2,M3 |
-| M4 | Skill 插拔框架 | SkillBase 抽象、registry、invoke、审批契约 | P1（预留） | M1 |
-| M5 | SCM 示范 skill | PANW 配置生成，pending_approval→approve→下发 | P1（预留） | M4 |
+| 模块 ID | 模块名 | 核心职责 | 状态 |
+|---------|-------|---------|------|
+| M0 | 骨架与引擎抽象 | 目录、配置、DB 连接、EngineProtocol+ClaudeCliEngine | ✅ 已交付 |
+| M1 | 认证与空间 | 登录/JWT、workspace、成员、鉴权、管理员种子、域名白名单(DB) | ✅ 已交付 |
+| M2 | 文档入库与归类 | 上传、本地存储、后台归类(CLI读原文/Bedrock)、任务可观测、分类、目录、删/移/替 | ✅ 已交付 |
+| M3 | 对话式检索取件 | Agent 式索引问答、答案+原文链接、多轮上下文、SSE 流式 | ✅ 已交付 |
+| MF | 前端（单端口入口） | Next.js+Tailwind、登录/对话(气泡+流式)/文档(目录树)/空间/用户/设置页 | ✅ 已交付 |
+| F1–F8 | 增强批次 | 拖拽、批量/目录上传、全字段展示、用户管理、用户组、RBAC、空间按组授权、分类迁移 | ✅ 已交付 |
+| M4 | Skill 插拔框架 | SkillBase 抽象、registry、invoke、审批契约 | 预留（未实现） |
+| M5 | SCM 示范 skill | PANW 配置生成，pending_approval→approve→下发 | 预留（未实现） |
+
+> 详细的已交付 Unit 见 git tag（`M1-U*-done` … `F8-done`）。以下模块拆解为历史实现记录；增强批次 F1–F8 的验收见 PRD 第 2 节。
 
 ---
 
@@ -136,10 +139,12 @@
 
 ## 交付顺序建议
 
-- **Phase 1**：M0 全部 → M1 全部
-- **Phase 2**：M2 全部
-- **Phase 3**：M3 全部（后端 MVP 到此可用）
-- **Phase 4**：MF 前端全部（用户可用的完整 MVP）
-- **Phase 5（未来）**：M4 → M5
+- **Phase 1**：M0 → M1 ✅
+- **Phase 2**：M2 ✅
+- **Phase 3**：M3（后端 MVP 可用）✅
+- **Phase 4**：MF 前端（用户可用的完整 MVP）✅
+- **Phase 5**：运维/接入收尾（Bedrock 接入、大 PDF 抽取、测试库隔离）✅
+- **Phase 6**：增强批次 F1–F8（拖拽/批量上传/全字段/用户管理/组/RBAC/空间组授权/分类迁移）✅
+- **Phase 7（未来）**：M4 Skill 框架 → M5 SCM skill
 
 每完成一个 Unit，建议 `git tag M<N>-U<N>-done`，方便回退。
