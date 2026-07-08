@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import FolderTree, { buildTree } from "@/components/FolderTree";
 import NavBar from "@/components/NavBar";
 import TaskLogPanel from "@/components/TaskLogPanel";
 import WorkspacePicker from "@/components/WorkspacePicker";
@@ -78,20 +79,40 @@ export default function DocumentsPage() {
   const folderName = (id: string | null) =>
     folders.find((f) => f.id === id)?.name ?? "—";
 
-  async function createFolder() {
-    const name = window.prompt("新目录名称");
+  async function createFolder(parentId: string | null) {
+    const name = window.prompt(parentId ? "新建子目录名称" : "新目录名称");
     if (!name || !workspaceId) return;
     setError(null);
     try {
-      await api.post(`/folders?workspace_id=${workspaceId}`, { name });
+      await api.post(`/folders?workspace_id=${workspaceId}`, {
+        name,
+        parent_id: parentId,
+      });
       await loadFolders();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "建目录失败");
     }
   }
 
+  async function renameFolder(folder: Folder) {
+    const name = window.prompt("重命名目录", folder.name);
+    if (!name || !workspaceId || name === folder.name) return;
+    setError(null);
+    try {
+      await api.patch(`/folders/${folder.id}?workspace_id=${workspaceId}`, {
+        name,
+      });
+      await loadFolders();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "重命名失败");
+    }
+  }
+
   async function deleteFolder(id: string) {
-    if (!workspaceId || !window.confirm("删除该目录？其下文档将移出目录，不会被删除。"))
+    if (
+      !workspaceId ||
+      !window.confirm("删除该目录？子目录一并删除，其下文档移出目录（不删除文档）。")
+    )
       return;
     try {
       await api.del(`/folders/${id}?workspace_id=${workspaceId}`);
@@ -200,10 +221,10 @@ export default function DocumentsPage() {
         <aside className="flex w-56 shrink-0 flex-col border-r bg-white">
           {admin && (
             <button
-              onClick={createFolder}
+              onClick={() => createFolder(null)}
               className="m-2 rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
             >
-              + 新建目录
+              + 新建顶级目录
             </button>
           )}
           <div className="flex-1 overflow-y-auto px-2 pb-2">
@@ -224,32 +245,15 @@ export default function DocumentsPage() {
               </button>
             ))}
             <div className="my-1 border-t" />
-            {folders.map((f) => (
-              <div
-                key={f.id}
-                className={`group flex items-center rounded ${
-                  activeFolder === f.id ? "bg-blue-50" : "hover:bg-gray-100"
-                }`}
-              >
-                <button
-                  onClick={() => setActiveFolder(f.id)}
-                  className={`flex-1 truncate px-3 py-2 text-left text-sm ${
-                    activeFolder === f.id ? "text-blue-700" : "text-gray-600"
-                  }`}
-                >
-                  📁 {f.name}
-                </button>
-                {admin && (
-                  <button
-                    onClick={() => deleteFolder(f.id)}
-                    className="hidden px-2 text-xs text-red-500 group-hover:block"
-                    title="删除目录"
-                  >
-                    ✕
-                  </button>
-                )}
-              </div>
-            ))}
+            <FolderTree
+              nodes={buildTree(folders)}
+              activeId={activeFolder}
+              admin={admin}
+              onSelect={setActiveFolder}
+              onAddChild={(parentId) => createFolder(parentId)}
+              onRename={renameFolder}
+              onDelete={deleteFolder}
+            />
           </div>
         </aside>
 
