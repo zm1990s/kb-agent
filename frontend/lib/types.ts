@@ -38,11 +38,19 @@ export interface DocumentPublic {
   workspace_id: string;
   title: string;
   mime_type: string;
+  folder_id: string | null;
   category_id: string | null;
   summary: string | null;
   tags: string[];
   status: string;
   created_at: string;
+}
+
+export interface Folder {
+  id: string;
+  workspace_id: string;
+  name: string;
+  parent_id: string | null;
 }
 
 export interface ProcessingTask {
