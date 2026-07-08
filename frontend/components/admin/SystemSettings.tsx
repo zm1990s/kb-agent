@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import CategoryManager from "@/components/admin/CategoryManager";
 import { api, ApiError } from "@/lib/api";
 import type { AllowedDomain } from "@/lib/types";
 
@@ -151,6 +152,9 @@ export default function SystemSettings() {
           )}
         </ul>
       </section>
+
+      {/* F8：分类体系（从空间管理移来） */}
+      <CategoryManager />
 
       {error && <p className="text-sm text-red-600">{error}</p>}
     </div>
