@@ -30,6 +30,7 @@ export default function DocumentsPage() {
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const dirRef = useRef<HTMLInputElement>(null);
   const replaceRef = useRef<HTMLInputElement>(null);
   const [replacingId, setReplacingId] = useState<string | null>(null);
   // 正在查看日志的文档
@@ -149,21 +150,61 @@ export default function DocumentsPage() {
     }
   }
 
-  async function onUpload(e: React.FormEvent) {
-    e.preventDefault();
-    const file = fileRef.current?.files?.[0];
-    if (!file || !workspaceId) return;
+  // 上传单个文件到指定目录
+  async function uploadOne(file: File, folderId: string | null) {
+    const form = new FormData();
+    form.append("file", file);
+    if (folderId) form.append("folder_id", folderId);
+    await api.upload(`/workspaces/${workspaceId}/documents`, form);
+  }
+
+  // 目录上传：按 relativePath 逐级建子目录（缓存已建的路径→id），再上传文件
+  async function ensureFolderPath(
+    segments: string[],
+    baseFolderId: string | null,
+    cache: Map<string, string>
+  ): Promise<string | null> {
+    let parent = baseFolderId;
+    let pathKey = "";
+    for (const seg of segments) {
+      pathKey += "/" + seg;
+      const cached = cache.get(pathKey);
+      if (cached) {
+        parent = cached;
+        continue;
+      }
+      const created = await api.post<Folder>(
+        `/folders?workspace_id=${workspaceId}`,
+        { name: seg, parent_id: parent }
+      );
+      cache.set(pathKey, created.id);
+      parent = created.id;
+    }
+    return parent;
+  }
+
+  async function handleFiles(files: FileList | null) {
+    if (!files || files.length === 0 || !workspaceId) return;
     setError(null);
     setUploading(true);
+    const baseFolder =
+      activeFolder !== ALL && activeFolder !== ROOT ? activeFolder : null;
+    const pathCache = new Map<string, string>();
     try {
-      const form = new FormData();
-      form.append("file", file);
-      // 当前选中具体目录时，上传即归入该目录
-      if (activeFolder !== ALL && activeFolder !== ROOT) {
-        form.append("folder_id", activeFolder);
+      for (const file of Array.from(files)) {
+        // webkitRelativePath 形如 "顶层/子/文件.pdf"（目录上传时有值）
+        const rel = (file as File & { webkitRelativePath?: string })
+          .webkitRelativePath;
+        let folderId = baseFolder;
+        if (rel && rel.includes("/")) {
+          const segs = rel.split("/").slice(0, -1); // 去掉文件名
+          folderId = await ensureFolderPath(segs, baseFolder, pathCache);
+        }
+        await uploadOne(file, folderId);
       }
-      await api.upload(`/workspaces/${workspaceId}/documents`, form);
       if (fileRef.current) fileRef.current.value = "";
+      if (dirRef.current) dirRef.current.value = "";
+      await loadFolders();
       await loadDocs();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "上传失败");
@@ -298,24 +339,46 @@ export default function DocumentsPage() {
 
         <main className="flex-1 overflow-y-auto p-4">
           {admin && (
-            <form
-              onSubmit={onUpload}
-              className="mb-4 flex items-center gap-3 rounded border bg-white p-4"
-            >
-              <input ref={fileRef} type="file" className="text-sm" required />
+            <div className="mb-4 flex flex-wrap items-center gap-3 rounded border bg-white p-4">
+              {/* 批量多文件 */}
+              <input
+                ref={fileRef}
+                type="file"
+                multiple
+                onChange={(e) => handleFiles(e.target.files)}
+                className="hidden"
+              />
               <button
-                type="submit"
+                onClick={() => fileRef.current?.click()}
                 disabled={uploading || !workspaceId}
                 className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
               >
-                {uploading ? "上传中…" : "上传文档"}
+                {uploading ? "上传中…" : "上传文件（可多选）"}
+              </button>
+              {/* 整目录上传（保持结构） */}
+              <input
+                ref={dirRef}
+                type="file"
+                // @ts-expect-error 非标准但主流浏览器支持：整目录选择
+                webkitdirectory=""
+                directory=""
+                multiple
+                onChange={(e) => handleFiles(e.target.files)}
+                className="hidden"
+              />
+              <button
+                onClick={() => dirRef.current?.click()}
+                disabled={uploading || !workspaceId}
+                className="rounded border border-blue-600 px-4 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-50"
+              >
+                上传整个目录
               </button>
               {activeFolder !== ALL && activeFolder !== ROOT && (
                 <span className="text-xs text-gray-400">
-                  上传到目录：{folderName(activeFolder)}
+                  归入目录：{folderName(activeFolder)}
                 </span>
               )}
-            </form>
+            </div>
           )}
 
           {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
