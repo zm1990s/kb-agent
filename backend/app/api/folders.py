@@ -8,13 +8,20 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.db import get_session
 from app.core.deps import get_current_user
 from app.models.auth import User
-from app.schemas.document import FolderCreate, FolderPublic, FolderRename
+from app.schemas.document import (
+    FolderCreate,
+    FolderMove,
+    FolderPublic,
+    FolderRename,
+)
 from app.services.folder_service import (
+    FolderCycleError,
     ParentFolderInvalidError,
     create_folder,
     delete_folder,
     get_folder_in_workspace,
     list_folders,
+    move_folder,
     rename_folder,
 )
 from app.services.workspace_service import is_member
@@ -75,6 +82,29 @@ async def rename_ws_folder(
     if folder is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "目录不存在")
     folder = await rename_folder(session, folder=folder, name=body.name)
+    return FolderPublic.model_validate(folder)
+
+
+@router.patch("/{folder_id}/move", response_model=FolderPublic)
+async def move_ws_folder(
+    folder_id: uuid.UUID,
+    workspace_id: uuid.UUID,
+    body: FolderMove,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> FolderPublic:
+    await _ensure_member(session, workspace_id, current_user)
+    folder = await get_folder_in_workspace(
+        session, folder_id=folder_id, workspace_id=workspace_id
+    )
+    if folder is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "目录不存在")
+    try:
+        folder = await move_folder(session, folder=folder, new_parent_id=body.parent_id)
+    except FolderCycleError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "不能移动到自身或子目录下") from exc
+    except ParentFolderInvalidError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "目标父目录无效") from exc
     return FolderPublic.model_validate(folder)
 
 

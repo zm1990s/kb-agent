@@ -124,6 +124,31 @@ export default function DocumentsPage() {
     }
   }
 
+  // 拖拽落到目录：文档→移动到目录；目录→改父级
+  async function onDropItem(
+    targetFolderId: string | null,
+    payload: { type: "doc" | "folder"; id: string }
+  ) {
+    if (!workspaceId) return;
+    setError(null);
+    try {
+      if (payload.type === "doc") {
+        await api.patch(`/documents/${payload.id}/move`, {
+          folder_id: targetFolderId,
+        });
+        await loadDocs();
+      } else {
+        await api.patch(
+          `/folders/${payload.id}/move?workspace_id=${workspaceId}`,
+          { parent_id: targetFolderId }
+        );
+        await loadFolders();
+      }
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "移动失败");
+    }
+  }
+
   async function onUpload(e: React.FormEvent) {
     e.preventDefault();
     const file = fileRef.current?.files?.[0];
@@ -253,7 +278,21 @@ export default function DocumentsPage() {
               onAddChild={(parentId) => createFolder(parentId)}
               onRename={renameFolder}
               onDelete={deleteFolder}
+              onDropItem={admin ? onDropItem : undefined}
             />
+            {admin && (
+              <div
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  const raw = e.dataTransfer.getData("application/kb-item");
+                  if (raw) onDropItem(null, JSON.parse(raw));
+                }}
+                className="mt-1 rounded border border-dashed border-gray-300 px-3 py-2 text-center text-xs text-gray-400"
+              >
+                拖到此处移出目录 / 置为顶级
+              </div>
+            )}
           </div>
         </aside>
 
@@ -309,8 +348,21 @@ export default function DocumentsPage() {
                   </tr>
                 )}
                 {docs.map((d) => (
-                  <tr key={d.id} className="border-t align-top">
-                    <td className="px-4 py-2">{d.title}</td>
+                  <tr
+                    key={d.id}
+                    className="border-t align-top"
+                    draggable={admin}
+                    onDragStart={(e) =>
+                      e.dataTransfer.setData(
+                        "application/kb-item",
+                        JSON.stringify({ type: "doc", id: d.id })
+                      )
+                    }
+                  >
+                    <td className="px-4 py-2">
+                      {admin && <span className="mr-1 cursor-grab text-gray-300">⠿</span>}
+                      {d.title}
+                    </td>
                     <td className="px-4 py-2">
                       {admin ? (
                         <select

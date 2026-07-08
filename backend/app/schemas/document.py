@@ -55,6 +55,10 @@ class FolderRename(BaseModel):
     name: str = Field(min_length=1, max_length=200)
 
 
+class FolderMove(BaseModel):
+    parent_id: uuid.UUID | None = None
+
+
 class FolderPublic(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

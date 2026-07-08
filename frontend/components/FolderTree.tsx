@@ -36,6 +36,13 @@ interface Props {
   onAddChild: (parentId: string) => void;
   onRename: (folder: Folder) => void;
   onDelete: (id: string) => void;
+  // 拖拽落到目录节点：payload 形如 {type:'doc'|'folder', id}
+  onDropItem?: (targetFolderId: string | null, payload: DragPayload) => void;
+}
+
+export interface DragPayload {
+  type: "doc" | "folder";
+  id: string;
 }
 
 // 递归渲染文件夹树。每个节点可展开/折叠，管理员可建子目录/改名/删除。
@@ -48,6 +55,7 @@ export default function FolderTree({
   onAddChild,
   onRename,
   onDelete,
+  onDropItem,
 }: Props) {
   return (
     <div>
@@ -62,6 +70,7 @@ export default function FolderTree({
           onAddChild={onAddChild}
           onRename={onRename}
           onDelete={onDelete}
+          onDropItem={onDropItem}
         />
       ))}
     </div>
@@ -77,17 +86,46 @@ function FolderRow({
   onAddChild,
   onRename,
   onDelete,
+  onDropItem,
 }: { node: FolderNode; depth: number } & Omit<Props, "nodes" | "depth">) {
   const [open, setOpen] = useState(true);
+  const [dragOver, setDragOver] = useState(false);
   const hasChildren = node.children.length > 0;
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOver(false);
+    const raw = e.dataTransfer.getData("application/kb-item");
+    if (!raw || !onDropItem) return;
+    try {
+      const payload = JSON.parse(raw) as DragPayload;
+      if (payload.type === "folder" && payload.id === node.id) return; // 不能拖到自己
+      onDropItem(node.id, payload);
+    } catch {
+      /* ignore */
+    }
+  }
 
   return (
     <div>
       <div
         className={`group flex items-center rounded ${
-          activeId === node.id ? "bg-blue-50" : "hover:bg-gray-100"
+          dragOver
+            ? "ring-2 ring-blue-400"
+            : activeId === node.id
+              ? "bg-blue-50"
+              : "hover:bg-gray-100"
         }`}
         style={{ paddingLeft: depth * 12 }}
+        onDragOver={(e) => {
+          if (onDropItem) {
+            e.preventDefault();
+            setDragOver(true);
+          }
+        }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={handleDrop}
       >
         <button
           onClick={() => setOpen((o) => !o)}
@@ -98,7 +136,14 @@ function FolderRow({
         </button>
         <button
           onClick={() => onSelect(node.id)}
-          className={`flex-1 truncate py-2 pr-1 text-left text-sm ${
+          draggable={admin && !!onDropItem}
+          onDragStart={(e) =>
+            e.dataTransfer.setData(
+              "application/kb-item",
+              JSON.stringify({ type: "folder", id: node.id })
+            )
+          }
+          className={`flex-1 cursor-grab truncate py-2 pr-1 text-left text-sm active:cursor-grabbing ${
             activeId === node.id ? "text-blue-700" : "text-gray-600"
           }`}
         >
@@ -140,6 +185,7 @@ function FolderRow({
           onAddChild={onAddChild}
           onRename={onRename}
           onDelete={onDelete}
+          onDropItem={onDropItem}
         />
       )}
     </div>
