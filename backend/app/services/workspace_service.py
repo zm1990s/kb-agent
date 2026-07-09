@@ -46,17 +46,27 @@ async def add_member(
     session: AsyncSession,
     *,
     workspace_id: uuid.UUID,
-    user_id: uuid.UUID,
+    user_id: uuid.UUID | None = None,
+    email: str | None = None,
     role_in_ws: str,
 ) -> WorkspaceMember:
-    """把用户加入空间。空间/用户不存在或已是成员分别抛对应异常。"""
+    """把用户加入空间。可按 user_id 或 email 查找用户。"""
     ws = await session.get(Workspace, workspace_id)
     if ws is None:
         raise WorkspaceNotFoundError(str(workspace_id))
 
-    user = await session.get(User, user_id)
+    if user_id is not None:
+        user = await session.get(User, user_id)
+    elif email is not None:
+        result = await session.execute(select(User).where(User.email == email.lower()))
+        user = result.scalar_one_or_none()
+    else:
+        raise UserNotFoundError("必须提供 user_id 或 email")
+
     if user is None:
-        raise UserNotFoundError(str(user_id))
+        raise UserNotFoundError(str(user_id or email))
+
+    user_id = user.id
 
     existing = await session.get(WorkspaceMember, (workspace_id, user_id))
     if existing is not None:

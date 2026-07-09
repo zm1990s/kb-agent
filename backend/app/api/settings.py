@@ -9,10 +9,17 @@ from app.core.deps import get_current_user, require_admin
 from app.models.auth import User
 from app.services.settings_service import (
     ENGINE_CATALOG,
+    PROMPT_CATALOG,
     EngineNotAvailableError,
+    InvalidPromptError,
     get_engine_backend,
+    get_prompt,
     get_setting,
+    get_prompt_version,
+    list_prompt_history,
+    rollback_prompt,
     set_engine_backend,
+    set_prompt,
     set_setting,
 )
 
@@ -99,6 +106,140 @@ async def get_branding(
     name = await get_setting(session, BRANDING_NAME_KEY) or DEFAULT_NAME
     logo_url = await get_setting(session, BRANDING_LOGO_KEY) or DEFAULT_LOGO
     return BrandingOut(name=name, logo_url=logo_url)
+
+
+# ── 提示词管理 ────────────────────────────────────────────────
+
+from datetime import datetime
+
+
+class PromptOut(BaseModel):
+    key: str
+    label: str
+    description: str
+    value: str
+    required_placeholders: list[str]
+
+
+class PromptIn(BaseModel):
+    value: str
+
+
+class PromptHistoryOut(BaseModel):
+    id: int
+    prompt_key: str
+    version: int
+    value: str
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+@router.get("/prompts", response_model=list[PromptOut])
+async def get_prompts(
+    _admin: User = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+) -> list[PromptOut]:
+    result = []
+    for tpl in PROMPT_CATALOG:
+        value = await get_prompt(session, tpl.key)
+        result.append(
+            PromptOut(
+                key=tpl.key,
+                label=tpl.label,
+                description=tpl.description,
+                value=value,
+                required_placeholders=tpl.required_placeholders,
+            )
+        )
+    return result
+
+
+@router.put("/prompts/{key}", response_model=PromptOut)
+async def update_prompt(
+    key: str,
+    body: PromptIn,
+    _admin: User = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+) -> PromptOut:
+    tpl = next((p for p in PROMPT_CATALOG if p.key == key), None)
+    if tpl is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "未知提示词 key")
+    try:
+        await set_prompt(session, key, body.value)
+    except InvalidPromptError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+    value = await get_prompt(session, key)
+    return PromptOut(
+        key=tpl.key,
+        label=tpl.label,
+        description=tpl.description,
+        value=value,
+        required_placeholders=tpl.required_placeholders,
+    )
+
+
+@router.put("/prompts/{key}/reset", response_model=PromptOut)
+async def reset_prompt(
+    key: str,
+    _admin: User = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+) -> PromptOut:
+    """恢复默认提示词（删除 DB 中的覆盖值）。"""
+    tpl = next((p for p in PROMPT_CATALOG if p.key == key), None)
+    if tpl is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "未知提示词 key")
+    from app.models.settings import AppSetting
+    row = await session.get(AppSetting, key)
+    if row is not None:
+        await session.delete(row)
+        await session.commit()
+    return PromptOut(
+        key=tpl.key,
+        label=tpl.label,
+        description=tpl.description,
+        value=tpl.default,
+        required_placeholders=tpl.required_placeholders,
+    )
+
+
+@router.get("/prompts/{key}/history", response_model=list[PromptHistoryOut])
+async def get_prompt_history(
+    key: str,
+    _admin: User = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+) -> list[PromptHistoryOut]:
+    if not any(p.key == key for p in PROMPT_CATALOG):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "未知提示词 key")
+    rows = await list_prompt_history(session, key)
+    return [PromptHistoryOut.model_validate(r) for r in rows]
+
+
+class RollbackIn(BaseModel):
+    version: int
+
+
+@router.post("/prompts/{key}/rollback", response_model=PromptOut)
+async def rollback_prompt_version(
+    key: str,
+    body: RollbackIn,
+    _admin: User = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+) -> PromptOut:
+    tpl = next((p for p in PROMPT_CATALOG if p.key == key), None)
+    if tpl is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "未知提示词 key")
+    try:
+        value = await rollback_prompt(session, key, body.version)
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
+    return PromptOut(
+        key=tpl.key,
+        label=tpl.label,
+        description=tpl.description,
+        value=value,
+        required_placeholders=tpl.required_placeholders,
+    )
 
 
 @router.put("/branding", response_model=BrandingOut)

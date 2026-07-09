@@ -29,6 +29,8 @@ class Conversation(Base):
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
     )
+    title: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    pinned: Mapped[bool] = mapped_column(nullable=False, server_default="false")
     created_at: Mapped[datetime] = mapped_column(
         server_default=func.now(), nullable=False
     )

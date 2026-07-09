@@ -38,6 +38,7 @@ export default function ChatPage() {
   const [stage, setStage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const loadConversations = useCallback(async () => {
     if (!workspaceId) return;
@@ -58,10 +59,17 @@ export default function ChatPage() {
     loadConversations();
   }, [workspaceId, loadConversations]);
 
-  // 新消息或阶段变化时滚到底部
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [turns, stage, busy]);
+
+  // Auto-resize textarea
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
+  }, [input]);
 
   async function selectConversation(id: string) {
     setError(null);
@@ -120,12 +128,20 @@ export default function ChatPage() {
           }
         }
       );
-      if (isNew) await loadConversations();
+      // Always refresh after a chat — picks up AI-generated title on new convs
+      await loadConversations();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "请求失败");
     } finally {
       setBusy(false);
       setStage(null);
+    }
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      send(e as unknown as React.FormEvent);
     }
   }
 
@@ -149,9 +165,11 @@ export default function ChatPage() {
   }
 
   return (
-    <div className="flex h-screen flex-col">
+    <div className="flex h-screen flex-col bg-gray-50">
       <NavBar />
-      <div className="flex items-center gap-3 border-b bg-white px-4 py-2">
+
+      {/* Workspace toolbar */}
+      <div className="flex items-center gap-3 border-b border-gray-200 bg-white px-4 py-2 shadow-sm">
         <span className="text-sm text-gray-500">空间：</span>
         <WorkspacePicker value={workspaceId} onChange={setWorkspaceId} />
       </div>
@@ -162,14 +180,31 @@ export default function ChatPage() {
           activeId={conversationId}
           onSelect={selectConversation}
           onNew={newConversation}
+          onUpdated={(updated) =>
+            setConversations((prev) =>
+              prev
+                .map((c) => (c.id === updated.id ? updated : c))
+                .sort((a, b) => {
+                  if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+                  return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+                })
+            )
+          }
         />
 
-        <main className="flex flex-1 flex-col overflow-hidden bg-gray-50">
-          <div ref={scrollRef} className="flex-1 space-y-6 overflow-y-auto p-6">
+        <main className="flex flex-1 flex-col overflow-hidden">
+          {/* Messages area */}
+          <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-6 space-y-4">
             {turns.length === 0 && !busy && (
-              <p className="mt-8 text-center text-sm text-gray-400">
-                向知识库提问，AI 会基于文档智能作答并附上原文来源。
-              </p>
+              <div className="flex h-full flex-col items-center justify-center text-center">
+                <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-blue-100 text-blue-600">
+                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M8.625 9.75a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375m-13.5 3.01c0 1.6 1.123 2.994 2.707 3.227 1.087.16 2.185.283 3.293.369V21l4.184-4.183a1.14 1.14 0 01.778-.332 48.294 48.294 0 005.83-.498c1.585-.233 2.708-1.626 2.708-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z" />
+                  </svg>
+                </div>
+                <p className="text-sm font-medium text-gray-600">向知识库提问</p>
+                <p className="mt-1 text-xs text-gray-400">AI 会基于文档智能作答并附上原文来源</p>
+              </div>
             )}
             {turns.map((t, i) => (
               <MessageBubble
@@ -183,24 +218,46 @@ export default function ChatPage() {
             {busy && <ThinkingBubble stage={stage} />}
           </div>
 
-          {error && <p className="px-6 text-sm text-red-600">{error}</p>}
+          {error && (
+            <div className="mx-4 mb-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              {error}
+            </div>
+          )}
 
-          <form onSubmit={send} className="flex gap-2 border-t bg-white p-4">
-            <input
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder={workspaceId ? "输入问题…" : "请先选择空间"}
-              disabled={!workspaceId || busy}
-              className="flex-1 rounded-full border px-4 py-2 text-sm focus:border-blue-500 focus:outline-none"
-            />
-            <button
-              type="submit"
-              disabled={!workspaceId || busy || !input.trim()}
-              className="rounded-full bg-blue-600 px-5 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-            >
-              {busy ? "…" : "发送"}
-            </button>
-          </form>
+          {/* Input area */}
+          <div className="border-t border-gray-200 bg-white px-4 py-3">
+            <form onSubmit={send}>
+              <div className="flex items-end gap-3 rounded-xl border border-gray-300 bg-gray-50 px-4 py-3 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500 transition-all">
+                <textarea
+                  ref={textareaRef}
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder={workspaceId ? "输入问题… (Enter 发送，Shift+Enter 换行)" : "请先选择空间"}
+                  disabled={!workspaceId || busy}
+                  rows={1}
+                  className="flex-1 resize-none bg-transparent text-sm text-gray-900 placeholder-gray-400 outline-none disabled:opacity-60"
+                  style={{ minHeight: "1.5rem", maxHeight: "10rem" }}
+                />
+                <button
+                  type="submit"
+                  disabled={!workspaceId || busy || !input.trim()}
+                  className="shrink-0 rounded-lg bg-blue-600 p-2 text-white hover:bg-blue-700 disabled:bg-gray-300 disabled:text-gray-500 transition-colors"
+                >
+                  {busy ? (
+                    <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                  ) : (
+                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z" />
+                    </svg>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
         </main>
       </div>
     </div>

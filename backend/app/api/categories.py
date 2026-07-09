@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_session
-from app.core.deps import require_admin
+from app.core.deps import get_current_user, require_admin
 from app.models.auth import User
 from app.schemas.document import CategoryCreate, CategoryPublic
 from app.services.category_service import (
@@ -30,7 +30,7 @@ async def _ensure_member(session: AsyncSession, ws_id: uuid.UUID, user: User) ->
 @router.get("", response_model=list[CategoryPublic])
 async def list_ws_categories(
     workspace: uuid.UUID,
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> list[CategoryPublic]:
     await _ensure_member(session, workspace, current_user)

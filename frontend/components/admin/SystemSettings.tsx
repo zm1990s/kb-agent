@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import CategoryManager from "@/components/admin/CategoryManager";
+import PromptsTab from "@/components/admin/PromptsTab";
 import { api, ApiError } from "@/lib/api";
 import type { AllowedDomain } from "@/lib/types";
 
@@ -19,8 +20,10 @@ interface Branding {
   logo_url: string;
 }
 
-// 系统设置分区：品牌配置 + 注册域名白名单 + 引擎（Claude/Codex/OpenClaw）选择。
+type Tab = "general" | "prompts";
+
 export default function SystemSettings() {
+  const [tab, setTab] = useState<Tab>("general");
   const [domains, setDomains] = useState<AllowedDomain[]>([]);
   const [domainName, setDomainName] = useState("");
   const [engine, setEngine] = useState<EngineConfig | null>(null);
@@ -114,124 +117,147 @@ export default function SystemSettings() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* 平台品牌配置 */}
-      <section className="rounded border bg-white p-4">
-        <h2 className="mb-1 text-sm font-medium">平台品牌</h2>
-        <p className="mb-3 text-xs text-gray-400">自定义左上角显示的平台名称和 Logo。</p>
-        <form onSubmit={saveBranding} className="space-y-3">
-          <div>
-            <label className="mb-1 block text-xs text-gray-500">平台名称</label>
-            <input
-              value={brandingName}
-              onChange={(e) => setBrandingName(e.target.value)}
-              placeholder="KB-Agent"
-              className="w-full rounded border px-3 py-2 text-sm"
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs text-gray-500">Logo 图片 URL（留空使用默认缩写）</label>
-            <input
-              value={brandingLogo}
-              onChange={(e) => setBrandingLogo(e.target.value)}
-              placeholder="https://example.com/logo.png"
-              className="w-full rounded border px-3 py-2 text-sm"
-            />
-          </div>
-          {branding.logo_url && (
-            <img
-              src={branding.logo_url}
-              alt="logo 预览"
-              className="h-10 w-10 rounded object-contain"
-            />
-          )}
+    <div>
+      {/* 标签切换 */}
+      <div className="mb-4 flex gap-1 border-b">
+        {([["general", "系统设置"], ["prompts", "内置提示词管理"]] as [Tab, string][]).map(([t, label]) => (
           <button
-            type="submit"
-            className="rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700"
+            key={t}
+            onClick={() => { setTab(t); setError(null); setSavedMsg(null); }}
+            className={`px-4 py-2 text-sm ${
+              tab === t
+                ? "border-b-2 border-blue-600 font-medium text-blue-700"
+                : "text-gray-500 hover:text-gray-800"
+            }`}
           >
-            保存品牌配置
+            {label}
           </button>
-        </form>
-        {savedMsg && <p className="mt-2 text-xs text-green-600">{savedMsg}</p>}
-      </section>
+        ))}
+      </div>
 
-      {/* 引擎配置 */}
-      <section className="rounded border bg-white p-4">
-        <h2 className="mb-1 text-sm font-medium">Agent 引擎</h2>
-        <p className="mb-3 text-xs text-gray-400">
-          选择处理归类与问答的后端。未实现的选项不可选。
-        </p>
-        <div className="space-y-2">
-          {engine?.options.map((o) => (
-            <label
-              key={o.id}
-              className={`flex items-center gap-2 rounded border px-3 py-2 text-sm ${
-                o.available
-                  ? "cursor-pointer hover:bg-gray-50"
-                  : "cursor-not-allowed bg-gray-50 text-gray-400"
-              } ${engine.current === o.id ? "border-blue-500 bg-blue-50" : ""}`}
-            >
-              <input
-                type="radio"
-                name="engine"
-                disabled={!o.available}
-                checked={engine.current === o.id}
-                onChange={() => selectEngine(o.id)}
-              />
-              {o.label}
-              {engine.current === o.id && (
-                <span className="ml-auto text-xs text-blue-600">当前</span>
+      {tab === "prompts" && <PromptsTab />}
+
+      {tab === "general" && (
+        <div className="space-y-6">
+          {/* 平台品牌配置 */}
+          <section className="rounded border bg-white p-4">
+            <h2 className="mb-1 text-sm font-medium">平台品牌</h2>
+            <p className="mb-3 text-xs text-gray-400">自定义左上角显示的平台名称和 Logo。</p>
+            <form onSubmit={saveBranding} className="space-y-3">
+              <div>
+                <label className="mb-1 block text-xs text-gray-500">平台名称</label>
+                <input
+                  value={brandingName}
+                  onChange={(e) => setBrandingName(e.target.value)}
+                  placeholder="KB-Agent"
+                  className="w-full rounded border px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs text-gray-500">Logo 图片 URL（留空使用默认缩写）</label>
+                <input
+                  value={brandingLogo}
+                  onChange={(e) => setBrandingLogo(e.target.value)}
+                  placeholder="https://example.com/logo.png"
+                  className="w-full rounded border px-3 py-2 text-sm"
+                />
+              </div>
+              {branding.logo_url && (
+                <img
+                  src={branding.logo_url}
+                  alt="logo 预览"
+                  className="h-10 w-10 rounded object-contain"
+                />
               )}
-            </label>
-          ))}
-          {!engine && <p className="text-sm text-gray-400">加载中…</p>}
-        </div>
-        {savedMsg && <p className="mt-2 text-xs text-green-600">{savedMsg}</p>}
-      </section>
-
-      {/* 域名白名单 */}
-      <section className="rounded border bg-white p-4">
-        <h2 className="mb-1 text-sm font-medium">注册域名白名单</h2>
-        <p className="mb-3 text-xs text-gray-400">
-          空 = 全拒绝注册。仅列出的域名邮箱可注册（完整域名相等匹配）。
-        </p>
-        <form onSubmit={addDomain} className="mb-3 flex gap-2">
-          <input
-            value={domainName}
-            onChange={(e) => setDomainName(e.target.value)}
-            placeholder="例如 company.com"
-            required
-            className="flex-1 rounded border px-3 py-2 text-sm"
-          />
-          <button className="rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700">
-            添加域名
-          </button>
-        </form>
-        <ul className="space-y-1 text-sm text-gray-700">
-          {domains.map((d) => (
-            <li
-              key={d.id}
-              className="flex items-center justify-between rounded bg-gray-50 px-3 py-1.5"
-            >
-              <span>{d.domain}</span>
               <button
-                onClick={() => deleteDomain(d.id)}
-                className="text-xs text-red-600 hover:underline"
+                type="submit"
+                className="rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700"
               >
-                删除
+                保存品牌配置
               </button>
-            </li>
-          ))}
-          {domains.length === 0 && (
-            <li className="text-gray-400">暂无域名（当前无人可注册）</li>
-          )}
-        </ul>
-      </section>
+            </form>
+            {savedMsg && <p className="mt-2 text-xs text-green-600">{savedMsg}</p>}
+          </section>
 
-      {/* F8：分类体系（从空间管理移来） */}
-      <CategoryManager />
+          {/* 引擎配置 */}
+          <section className="rounded border bg-white p-4">
+            <h2 className="mb-1 text-sm font-medium">Agent 引擎</h2>
+            <p className="mb-3 text-xs text-gray-400">
+              选择处理归类与问答的后端。未实现的选项不可选。
+            </p>
+            <div className="space-y-2">
+              {engine?.options.map((o) => (
+                <label
+                  key={o.id}
+                  className={`flex items-center gap-2 rounded border px-3 py-2 text-sm ${
+                    o.available
+                      ? "cursor-pointer hover:bg-gray-50"
+                      : "cursor-not-allowed bg-gray-50 text-gray-400"
+                  } ${engine.current === o.id ? "border-blue-500 bg-blue-50" : ""}`}
+                >
+                  <input
+                    type="radio"
+                    name="engine"
+                    disabled={!o.available}
+                    checked={engine.current === o.id}
+                    onChange={() => selectEngine(o.id)}
+                  />
+                  {o.label}
+                  {engine.current === o.id && (
+                    <span className="ml-auto text-xs text-blue-600">当前</span>
+                  )}
+                </label>
+              ))}
+              {!engine && <p className="text-sm text-gray-400">加载中…</p>}
+            </div>
+            {savedMsg && <p className="mt-2 text-xs text-green-600">{savedMsg}</p>}
+          </section>
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+          {/* 域名白名单 */}
+          <section className="rounded border bg-white p-4">
+            <h2 className="mb-1 text-sm font-medium">注册域名白名单</h2>
+            <p className="mb-3 text-xs text-gray-400">
+              空 = 全拒绝注册。仅列出的域名邮箱可注册（完整域名相等匹配）。
+            </p>
+            <form onSubmit={addDomain} className="mb-3 flex gap-2">
+              <input
+                value={domainName}
+                onChange={(e) => setDomainName(e.target.value)}
+                placeholder="例如 company.com"
+                required
+                className="flex-1 rounded border px-3 py-2 text-sm"
+              />
+              <button className="rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700">
+                添加域名
+              </button>
+            </form>
+            <ul className="space-y-1 text-sm text-gray-700">
+              {domains.map((d) => (
+                <li
+                  key={d.id}
+                  className="flex items-center justify-between rounded bg-gray-50 px-3 py-1.5"
+                >
+                  <span>{d.domain}</span>
+                  <button
+                    onClick={() => deleteDomain(d.id)}
+                    className="text-xs text-red-600 hover:underline"
+                  >
+                    删除
+                  </button>
+                </li>
+              ))}
+              {domains.length === 0 && (
+                <li className="text-gray-400">暂无域名（当前无人可注册）</li>
+              )}
+            </ul>
+          </section>
+
+          {/* F8：分类体系（从空间管理移来） */}
+          <CategoryManager />
+
+          {error && <p className="text-sm text-red-600">{error}</p>}
+        </div>
+      )}
     </div>
   );
 }

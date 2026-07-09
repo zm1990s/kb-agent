@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import StatsTab from "@/components/admin/StatsTab";
 import NavBar from "@/components/NavBar";
 import { api, ApiError } from "@/lib/api";
 import { isAdmin } from "@/lib/auth";
@@ -37,12 +36,13 @@ const MODULES = [
   { key: "workspaces", label: "空间管理" },
   { key: "users", label: "用户管理" },
   { key: "settings", label: "系统设置" },
+  { key: "stats", label: "数据统计" },
 ];
 
 export default function UsersPage() {
   const ready = useAuthGuard();
   const router = useRouter();
-  const [tab, setTab] = useState<"users" | "groups" | "stats">("users");
+  const [tab, setTab] = useState<"users" | "groups">("users");
   const [users, setUsers] = useState<UserRow[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -72,7 +72,7 @@ export default function UsersPage() {
       <main className="mx-auto w-full max-w-5xl flex-1 p-4">
         <h1 className="mb-4 text-lg font-semibold">用户管理</h1>
         <div className="mb-4 flex gap-1 border-b">
-          {(["users", "groups", "stats"] as const).map((t) => (
+          {(["users", "groups"] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -82,7 +82,7 @@ export default function UsersPage() {
                   : "text-gray-500 hover:text-gray-800"
               }`}
             >
-              {t === "users" ? "用户" : t === "groups" ? "用户组与权限" : "使用报表"}
+              {t === "users" ? "用户" : "用户组与权限"}
             </button>
           ))}
         </div>
@@ -93,7 +93,6 @@ export default function UsersPage() {
         {tab === "groups" && (
           <GroupsTab groups={groups} reload={load} setError={setError} />
         )}
-        {tab === "stats" && <StatsTab />}
       </main>
     </div>
   );
@@ -144,8 +143,7 @@ function UsersTab({
                   className="rounded border px-1 py-0.5 text-xs"
                 >
                   <option value="admin">管理员</option>
-                  <option value="internal">内部</option>
-                  <option value="partner">Partner</option>
+                  <option value="user">普通用户</option>
                 </select>
               </td>
               <td className="px-4 py-2">
@@ -179,6 +177,15 @@ function UsersTab({
                   className="rounded bg-gray-100 px-2 py-1 text-xs text-blue-700 hover:bg-gray-200"
                 >
                   重置密码
+                </button>
+                <button
+                  onClick={() => {
+                    if (window.confirm(`确认永久删除用户「${u.email}」？此操作不可恢复。`))
+                      act(() => api.del(`/admin/users/${u.id}`));
+                  }}
+                  className="ml-1 rounded bg-gray-100 px-2 py-1 text-xs text-red-600 hover:bg-red-50"
+                >
+                  删除
                 </button>
               </td>
             </tr>

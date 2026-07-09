@@ -23,7 +23,7 @@ class SetActiveRequest(BaseModel):
 
 
 class SetRoleRequest(BaseModel):
-    role: Literal["admin", "internal", "partner"]
+    role: Literal["admin", "user"]
 
 
 class ResetPasswordRequest(BaseModel):
@@ -64,7 +64,7 @@ class GroupRulePublic(BaseModel):
 # ── F6 RBAC ────────────────────────────────────────────
 
 class PermissionSet(BaseModel):
-    module: Literal["chat", "documents", "workspaces", "users", "settings"]
+    module: Literal["chat", "documents", "workspaces", "users", "settings", "stats"]
     level: Literal["none", "read", "write"]
 
 

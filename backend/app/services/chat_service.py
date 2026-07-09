@@ -108,14 +108,62 @@ async def create_conversation(
 async def list_conversations(
     session: AsyncSession, *, workspace_id: uuid.UUID, user_id: uuid.UUID
 ) -> list[Conversation]:
-    """列出当前用户在某空间的会话（最近优先）。"""
+    """列出当前用户在某空间的会话（置顶优先，然后按创建时间倒序）。"""
     stmt = (
         select(Conversation)
         .where(
             Conversation.workspace_id == workspace_id,
             Conversation.user_id == user_id,
         )
-        .order_by(Conversation.created_at.desc())
+        .order_by(Conversation.pinned.desc(), Conversation.created_at.desc())
     )
     result = await session.execute(stmt)
     return list(result.scalars().all())
+
+
+async def update_conversation(
+    session: AsyncSession,
+    *,
+    conversation_id: uuid.UUID,
+    user_id: uuid.UUID,
+    title: str | None = None,
+    pinned: bool | None = None,
+) -> Conversation | None:
+    """更新会话标题或置顶状态；校验归属，不匹配返回 None。"""
+    conv = await session.get(Conversation, conversation_id)
+    if conv is None or conv.user_id != user_id:
+        return None
+    if title is not None:
+        conv.title = title[:200]
+    if pinned is not None:
+        conv.pinned = pinned
+    await session.commit()
+    await session.refresh(conv)
+    return conv
+
+
+async def generate_conversation_title(
+    session: AsyncSession,
+    *,
+    conversation_id: uuid.UUID,
+    first_message: str,
+) -> None:
+    """用 LLM 为会话生成简短标题（后台任务，失败静默）。"""
+    from app.services.settings_service import get_engine_backend
+    from app.engine.base import get_engine
+
+    try:
+        engine_backend = await get_engine_backend(session)
+        engine = get_engine(engine_backend)
+        from app.services.settings_service import TITLE_PROMPT_KEY, get_prompt
+        prompt_tpl = await get_prompt(session, TITLE_PROMPT_KEY)
+        prompt = prompt_tpl.format(message=first_message[:500])
+        result = await engine.complete(prompt)
+        title = result.text.strip().strip('"').strip("'").strip("《》【】")[:100]
+        if title:
+            conv = await session.get(Conversation, conversation_id)
+            if conv is not None and not conv.title:
+                conv.title = title
+                await session.commit()
+    except Exception:
+        pass  # 标题生成失败不影响对话

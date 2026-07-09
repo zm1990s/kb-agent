@@ -86,6 +86,7 @@ class Document(Base):
         ForeignKey("categories.id", ondelete="SET NULL"),
         nullable=True,
     )
+    brief: Mapped[str | None] = mapped_column(Text, nullable=True)
     summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     tags: Mapped[list[str]] = mapped_column(ARRAY(Text), nullable=False, default=list)
     content_text: Mapped[str | None] = mapped_column(Text, nullable=True)

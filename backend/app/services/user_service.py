@@ -138,7 +138,7 @@ async def register_user(
     *,
     email: str,
     password: str,
-    role: str = "internal",
+    role: str = "user",
 ) -> User:
     """注册新用户。域名不合法抛 DomainNotAllowedError，重复抛 EmailExistsError。"""
     email = email.lower()

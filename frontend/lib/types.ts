@@ -40,10 +40,12 @@ export interface DocumentPublic {
   mime_type: string;
   folder_id: string | null;
   category_id: string | null;
+  brief: string | null;
   summary: string | null;
   tags: string[];
   status: string;
   created_at: string;
+  content_text: string | null;
 }
 
 export interface Folder {
@@ -87,6 +89,8 @@ export interface ChatResponse {
 export interface ConversationSummary {
   id: string;
   workspace_id: string;
+  title: string | null;
+  pinned: boolean;
   created_at: string;
 }
 

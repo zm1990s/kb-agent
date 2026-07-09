@@ -263,6 +263,54 @@ async def download_document(
     )
 
 
+_PREVIEWABLE_INLINE = {
+    "application/pdf",
+    "image/png",
+    "image/jpeg",
+    "image/gif",
+    "image/webp",
+    "image/svg+xml",
+    "text/plain",
+    "text/html",
+    "text/markdown",
+    "text/csv",
+}
+
+
+@router.get("/documents/{document_id}/preview")
+async def preview_document(
+    document_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> Response:
+    """返回文件内容用于浏览器内联预览。PDF/图片直接 inline；其余回退到 content_text 纯文本。"""
+    doc = await _get_doc_for_member(session, document_id, current_user)
+    mime = doc.mime_type or "application/octet-stream"
+
+    if mime in _PREVIEWABLE_INLINE:
+        data = await get_storage().read_bytes(doc.storage_key)
+        return Response(
+            content=data,
+            media_type=mime,
+            headers={
+                "Content-Disposition": f'inline; filename="{doc.title}"',
+                "X-Content-Type-Options": "nosniff",
+                "Cache-Control": "private, max-age=300",
+            },
+        )
+
+    # 非直接可预览类型：返回已提取的纯文本（归类阶段产出）
+    text = doc.content_text or doc.summary or "（该文件类型暂不支持在线预览）"
+    return Response(
+        content=text,
+        media_type="text/plain; charset=utf-8",
+        headers={
+            "Content-Disposition": f'inline; filename="{doc.title}.txt"',
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+
+
 @router.get("/documents/{document_id}/tasks", response_model=list[ProcessingTaskPublic])
 async def list_tasks(
     document_id: uuid.UUID,

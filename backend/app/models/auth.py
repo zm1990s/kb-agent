@@ -13,7 +13,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.db import Base
 
-USER_ROLES = ("admin", "internal", "partner")
+USER_ROLES = ("admin", "user")
 WS_ROLES = ("owner", "editor", "viewer")
 
 
@@ -47,7 +47,7 @@ class User(Base):
 
     __table_args__ = (
         CheckConstraint(
-            "role IN ('admin', 'internal', 'partner')", name="users_role_check"
+            "role IN ('admin', 'user')", name="users_role_check"
         ),
     )
 

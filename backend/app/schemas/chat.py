@@ -48,4 +48,11 @@ class ConversationSummary(BaseModel):
 
     id: uuid.UUID
     workspace_id: uuid.UUID
+    title: str | None
+    pinned: bool
     created_at: datetime
+
+
+class ConversationUpdate(BaseModel):
+    title: str | None = None
+    pinned: bool | None = None

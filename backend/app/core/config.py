@@ -29,7 +29,7 @@ class Settings(BaseSettings):
     engine_backend: str = Field("claude_cli", alias="ENGINE_BACKEND")
     claude_cli_path: str = Field("claude", alias="CLAUDE_CLI_PATH")
     claude_model: str = Field("", alias="CLAUDE_MODEL")
-    engine_timeout_sec: int = Field(120, alias="ENGINE_TIMEOUT_SEC")
+    engine_idle_timeout_sec: int = Field(60, alias="ENGINE_IDLE_TIMEOUT_SEC")
 
     # ── 存储（MVP 本地文件系统）──────────────────────────
     storage_backend: str = Field("local", alias="STORAGE_BACKEND")

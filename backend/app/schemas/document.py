@@ -40,10 +40,12 @@ class DocumentPublic(BaseModel):
     mime_type: str
     folder_id: uuid.UUID | None
     category_id: uuid.UUID | None
+    brief: str | None = None
     summary: str | None
     tags: list[str]
     status: str
     created_at: datetime
+    content_text: str | None = None
 
 
 class FolderCreate(BaseModel):

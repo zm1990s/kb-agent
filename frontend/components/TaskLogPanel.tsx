@@ -63,7 +63,7 @@ export default function TaskLogPanel({
             <div key={t.id} className="rounded border">
               <div className="flex items-center justify-between border-b bg-gray-50 px-3 py-2 text-xs">
                 <span>
-                  第 {(tasks.length - i)} 次 · 尝试 {t.attempts}/{t.max_attempts}
+                  第 {i + 1} 次 · 尝试 {t.attempts}/{t.max_attempts}
                 </span>
                 <span
                   className={

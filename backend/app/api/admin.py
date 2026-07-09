@@ -1,12 +1,16 @@
 """管理后台路由（F4-F6）：用户管理、用户组、RBAC。均需 admin。"""
 
+import collections
+import os
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import PlainTextResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_session
 from app.core.deps import require_admin
+from app.core.logging_setup import get_log_dir
 from app.models.auth import User
 from app.schemas.rbac import (
     GroupCreate,
@@ -21,6 +25,7 @@ from app.schemas.rbac import (
     UserAdminView,
 )
 from app.services import rbac_service
+from app.services.rbac_service import delete_user
 from app.services.usage_service import get_stats
 
 router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(require_admin)])
@@ -31,6 +36,19 @@ router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(requir
 @router.get("/users", response_model=list[UserAdminView])
 async def list_users(session: AsyncSession = Depends(get_session)):
     return await rbac_service.list_users(session)
+
+
+@router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_user_endpoint(
+    user_id: uuid.UUID,
+    current_admin: User = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+):
+    """管理员删除用户（不可删除自身）。"""
+    if user_id == current_admin.id:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "不能删除自己")
+    if not await delete_user(session, user_id=user_id):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "用户不存在")
 
 
 @router.patch("/users/{user_id}/active", response_model=UserAdminView)
@@ -176,3 +194,61 @@ async def usage_stats(
     if days < 1 or days > 365:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "days 须在 1-365 之间")
     return await get_stats(session, days=days)
+
+
+# ── 日志查看 ──────────────────────────────────────────
+
+
+@router.get("/logs")
+async def list_log_files(_admin: User = Depends(require_admin)) -> list[dict]:
+    """列出可用的日志文件（最新优先）。"""
+    log_dir = get_log_dir()
+    if not os.path.isdir(log_dir):
+        return []
+    import re as _re
+    _log_pat = _re.compile(r'^[\w.-]+\.log(\.\d+)?$')
+    files = sorted(
+        (f for f in os.listdir(log_dir) if _log_pat.match(f)),
+        key=lambda f: os.path.getmtime(os.path.join(log_dir, f)),
+        reverse=True,
+    )
+    return [
+        {
+            "name": f,
+            "size": os.path.getsize(os.path.join(log_dir, f)),
+            "mtime": os.path.getmtime(os.path.join(log_dir, f)),
+        }
+        for f in files
+    ]
+
+
+def _tail_file(path: str, lines: int) -> str:
+    """高效读取文件末尾 N 行（不把整个大文件加载到内存）。"""
+    deque: collections.deque[str] = collections.deque(maxlen=lines)
+    try:
+        with open(path, encoding="utf-8", errors="replace") as f:
+            for line in f:
+                deque.append(line)
+    except FileNotFoundError:
+        return ""
+    return "".join(deque)
+
+
+@router.get("/logs/{filename}")
+async def read_log_file(
+    filename: str,
+    lines: int = Query(default=500, ge=1, le=5000),
+    _admin: User = Depends(require_admin),
+) -> PlainTextResponse:
+    """读取指定日志文件末尾 N 行（默认 500）。"""
+    # 防路径穿越：只允许 logs/ 目录下名称符合规范的文件
+    if "/" in filename or "\\" in filename or ".." in filename:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "非法文件名")
+    log_dir = get_log_dir()
+    path = os.path.realpath(os.path.join(log_dir, filename))
+    if not path.startswith(os.path.realpath(log_dir) + os.sep):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "非法文件名")
+    if not os.path.isfile(path):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "日志文件不存在")
+    content = _tail_file(path, lines)
+    return PlainTextResponse(content)

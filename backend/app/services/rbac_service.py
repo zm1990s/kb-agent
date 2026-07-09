@@ -56,6 +56,17 @@ async def admin_reset_password(
     return user
 
 
+async def delete_user(
+    session: AsyncSession, *, user_id: uuid.UUID
+) -> bool:
+    user = await session.get(User, user_id)
+    if user is None:
+        return False
+    await session.delete(user)
+    await session.commit()
+    return True
+
+
 # ── F5 用户组 + 规则 + 自动入组 ─────────────────────────
 
 async def list_groups(session: AsyncSession) -> list[Group]:

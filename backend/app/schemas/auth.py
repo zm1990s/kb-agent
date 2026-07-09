@@ -63,7 +63,8 @@ class WorkspaceWithRole(WorkspacePublic):
 
 
 class MemberAddRequest(BaseModel):
-    user_id: uuid.UUID
+    user_id: uuid.UUID | None = None
+    email: str | None = None
     role_in_ws: Literal["owner", "editor", "viewer"]
 
 

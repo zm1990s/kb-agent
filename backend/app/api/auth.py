@@ -19,6 +19,7 @@ from app.schemas.auth import (
     UserPublic,
 )
 from app.services.usage_service import record_event
+from app.services.rbac_service import delete_user
 from app.services.user_service import (
     DomainNotAllowedError,
     EmailExistsError,
@@ -116,6 +117,20 @@ async def change_own_password(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="当前密码错误",
         ) from exc
+
+
+@router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_self(
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> None:
+    """用户主动注销账号（永久删除）。"""
+    if current_user.role == "admin":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="管理员账号不可自助注销，请联系其他管理员操作",
+        )
+    await delete_user(session, user_id=current_user.id)
 
 
 # ── 注册域名白名单（管理员维护）────────────────────────────

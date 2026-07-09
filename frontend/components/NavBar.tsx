@@ -4,16 +4,16 @@ import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import ChangePasswordModal from "@/components/ChangePasswordModal";
 import { api } from "@/lib/api";
 import { clearAuth, getEmail, isAdmin } from "@/lib/auth";
 
 // 每个导航项对应一个 RBAC 模块；level != none 才显示。
 const links = [
-  { href: "/chat", label: "对话查询", module: "chat" },
+  { href: "/chat", label: "聊天", module: "chat" },
   { href: "/documents", label: "文档管理", module: "documents" },
   { href: "/admin", label: "空间管理", module: "workspaces" },
   { href: "/users", label: "用户管理", module: "users" },
+  { href: "/stats", label: "数据统计", module: "stats" },
   { href: "/settings", label: "系统设置", module: "settings" },
 ];
 
@@ -30,7 +30,6 @@ export default function NavBar() {
   const [perms, setPerms] = useState<Record<string, string> | null>(null);
   const [branding, setBranding] = useState<Branding>({ name: "KB-Agent", logo_url: "" });
   const [dropOpen, setDropOpen] = useState(false);
-  const [showChangePwd, setShowChangePwd] = useState(false);
   const dropRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -69,7 +68,7 @@ export default function NavBar() {
 
   return (
     <>
-      <nav className="relative flex items-center border-b bg-white px-4 py-2">
+      <nav className="relative flex items-center border-b border-gray-200 bg-white px-4 py-2 shadow-sm">
         {/* 左：Logo + 平台名（点击回首页） */}
         <div className="flex w-48 shrink-0 items-center">
           <Link href="/chat" className="flex items-center gap-2 text-gray-800 hover:text-blue-700">
@@ -121,15 +120,13 @@ export default function NavBar() {
           </button>
           {dropOpen && (
             <div className="absolute right-4 top-full z-50 mt-1 w-40 rounded border bg-white py-1 shadow-lg">
-              <button
-                onClick={() => {
-                  setDropOpen(false);
-                  setShowChangePwd(true);
-                }}
-                className="block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100"
+              <Link
+                href="/account"
+                onClick={() => setDropOpen(false)}
+                className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
               >
-                修改密码
-              </button>
+                账户管理
+              </Link>
               <div className="my-1 border-t" />
               <button
                 onClick={logout}
@@ -142,9 +139,6 @@ export default function NavBar() {
         </div>
       </nav>
 
-      {showChangePwd && (
-        <ChangePasswordModal onClose={() => setShowChangePwd(false)} />
-      )}
     </>
   );
 }

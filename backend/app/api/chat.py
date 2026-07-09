@@ -16,6 +16,7 @@ from app.schemas.chat import (
     ConversationCreate,
     ConversationHistory,
     ConversationSummary,
+    ConversationUpdate,
     MessagePublic,
     SourceRef,
 )
@@ -28,11 +29,13 @@ from app.services.answer_service import (
 from app.services.chat_service import (
     add_message,
     create_conversation,
+    generate_conversation_title,
     get_conversation_for_user,
     get_or_create_conversation,
     list_conversations,
     list_messages,
     recent_history,
+    update_conversation,
 )
 from app.services.usage_service import record_event
 from app.services.workspace_service import is_member
@@ -110,6 +113,7 @@ async def chat_stream(
     ):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "无权访问该空间")
 
+    is_new_conv = body.conversation_id is None
     conv = await get_or_create_conversation(
         session,
         conversation_id=body.conversation_id,
@@ -146,6 +150,14 @@ async def chat_stream(
             content=final.answer,
             sources=final.sources,
         )
+        # 新会话：后台生成标题
+        if is_new_conv:
+            async with SessionLocal() as bg_session:
+                await generate_conversation_title(
+                    bg_session,
+                    conversation_id=conv.id,
+                    first_message=body.message,
+                )
         yield sse(
             "done",
             {
@@ -214,3 +226,23 @@ async def get_conversation(
         conversation_id=conv.id,
         messages=[MessagePublic.model_validate(m) for m in msgs],
     )
+
+
+@router.patch("/conversations/{conversation_id}", response_model=ConversationSummary)
+async def patch_conversation(
+    conversation_id: uuid.UUID,
+    body: ConversationUpdate,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> ConversationSummary:
+    """更新会话标题或置顶状态。"""
+    conv = await update_conversation(
+        session,
+        conversation_id=conversation_id,
+        user_id=current_user.id,
+        title=body.title,
+        pinned=body.pinned,
+    )
+    if conv is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "会话不存在")
+    return ConversationSummary.model_validate(conv)

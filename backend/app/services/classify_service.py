@@ -18,14 +18,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.engine.base import get_engine
 from app.models.document import Category, Document, ProcessingTask
 
-_CLASSIFY_PROMPT = """你是知识库文档归类助手。请阅读随附文件，输出一个 JSON 对象，字段：
-- "category": 从下列候选分类中选最匹配的一个名称（若都不合适填 null）：{categories}
-- "summary": 200 字以内的中文摘要
-- "tags": 3-6 个关键词字符串数组
-- "content_text": 文件的纯文本正文（用于全文检索；尽量完整）
-
-只输出 JSON，不要多余解释。"""
-
 
 def _parse_engine_json(text: str) -> dict:
     """从引擎输出中提取 JSON 对象（容忍前后包裹的代码块/文字）。"""
@@ -75,8 +67,12 @@ async def run_classification(session: AsyncSession, task_id: uuid.UUID) -> None:
             select(Category.name).where(Category.workspace_id == doc.workspace_id)
         )
         cat_names = [n for (n,) in cats_result.all()]
-        prompt = _CLASSIFY_PROMPT.format(
-            categories=", ".join(cat_names) if cat_names else "（无预定义分类）"
+
+        from app.services.settings_service import CLASSIFY_PROMPT_KEY, get_prompt
+        prompt_tpl = await get_prompt(session, CLASSIFY_PROMPT_KEY)
+        prompt = prompt_tpl.format(
+            categories=", ".join(cat_names) if cat_names else "（无预定义分类）",
+            timestamp=datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC"),
         )
 
         # 经 engine 让 CLI 读原文（唯一 LLM 出口）；引擎后端取管理员在应用内的选择
@@ -95,6 +91,7 @@ async def run_classification(session: AsyncSession, task_id: uuid.UUID) -> None:
         )
 
         doc.category_id = category_id
+        doc.brief = parsed.get("brief")
         doc.summary = parsed.get("summary")
         doc.tags = list(parsed.get("tags") or [])
         doc.content_text = parsed.get("content_text")

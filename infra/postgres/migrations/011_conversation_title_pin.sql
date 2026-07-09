@@ -1,0 +1,3 @@
+-- migration 011: 会话标题与置顶
+ALTER TABLE conversations ADD COLUMN IF NOT EXISTS title VARCHAR(200);
+ALTER TABLE conversations ADD COLUMN IF NOT EXISTS pinned BOOLEAN NOT NULL DEFAULT FALSE;

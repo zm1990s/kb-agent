@@ -1,14 +1,19 @@
 """空间路由。建空间/加成员需管理员；列表返回当前用户可见空间。"""
 
+import io
+import zipfile
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_session
 from app.core.deps import get_current_user, require_admin
-from app.models.auth import User
+from app.models.auth import User, Workspace
+from app.models.document import Document
 from app.schemas.auth import (
     MemberAddRequest,
     WorkspaceCreate,
@@ -26,6 +31,7 @@ from app.services.workspace_service import (
     list_my_workspaces,
     revoke_group,
 )
+from app.storage.base import get_storage
 
 router = APIRouter(prefix="/workspaces", tags=["workspaces"])
 
@@ -67,11 +73,14 @@ async def add_workspace_member(
     admin: User = Depends(require_admin),
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, str]:
+    if body.user_id is None and not body.email:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "请提供 user_id 或 email")
     try:
         await add_member(
             session,
             workspace_id=workspace_id,
             user_id=body.user_id,
+            email=body.email,
             role_in_ws=body.role_in_ws,
         )
     except WorkspaceNotFoundError as exc:
@@ -140,3 +149,76 @@ async def revoke_ws_from_group(
         session, workspace_id=workspace_id, group_id=group_id
     ):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "授权不存在")
+
+
+@router.get("/{workspace_id}/export")
+async def export_workspace(
+    workspace_id: uuid.UUID,
+    admin: User = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+) -> StreamingResponse:
+    """把空间内所有文档打包为 zip 供下载。文件名用原始 title。"""
+    ws = await session.get(Workspace, workspace_id)
+    if ws is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "空间不存在")
+
+    result = await session.execute(
+        select(Document).where(Document.workspace_id == workspace_id)
+    )
+    docs = list(result.scalars().all())
+
+    buf = io.BytesIO()
+    storage = get_storage()
+    with zipfile.ZipFile(buf, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        seen_names: dict[str, int] = {}
+        for doc in docs:
+            try:
+                data = await storage.read_bytes(doc.storage_key)
+            except Exception:
+                continue
+            # 去重文件名
+            name = doc.title
+            if name in seen_names:
+                seen_names[name] += 1
+                base, _, ext = name.rpartition(".")
+                name = f"{base}_{seen_names[doc.title]}.{ext}" if ext else f"{name}_{seen_names[doc.title]}"
+            else:
+                seen_names[name] = 0
+            zf.writestr(name, data)
+
+    buf.seek(0)
+    safe_name = ws.name.replace('"', "")
+    return StreamingResponse(
+        buf,
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": f'attachment; filename="{safe_name}.zip"',
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+
+
+@router.delete("/{workspace_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_workspace(
+    workspace_id: uuid.UUID,
+    admin: User = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+) -> None:
+    """删除空间及其全部内容（文档/对话/成员/授权均 CASCADE）。"""
+    ws = await session.get(Workspace, workspace_id)
+    if ws is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "空间不存在")
+
+    # 先删除磁盘文件（CASCADE 会删 DB 记录，但不会删文件系统）
+    result = await session.execute(
+        select(Document).where(Document.workspace_id == workspace_id)
+    )
+    storage = get_storage()
+    for doc in result.scalars().all():
+        try:
+            await storage.delete(doc.storage_key)
+        except Exception:
+            pass  # 文件已不存在则忽略
+
+    await session.delete(ws)
+    await session.commit()

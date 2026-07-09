@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import FolderTree, { buildTree } from "@/components/FolderTree";
+import Markdown from "@/components/Markdown";
 import NavBar from "@/components/NavBar";
 import TaskLogPanel from "@/components/TaskLogPanel";
 import WorkspacePicker from "@/components/WorkspacePicker";
@@ -45,6 +46,11 @@ export default function DocumentsPage() {
   const [replacingId, setReplacingId] = useState<string | null>(null);
   // 正在查看日志的文档
   const [logDoc, setLogDoc] = useState<DocumentPublic | null>(null);
+  // 文件详情弹窗
+  const [detailDoc, setDetailDoc] = useState<DocumentPublic | null>(null);
+  // 预览
+  const [previewDoc, setPreviewDoc] = useState<DocumentPublic | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   // 分类名映射（展示用）
   const [categories, setCategories] = useState<Category[]>([]);
   // 搜索关键词
@@ -315,6 +321,28 @@ export default function DocumentsPage() {
     }
   }
 
+  async function previewDoc_(doc: DocumentPublic) {
+    try {
+      const token = getToken();
+      const res = await fetch(`/api/documents/${doc.id}/preview`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) throw new Error();
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      setPreviewDoc(doc);
+      setPreviewUrl(url);
+    } catch {
+      setError("预览失败");
+    }
+  }
+
+  function closePreview() {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setPreviewDoc(null);
+    setPreviewUrl(null);
+  }
+
   async function download(doc: DocumentPublic) {
     try {
       const token = getToken();
@@ -431,7 +459,7 @@ export default function DocumentsPage() {
                 disabled={uploading || !workspaceId}
                 className="rounded border border-blue-600 px-4 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-50"
               >
-                上传整个目录
+                上传目录
               </button>
               {activeFolder !== ALL && activeFolder !== ROOT && (
                 <span className="text-xs text-gray-400">
@@ -615,8 +643,17 @@ export default function DocumentsPage() {
                       </td>
                     )}
                     {cols.summary && (
-                      <td className="max-w-xs truncate px-4 py-2 text-gray-600">
-                        {d.summary ?? "—"}
+                      <td className="max-w-xs px-4 py-2 text-gray-600">
+                        <div className="group relative">
+                          <span className="line-clamp-2 cursor-help">
+                            {d.brief || d.summary || "—"}
+                          </span>
+                          {(d.brief || d.summary) && (
+                            <div className="pointer-events-none absolute left-0 top-full z-20 mt-1 hidden w-80 rounded-lg border border-gray-200 bg-white p-3 text-xs leading-relaxed text-gray-700 shadow-lg group-hover:block">
+                              {d.summary || d.brief}
+                            </div>
+                          )}
+                        </div>
                       </td>
                     )}
                     {cols.created && (
@@ -626,16 +663,28 @@ export default function DocumentsPage() {
                     )}
                     <td className="whitespace-nowrap px-4 py-2">
                       <button
+                        onClick={() => previewDoc_(d)}
+                        className="mr-1 rounded bg-gray-100 px-2 py-1 text-xs text-gray-700 hover:bg-gray-200"
+                      >
+                        预览
+                      </button>
+                      <button
                         onClick={() => download(d)}
                         className="mr-1 rounded bg-gray-100 px-2 py-1 text-xs text-blue-700 hover:bg-gray-200"
                       >
                         下载
                       </button>
                       <button
+                        onClick={() => setDetailDoc(d)}
+                        className="mr-1 rounded bg-gray-100 px-2 py-1 text-xs text-gray-700 hover:bg-gray-200"
+                      >
+                        文件详情
+                      </button>
+                      <button
                         onClick={() => setLogDoc(d)}
                         className="mr-1 rounded bg-gray-100 px-2 py-1 text-xs text-gray-700 hover:bg-gray-200"
                       >
-                        详情
+                        处理详情
                       </button>
                       {admin && d.status === "failed" && (
                         <button
@@ -670,12 +719,114 @@ export default function DocumentsPage() {
         </main>
       </div>
 
+      {detailDoc && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setDetailDoc(null)}>
+          <div className="w-full max-w-2xl rounded-xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between border-b px-5 py-4">
+              <h2 className="max-w-lg truncate text-sm font-semibold text-gray-800">{detailDoc.title}</h2>
+              <button onClick={() => setDetailDoc(null)} className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700">
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="max-h-[70vh] overflow-y-auto p-5">
+              <table className="w-full text-sm">
+                <tbody className="divide-y divide-gray-100">
+                  <tr className="align-top">
+                    <td className="w-28 shrink-0 py-3 pr-4 font-medium text-gray-500">分类</td>
+                    <td className="py-3 text-gray-800">{categoryName(detailDoc.category_id)}</td>
+                  </tr>
+                  <tr className="align-top">
+                    <td className="py-3 pr-4 font-medium text-gray-500">简介</td>
+                    <td className="py-3 text-gray-800 leading-relaxed">{detailDoc.brief || "—"}</td>
+                  </tr>
+                  <tr className="align-top">
+                    <td className="py-3 pr-4 font-medium text-gray-500">摘要</td>
+                    <td className="py-3 text-gray-800 leading-relaxed whitespace-pre-wrap">{detailDoc.summary || "—"}</td>
+                  </tr>
+                  <tr className="align-top">
+                    <td className="py-3 pr-4 font-medium text-gray-500">标签</td>
+                    <td className="py-3">
+                      {detailDoc.tags && detailDoc.tags.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {detailDoc.tags.map((t) => (
+                            <span key={t} className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">{t}</span>
+                          ))}
+                        </div>
+                      ) : "—"}
+                    </td>
+                  </tr>
+                  <tr className="align-top">
+                    <td className="py-3 pr-4 font-medium text-gray-500">正文全文</td>
+                    <td className="py-3">
+                      {detailDoc.content_text ? (
+                        <div className="max-h-96 overflow-y-auto rounded border border-gray-200 bg-gray-50 p-3 text-xs leading-relaxed">
+                          <Markdown content={detailDoc.content_text} />
+                        </div>
+                      ) : "—"}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
       {logDoc && (
         <TaskLogPanel
           documentId={logDoc.id}
           title={logDoc.title}
           onClose={() => setLogDoc(null)}
         />
+      )}
+
+      {previewDoc && previewUrl && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <div className="flex w-full max-w-4xl flex-col rounded-lg bg-white shadow-2xl" style={{ height: "85vh" }}>
+            <div className="flex items-center justify-between border-b px-4 py-3">
+              <span className="max-w-lg truncate text-sm font-medium text-gray-800">
+                {previewDoc.title}
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => download(previewDoc)}
+                  className="rounded bg-gray-100 px-3 py-1.5 text-xs text-blue-700 hover:bg-gray-200"
+                >
+                  下载
+                </button>
+                <button
+                  onClick={closePreview}
+                  className="rounded bg-gray-100 px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-200"
+                >
+                  关闭
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-hidden">
+              {previewDoc.mime_type?.startsWith("image/") ? (
+                <div className="flex h-full items-center justify-center overflow-auto p-4">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={previewUrl} alt={previewDoc.title} className="max-h-full max-w-full object-contain" />
+                </div>
+              ) : previewDoc.mime_type === "application/pdf" ? (
+                <iframe
+                  src={previewUrl}
+                  className="h-full w-full border-0"
+                  title={previewDoc.title}
+                />
+              ) : (
+                <iframe
+                  src={previewUrl}
+                  className="h-full w-full border-0"
+                  title={previewDoc.title}
+                  sandbox="allow-same-origin"
+                />
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
