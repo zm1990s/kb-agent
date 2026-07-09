@@ -22,7 +22,7 @@ COPY . .
 # 以非 root 用户运行：--dangerously-skip-permissions 拒绝 root；也是纵深防御。
 # 家目录供 Claude CLI 写 ~/.claude 配置/缓存。
 RUN useradd -m -u 10001 appuser \
-    && mkdir -p /app/local_storage \
+    && mkdir -p /app/local_storage /app/logs \
     && chown -R appuser:appuser /app
 USER appuser
 ENV HOME=/home/appuser
