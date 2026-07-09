@@ -364,44 +364,80 @@ function RuleForm({
   const [field, setField] = useState("email_domain");
   const [op, setOp] = useState("equals");
   const [value, setValue] = useState("");
-  return (
-    <form
-      onSubmit={(e) => {
+
+  function splitValues(raw: string): string[] {
+    return raw
+      .split(/[\s,;，；\n]+/)
+      .map((v) => v.trim())
+      .filter(Boolean);
+  }
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const parts = splitValues(value);
+    if (parts.length === 0) return;
+    parts.forEach((v) => onAdd(field, op, v));
+    setValue("");
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter" || e.key === "," || e.key === " ") {
+      const parts = splitValues(value);
+      if (parts.length > 0) {
         e.preventDefault();
-        if (value.trim()) {
-          onAdd(field, op, value.trim());
-          setValue("");
-        }
-      }}
-      className="flex flex-wrap gap-2"
-    >
-      <select
-        value={field}
-        onChange={(e) => setField(e.target.value)}
-        className="rounded border px-2 py-1 text-xs"
-      >
-        <option value="email_domain">邮箱域名</option>
-        <option value="email">邮箱</option>
-        <option value="role">角色</option>
-      </select>
-      <select
-        value={op}
-        onChange={(e) => setOp(e.target.value)}
-        className="rounded border px-2 py-1 text-xs"
-      >
-        <option value="equals">等于</option>
-        <option value="endswith">以…结尾</option>
-        <option value="contains">包含</option>
-      </select>
-      <input
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        placeholder="值，如 company.com"
-        className="flex-1 rounded border px-2 py-1 text-xs"
-      />
-      <button className="rounded bg-blue-600 px-3 py-1 text-xs text-white hover:bg-blue-700">
-        添加规则
-      </button>
+        parts.forEach((v) => onAdd(field, op, v));
+        setValue("");
+      }
+    }
+  }
+
+  const preview = splitValues(value);
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-2">
+      <div className="flex flex-wrap gap-2">
+        <select
+          value={field}
+          onChange={(e) => setField(e.target.value)}
+          className="rounded border px-2 py-1 text-xs"
+        >
+          <option value="email_domain">邮箱域名</option>
+          <option value="email">邮箱</option>
+          <option value="role">角色</option>
+        </select>
+        <select
+          value={op}
+          onChange={(e) => setOp(e.target.value)}
+          className="rounded border px-2 py-1 text-xs"
+        >
+          <option value="equals">等于</option>
+          <option value="endswith">以…结尾</option>
+          <option value="contains">包含</option>
+        </select>
+        <input
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder="支持空格/逗号/回车分隔多个值"
+          className="flex-1 rounded border px-2 py-1 text-xs"
+        />
+        <button className="rounded bg-blue-600 px-3 py-1 text-xs text-white hover:bg-blue-700">
+          添加规则
+        </button>
+      </div>
+      {preview.length > 1 && (
+        <div className="flex flex-wrap gap-1">
+          {preview.map((v) => (
+            <span
+              key={v}
+              className="rounded bg-blue-50 px-2 py-0.5 text-xs text-blue-700"
+            >
+              {v}
+            </span>
+          ))}
+          <span className="text-xs text-gray-400">将添加 {preview.length} 条规则</span>
+        </div>
+      )}
     </form>
   );
 }
