@@ -18,6 +18,8 @@ services:
 
   backend:
     build: ./backend
+    # logs/ 目录须由宿主机预建并可写，否则容器内 appuser(10001) 无权创建文件。
+    # 首次部署时 docker compose 会自动执行：mkdir -p ./logs ./local_storage
     depends_on:
       postgres:
         condition: service_healthy

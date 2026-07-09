@@ -37,36 +37,42 @@ def configure_logging() -> None:
         ch.setFormatter(fmt)
         root.addHandler(ch)
 
-    os.makedirs(LOG_DIR, exist_ok=True)
+    try:
+        os.makedirs(LOG_DIR, exist_ok=True)
+    except OSError:
+        pass  # 目录创建失败时仍继续，只是没有文件日志
 
-    # 应用日志（业务逻辑、任务、uvicorn 启停等）
-    fh = RotatingFileHandler(
-        os.path.join(LOG_DIR, "kb-agent.log"),
-        maxBytes=10 * 1024 * 1024,
-        backupCount=10,
-        encoding="utf-8",
-    )
-    fh.setFormatter(fmt)
-    root.addHandler(fh)
-
-    # 访问日志（uvicorn HTTP 请求记录）
-    access_fh = RotatingFileHandler(
-        os.path.join(LOG_DIR, "access.log"),
-        maxBytes=10 * 1024 * 1024,
-        backupCount=10,
-        encoding="utf-8",
-    )
-    access_fh.setFormatter(fmt)
-
-    # uvicorn 默认 propagate=False，需手动把 handler 加到它的 logger 上，
-    # 同时开启 propagate 让 root handler（kb-agent.log）也能捕获 uvicorn 日志。
+    # uvicorn 默认 propagate=False，需手动开启，让其日志也流向 root handler。
     for name in ("uvicorn", "uvicorn.error", "uvicorn.access"):
         uv_logger = logging.getLogger(name)
         uv_logger.propagate = True
         uv_logger.setLevel(logging.INFO)
 
-    # access.log 专门挂到 uvicorn.access 上
-    logging.getLogger("uvicorn.access").addHandler(access_fh)
+    # 应用日志（业务逻辑、任务、uvicorn 启停等）
+    try:
+        fh = RotatingFileHandler(
+            os.path.join(LOG_DIR, "kb-agent.log"),
+            maxBytes=10 * 1024 * 1024,
+            backupCount=10,
+            encoding="utf-8",
+        )
+        fh.setFormatter(fmt)
+        root.addHandler(fh)
+    except OSError as e:
+        logging.getLogger(__name__).warning("无法创建 kb-agent.log，仅输出到控制台：%s", e)
+
+    # 访问日志（uvicorn HTTP 请求）
+    try:
+        access_fh = RotatingFileHandler(
+            os.path.join(LOG_DIR, "access.log"),
+            maxBytes=10 * 1024 * 1024,
+            backupCount=10,
+            encoding="utf-8",
+        )
+        access_fh.setFormatter(fmt)
+        logging.getLogger("uvicorn.access").addHandler(access_fh)
+    except OSError as e:
+        logging.getLogger(__name__).warning("无法创建 access.log，仅输出到控制台：%s", e)
 
     # 降低 sqlalchemy 噪声
     logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
