@@ -7,7 +7,7 @@
 面向内部员工与外部 Partner 的共享 Agent 知识平台：管理员上传文档 → Agent 自动归类/总结沉淀为可检索知识 → 用户通过对话查询知识并获取原文；架构预留 Skill 插拔框架（未来接入 SCM 等 skill，可在人工确认后下发 PANW 产品配置）。
 
 ## 技术栈（禁止中途更换，如需变更走 /design 流程）
-- Backend: **Python 3.11 + FastAPI**（async），Pydantic v2
+- Backend: **Python 3.12 + FastAPI**（async），Pydantic v2
 - 数据库: **PostgreSQL 16**（元数据 + 全文检索 `tsvector`）；**MVP 不引入向量库**（检索走结构化元数据 + 关键词，把原文交给 LLM 回答以降低幻觉）
 - 文件存储: **MVP 用本地文件系统**（保持架构简单）；通过 `StorageProtocol` 抽象封装，未来可换云对象存储而不动业务层
 - 正文/归类: **交给 Claude CLI 直接读原文**（Word/PDF/图片/Excel/PPT 等常见格式 CLI 原生支持），归类时一趟调用同时产出 {分类, 摘要, 标签, 可搜正文 content_text}，MVP 不自己写解析库

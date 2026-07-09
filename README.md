@@ -12,7 +12,7 @@
 
 ## 技术栈
 
-- **Backend**: Python 3.11 + FastAPI（async）、Pydantic v2
+- **Backend**: Python 3.12 + FastAPI（async）、Pydantic v2
 - **数据库**: PostgreSQL 16（元数据 + 权限模型；对话用 Agent 式索引问答，不引入向量库）
 - **文件存储**: 本地文件系统（经 `StorageProtocol` 抽象，未来可换云对象存储）
 - **Agent 引擎**: 封装 Claude CLI 子进程（经 `EngineProtocol` 抽象；认证支持 API key/网关/AWS Bedrock；Codex/OpenClaw 预留灰显）
