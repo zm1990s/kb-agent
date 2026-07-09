@@ -12,7 +12,13 @@ from pathlib import Path
 import asyncpg
 
 
-MIGRATIONS_DIR = Path(__file__).parent.parent / "infra" / "postgres" / "migrations"
+# 容器内：/app/infra/postgres/migrations（由 docker-compose 挂载）
+# 本地直接运行：相对项目根的 infra/postgres/migrations
+_here = Path(__file__).parent  # /app（容器）或 backend/（本地）
+MIGRATIONS_DIR = _here / "infra" / "postgres" / "migrations"
+if not MIGRATIONS_DIR.exists():
+    # 本地开发时 migrate.py 在 backend/，infra/ 在上一级
+    MIGRATIONS_DIR = _here.parent / "infra" / "postgres" / "migrations"
 
 
 async def run_migrations(dsn: str) -> None:
