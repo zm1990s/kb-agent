@@ -28,4 +28,5 @@ USER appuser
 ENV HOME=/home/appuser
 
 EXPOSE 8000
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# 启动时先跑增量迁移（幂等），再起 uvicorn
+CMD ["sh", "-c", "python migrate.py && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
