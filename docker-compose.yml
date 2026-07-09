@@ -49,8 +49,9 @@ services:
       - ./infra:/app/infra:ro
       # 本地存储目录（原始文件落盘处，不入 git）
       - ./local_storage:/app/local_storage
-      # 应用日志（RotatingFileHandler，10MB×10文件）
-      - ./logs:/app/logs
+      # 应用日志：named volume，由 Docker 管理权限（appuser 可写）
+      # bind mount 会被宿主机 root 目录覆盖权限，导致 appuser 无法写入
+      - logs_data:/app/logs
 
   frontend:
     build: ./frontend
@@ -69,3 +70,4 @@ services:
 
 volumes:
   pgdata:
+  logs_data:
