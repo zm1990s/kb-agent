@@ -119,6 +119,7 @@ async def answer_question_streamed(
 
     供 SSE 端点消费；answer_question() 是它的收敛封装。
     """
+    logger.info("answer start workspace=%s question_len=%d", workspace_id, len(question))
     yield Stage("indexing", "正在检索知识库索引…")
     index = await _load_index(session, workspace_id)
 
@@ -211,6 +212,7 @@ async def answer_question_streamed(
         if isinstance(num, int) and 1 <= num <= len(index):
             sources.append(await _build_source(index[num - 1][0]))
 
+    logger.info("answer done workspace=%s sources=%d", workspace_id, len(sources))
     yield Stage("done", "完成")
     yield AnswerResult(answer=answer or phase1_result.text.strip(), sources=sources)
 

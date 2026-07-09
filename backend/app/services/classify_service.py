@@ -9,6 +9,7 @@
 """
 
 import json
+import logging
 import uuid
 from datetime import UTC, datetime
 
@@ -17,6 +18,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.engine.base import get_engine
 from app.models.document import Category, Document, ProcessingTask
+
+logger = logging.getLogger(__name__)
 
 
 def _parse_engine_json(text: str) -> dict:
@@ -60,6 +63,7 @@ async def run_classification(session: AsyncSession, task_id: uuid.UUID) -> None:
     task.attempts += 1
     _append_log(task, "start", f"第 {task.attempts} 次尝试")
     await session.commit()
+    logger.info("classify start doc=%s attempt=%d", doc.id, task.attempts)
 
     try:
         # 候选分类
@@ -118,6 +122,7 @@ async def run_classification(session: AsyncSession, task_id: uuid.UUID) -> None:
         task.error = None
         _append_log(task, "done", "归类成功")
         await session.commit()
+        logger.info("classify done doc=%s category=%s", doc.id, parsed.get("category"))
 
     except Exception as exc:  # noqa: BLE001  # 后台任务须兜底，不能让异常逃逸
         await session.rollback()
@@ -128,6 +133,7 @@ async def run_classification(session: AsyncSession, task_id: uuid.UUID) -> None:
             task.status = "failed"
             task.error = err
             _append_log(task, "error", err)
+            logger.error("classify failed doc=%s: %s", task.document_id, err)
         if doc is not None:
             doc.status = "failed"
         await session.commit()
