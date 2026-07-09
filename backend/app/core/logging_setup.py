@@ -42,11 +42,14 @@ def configure_logging() -> None:
     except OSError:
         pass  # 目录创建失败时仍继续，只是没有文件日志
 
-    # uvicorn 默认 propagate=False，需手动开启，让其日志也流向 root handler。
-    for name in ("uvicorn", "uvicorn.error", "uvicorn.access"):
+    # uvicorn 默认 propagate=False。
+    # uvicorn / uvicorn.error 需流向 root（写 kb-agent.log）；
+    # uvicorn.access 单独写 access.log，不 propagate 到 root 避免重复。
+    for name in ("uvicorn", "uvicorn.error"):
         uv_logger = logging.getLogger(name)
         uv_logger.propagate = True
         uv_logger.setLevel(logging.INFO)
+    logging.getLogger("uvicorn.access").propagate = False
 
     # 应用日志（业务逻辑、任务、uvicorn 启停等）
     try:

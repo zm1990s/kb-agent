@@ -3,6 +3,7 @@
 workspace 以 query/body 传入（非路径），故在端点内显式做成员校验。
 """
 
+import logging
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -17,7 +18,10 @@ from app.services.category_service import (
     create_category,
     list_categories,
 )
+from app.services.usage_service import record_event
 from app.services.workspace_service import is_member
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/categories", tags=["categories"])
 
@@ -57,4 +61,10 @@ async def create_ws_category(
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST, "父分类不存在或不属于该空间"
         ) from exc
+    logger.info("audit admin create_category admin=%s workspace=%s category=%s name=%s",
+                current_user.id, workspace_id, cat.id, cat.name)
+    await record_event(session, action="admin_create_category", user_id=current_user.id,
+                       meta={"workspace_id": str(workspace_id),
+                             "category_id": str(cat.id), "name": cat.name,
+                             "parent_id": str(body.parent_id) if body.parent_id else None})
     return CategoryPublic.model_validate(cat)

@@ -1,6 +1,7 @@
 """对话检索路由。仅限所属空间；串起检索→生成→落库。"""
 
 import json
+import logging
 import uuid
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
@@ -39,6 +40,8 @@ from app.services.chat_service import (
 )
 from app.services.usage_service import record_event
 from app.services.workspace_service import is_member
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["chat"])
 
@@ -84,6 +87,15 @@ async def chat(
         sources=result.sources,
     )
 
+    logger.info(
+        "audit chat user=%s workspace=%s conversation=%s q_len=%d a_len=%d",
+        current_user.id,
+        body.workspace_id,
+        conv.id,
+        len(body.message),
+        len(result.answer),
+    )
+
     async def _log_chat() -> None:
         async with SessionLocal() as s:
             await record_event(
@@ -91,6 +103,11 @@ async def chat(
                 action="chat",
                 user_id=current_user.id,
                 workspace_id=body.workspace_id,
+                meta={
+                    "conversation_id": str(conv.id),
+                    "question": body.message,
+                    "answer": result.answer,
+                },
             )
 
     background_tasks.add_task(_log_chat)
@@ -150,6 +167,26 @@ async def chat_stream(
             content=final.answer,
             sources=final.sources,
         )
+        logger.info(
+            "audit chat_stream user=%s workspace=%s conversation=%s q_len=%d a_len=%d",
+            current_user.id,
+            body.workspace_id,
+            conv.id,
+            len(body.message),
+            len(final.answer),
+        )
+        async with SessionLocal() as audit_session:
+            await record_event(
+                audit_session,
+                action="chat",
+                user_id=current_user.id,
+                workspace_id=body.workspace_id,
+                meta={
+                    "conversation_id": str(conv.id),
+                    "question": body.message,
+                    "answer": final.answer,
+                },
+            )
         # 新会话：后台生成标题
         if is_new_conv:
             async with SessionLocal() as bg_session:

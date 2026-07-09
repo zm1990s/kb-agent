@@ -1,6 +1,7 @@
 """管理后台路由（F4-F6）：用户管理、用户组、RBAC。均需 admin。"""
 
 import collections
+import logging
 import os
 import uuid
 
@@ -26,7 +27,9 @@ from app.schemas.rbac import (
 )
 from app.services import rbac_service
 from app.services.rbac_service import delete_user
-from app.services.usage_service import get_stats
+from app.services.usage_service import get_stats, record_event
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(require_admin)])
 
@@ -49,12 +52,16 @@ async def delete_user_endpoint(
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "不能删除自己")
     if not await delete_user(session, user_id=user_id):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "用户不存在")
+    logger.info("audit admin delete_user admin=%s target=%s", current_admin.id, user_id)
+    await record_event(session, action="admin_delete_user", user_id=current_admin.id,
+                       meta={"target_user_id": str(user_id)})
 
 
 @router.patch("/users/{user_id}/active", response_model=UserAdminView)
 async def set_active(
     user_id: uuid.UUID,
     body: SetActiveRequest,
+    current_admin: User = Depends(require_admin),
     session: AsyncSession = Depends(get_session),
 ):
     user = await rbac_service.set_user_active(
@@ -62,6 +69,10 @@ async def set_active(
     )
     if user is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "用户不存在")
+    logger.info("audit admin set_active admin=%s target=%s active=%s",
+                current_admin.id, user_id, body.is_active)
+    await record_event(session, action="admin_set_user_active", user_id=current_admin.id,
+                       meta={"target_user_id": str(user_id), "is_active": body.is_active})
     return user
 
 
@@ -69,11 +80,16 @@ async def set_active(
 async def set_role(
     user_id: uuid.UUID,
     body: SetRoleRequest,
+    current_admin: User = Depends(require_admin),
     session: AsyncSession = Depends(get_session),
 ):
     user = await rbac_service.set_user_role(session, user_id=user_id, role=body.role)
     if user is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "用户不存在")
+    logger.info("audit admin set_role admin=%s target=%s role=%s",
+                current_admin.id, user_id, body.role)
+    await record_event(session, action="admin_set_user_role", user_id=current_admin.id,
+                       meta={"target_user_id": str(user_id), "role": body.role})
     return user
 
 
@@ -81,6 +97,7 @@ async def set_role(
 async def reset_password(
     user_id: uuid.UUID,
     body: ResetPasswordRequest,
+    current_admin: User = Depends(require_admin),
     session: AsyncSession = Depends(get_session),
 ):
     user = await rbac_service.admin_reset_password(
@@ -88,6 +105,9 @@ async def reset_password(
     )
     if user is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "用户不存在")
+    logger.info("audit admin reset_password admin=%s target=%s", current_admin.id, user_id)
+    await record_event(session, action="admin_reset_password", user_id=current_admin.id,
+                       meta={"target_user_id": str(user_id)})
 
 
 # ── F5 用户组 ──────────────────────────────────────────
@@ -98,18 +118,29 @@ async def list_groups(session: AsyncSession = Depends(get_session)):
 
 
 @router.post("/groups", response_model=GroupPublic, status_code=status.HTTP_201_CREATED)
-async def create_group(body: GroupCreate, session: AsyncSession = Depends(get_session)):
-    return await rbac_service.create_group(
-        session, name=body.name, description=body.description
-    )
+async def create_group(
+    body: GroupCreate,
+    current_admin: User = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+):
+    group = await rbac_service.create_group(session, name=body.name, description=body.description)
+    logger.info("audit admin create_group admin=%s group=%s", current_admin.id, group.id)
+    await record_event(session, action="admin_create_group", user_id=current_admin.id,
+                       meta={"group_id": str(group.id), "name": body.name})
+    return group
 
 
 @router.delete("/groups/{group_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_group(
-    group_id: uuid.UUID, session: AsyncSession = Depends(get_session)
+    group_id: uuid.UUID,
+    current_admin: User = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
 ):
     if not await rbac_service.delete_group(session, group_id=group_id):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "组不存在")
+    logger.info("audit admin delete_group admin=%s group=%s", current_admin.id, group_id)
+    await record_event(session, action="admin_delete_group", user_id=current_admin.id,
+                       meta={"group_id": str(group_id)})
 
 
 @router.get("/groups/{group_id}/rules", response_model=list[GroupRulePublic])
@@ -127,17 +158,31 @@ async def list_rules(
 async def add_rule(
     group_id: uuid.UUID,
     body: GroupRuleCreate,
+    current_admin: User = Depends(require_admin),
     session: AsyncSession = Depends(get_session),
 ):
-    return await rbac_service.add_group_rule(
+    rule = await rbac_service.add_group_rule(
         session, group_id=group_id, field=body.field, op=body.op, value=body.value
     )
+    logger.info("audit admin add_rule admin=%s group=%s field=%s op=%s value=%s",
+                current_admin.id, group_id, body.field, body.op, body.value)
+    await record_event(session, action="admin_add_group_rule", user_id=current_admin.id,
+                       meta={"group_id": str(group_id), "field": body.field,
+                             "op": body.op, "value": body.value})
+    return rule
 
 
 @router.delete("/rules/{rule_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_rule(rule_id: uuid.UUID, session: AsyncSession = Depends(get_session)):
+async def delete_rule(
+    rule_id: uuid.UUID,
+    current_admin: User = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+):
     if not await rbac_service.delete_group_rule(session, rule_id=rule_id):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "规则不存在")
+    logger.info("audit admin delete_rule admin=%s rule=%s", current_admin.id, rule_id)
+    await record_event(session, action="admin_delete_group_rule", user_id=current_admin.id,
+                       meta={"rule_id": str(rule_id)})
 
 
 @router.get("/groups/{group_id}/members", response_model=list[UserAdminView])
@@ -148,8 +193,14 @@ async def group_members(
 
 
 @router.post("/recompute-memberships")
-async def recompute_memberships(session: AsyncSession = Depends(get_session)):
+async def recompute_memberships(
+    current_admin: User = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+):
     count = await rbac_service.recompute_all_memberships(session)
+    logger.info("audit admin recompute_memberships admin=%s count=%d", current_admin.id, count)
+    await record_event(session, action="admin_recompute_memberships", user_id=current_admin.id,
+                       meta={"recomputed_users": count})
     return {"recomputed_users": count}
 
 
@@ -166,11 +217,16 @@ async def get_permissions(
 async def set_permission(
     group_id: uuid.UUID,
     body: PermissionSet,
+    current_admin: User = Depends(require_admin),
     session: AsyncSession = Depends(get_session),
 ):
     await rbac_service.set_group_permission(
         session, group_id=group_id, module=body.module, level=body.level
     )
+    logger.info("audit admin set_permission admin=%s group=%s module=%s level=%s",
+                current_admin.id, group_id, body.module, body.level)
+    await record_event(session, action="admin_set_permission", user_id=current_admin.id,
+                       meta={"group_id": str(group_id), "module": body.module, "level": body.level})
 
 
 # 供前端获取「我的有效权限」以做菜单显隐/只读控制

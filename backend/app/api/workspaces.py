@@ -1,8 +1,9 @@
 """空间路由。建空间/加成员需管理员；列表返回当前用户可见空间。"""
 
 import io
-import zipfile
+import logging
 import uuid
+import zipfile
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
@@ -20,6 +21,7 @@ from app.schemas.auth import (
     WorkspacePublic,
     WorkspaceWithRole,
 )
+from app.services.usage_service import record_event
 from app.services.workspace_service import (
     AlreadyMemberError,
     UserNotFoundError,
@@ -33,6 +35,8 @@ from app.services.workspace_service import (
 )
 from app.storage.base import get_storage
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/workspaces", tags=["workspaces"])
 
 
@@ -45,6 +49,10 @@ async def create(
     ws = await create_workspace(
         session, name=body.name, description=body.description, owner=admin
     )
+    logger.info("audit admin create_workspace admin=%s workspace=%s name=%s",
+                admin.id, ws.id, ws.name)
+    await record_event(session, action="admin_create_workspace", user_id=admin.id,
+                       meta={"workspace_id": str(ws.id), "name": ws.name})
     return WorkspacePublic.model_validate(ws)
 
 
@@ -89,6 +97,12 @@ async def add_workspace_member(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "用户不存在") from exc
     except AlreadyMemberError as exc:
         raise HTTPException(status.HTTP_409_CONFLICT, "用户已是该空间成员") from exc
+    logger.info("audit admin add_member admin=%s workspace=%s email=%s user_id=%s",
+                admin.id, workspace_id, body.email, body.user_id)
+    await record_event(session, action="admin_add_member", user_id=admin.id,
+                       meta={"workspace_id": str(workspace_id),
+                             "member_user_id": str(body.user_id) if body.user_id else None,
+                             "email": body.email, "role_in_ws": body.role_in_ws})
     return {"status": "ok"}
 
 
@@ -132,6 +146,11 @@ async def grant_ws_to_group(
         group_id=body.group_id,
         role_in_ws=body.role_in_ws,
     )
+    logger.info("audit admin grant_group admin=%s workspace=%s group=%s role=%s",
+                admin.id, workspace_id, body.group_id, body.role_in_ws)
+    await record_event(session, action="admin_grant_group", user_id=admin.id,
+                       meta={"workspace_id": str(workspace_id),
+                             "group_id": str(body.group_id), "role_in_ws": body.role_in_ws})
     return {"status": "ok"}
 
 
@@ -149,6 +168,10 @@ async def revoke_ws_from_group(
         session, workspace_id=workspace_id, group_id=group_id
     ):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "授权不存在")
+    logger.info("audit admin revoke_group admin=%s workspace=%s group=%s",
+                admin.id, workspace_id, group_id)
+    await record_event(session, action="admin_revoke_group", user_id=admin.id,
+                       meta={"workspace_id": str(workspace_id), "group_id": str(group_id)})
 
 
 @router.get("/{workspace_id}/export")
@@ -220,5 +243,9 @@ async def delete_workspace(
         except Exception:
             pass  # 文件已不存在则忽略
 
+    logger.info("audit admin delete_workspace admin=%s workspace=%s name=%s",
+                admin.id, workspace_id, ws.name)
+    await record_event(session, action="admin_delete_workspace", user_id=admin.id,
+                       meta={"workspace_id": str(workspace_id), "name": ws.name})
     await session.delete(ws)
     await session.commit()

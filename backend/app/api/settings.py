@@ -1,5 +1,8 @@
 """系统设置路由（管理员）。当前含引擎（LLM 后端）选择和平台品牌配置。"""
 
+import logging
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,13 +18,15 @@ from app.services.settings_service import (
     get_engine_backend,
     get_prompt,
     get_setting,
-    get_prompt_version,
     list_prompt_history,
     rollback_prompt,
     set_engine_backend,
     set_prompt,
     set_setting,
 )
+from app.services.usage_service import record_event
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 
@@ -59,7 +64,7 @@ async def get_engine_config(
 @router.put("/engine", response_model=EngineConfigOut)
 async def update_engine_config(
     body: EngineConfigIn,
-    _admin: User = Depends(require_admin),
+    admin: User = Depends(require_admin),
     session: AsyncSession = Depends(get_session),
 ) -> EngineConfigOut:
     try:
@@ -69,6 +74,9 @@ async def update_engine_config(
             status.HTTP_400_BAD_REQUEST, "该引擎不可用或未实现"
         ) from exc
     current = await get_engine_backend(session)
+    logger.info("audit admin set_engine admin=%s backend=%s", admin.id, body.backend)
+    await record_event(session, action="admin_set_engine", user_id=admin.id,
+                       meta={"backend": body.backend})
     return EngineConfigOut(
         current=current,
         options=[
@@ -109,8 +117,6 @@ async def get_branding(
 
 
 # ── 提示词管理 ────────────────────────────────────────────────
-
-from datetime import datetime
 
 
 class PromptOut(BaseModel):
@@ -159,7 +165,7 @@ async def get_prompts(
 async def update_prompt(
     key: str,
     body: PromptIn,
-    _admin: User = Depends(require_admin),
+    admin: User = Depends(require_admin),
     session: AsyncSession = Depends(get_session),
 ) -> PromptOut:
     tpl = next((p for p in PROMPT_CATALOG if p.key == key), None)
@@ -170,6 +176,9 @@ async def update_prompt(
     except InvalidPromptError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
     value = await get_prompt(session, key)
+    logger.info("audit admin update_prompt admin=%s key=%s", admin.id, key)
+    await record_event(session, action="admin_update_prompt", user_id=admin.id,
+                       meta={"key": key})
     return PromptOut(
         key=tpl.key,
         label=tpl.label,
@@ -182,7 +191,7 @@ async def update_prompt(
 @router.put("/prompts/{key}/reset", response_model=PromptOut)
 async def reset_prompt(
     key: str,
-    _admin: User = Depends(require_admin),
+    admin: User = Depends(require_admin),
     session: AsyncSession = Depends(get_session),
 ) -> PromptOut:
     """恢复默认提示词（删除 DB 中的覆盖值）。"""
@@ -194,6 +203,9 @@ async def reset_prompt(
     if row is not None:
         await session.delete(row)
         await session.commit()
+    logger.info("audit admin reset_prompt admin=%s key=%s", admin.id, key)
+    await record_event(session, action="admin_reset_prompt", user_id=admin.id,
+                       meta={"key": key})
     return PromptOut(
         key=tpl.key,
         label=tpl.label,
@@ -223,7 +235,7 @@ class RollbackIn(BaseModel):
 async def rollback_prompt_version(
     key: str,
     body: RollbackIn,
-    _admin: User = Depends(require_admin),
+    admin: User = Depends(require_admin),
     session: AsyncSession = Depends(get_session),
 ) -> PromptOut:
     tpl = next((p for p in PROMPT_CATALOG if p.key == key), None)
@@ -233,6 +245,10 @@ async def rollback_prompt_version(
         value = await rollback_prompt(session, key, body.version)
     except ValueError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
+    logger.info("audit admin rollback_prompt admin=%s key=%s version=%d",
+                admin.id, key, body.version)
+    await record_event(session, action="admin_rollback_prompt", user_id=admin.id,
+                       meta={"key": key, "version": body.version})
     return PromptOut(
         key=tpl.key,
         label=tpl.label,
@@ -245,7 +261,7 @@ async def rollback_prompt_version(
 @router.put("/branding", response_model=BrandingOut)
 async def update_branding(
     body: BrandingIn,
-    _admin: User = Depends(require_admin),
+    admin: User = Depends(require_admin),
     session: AsyncSession = Depends(get_session),
 ) -> BrandingOut:
     if body.name is not None:
@@ -254,4 +270,7 @@ async def update_branding(
         await set_setting(session, BRANDING_LOGO_KEY, body.logo_url.strip())
     name = await get_setting(session, BRANDING_NAME_KEY) or DEFAULT_NAME
     logo_url = await get_setting(session, BRANDING_LOGO_KEY) or DEFAULT_LOGO
+    logger.info("audit admin update_branding admin=%s name=%s", admin.id, body.name)
+    await record_event(session, action="admin_update_branding", user_id=admin.id,
+                       meta={"name": body.name, "logo_url": body.logo_url})
     return BrandingOut(name=name, logo_url=logo_url)

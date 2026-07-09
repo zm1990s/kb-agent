@@ -112,6 +112,18 @@ def _parse_engine_json(text: str) -> dict:
     return json.loads(re.sub(r'"(?:[^"\\]|\\.)*"', _escape_ctrl, raw, flags=re.DOTALL))
 
 
+def _extract_answer_fallback(text: str) -> str | None:
+    """JSON 解析失败时，尝试用 regex 提取 answer 字段值。"""
+    import re
+    m = re.search(r'"answer"\s*:\s*"((?:[^"\\]|\\.)*)"', text, re.DOTALL)
+    if not m:
+        return None
+    try:
+        return json.loads(f'"{m.group(1)}"')
+    except Exception:
+        return m.group(1)
+
+
 @dataclass
 class Stage:
     """流式工作阶段事件（供前端展示 Agent 进展）。"""
@@ -169,8 +181,10 @@ async def answer_question_streamed(
     try:
         phase1 = _parse_engine_json(phase1_result.text)
     except (ValueError, json.JSONDecodeError):
+        fallback = _extract_answer_fallback(phase1_result.text)
+        logger.warning("phase1 JSON 解析失败，fallback answer=%s", bool(fallback))
         yield Stage("done", "完成")
-        yield AnswerResult(answer=phase1_result.text.strip(), sources=[])
+        yield AnswerResult(answer=fallback or "抱歉，处理回答时出现格式问题，请重新提问。", sources=[])
         return
 
     if phase1.get("mode") == "fetch":
@@ -212,8 +226,10 @@ async def answer_question_streamed(
             answer = str(parsed.get("answer") or "").strip()
             doc_numbers = parsed.get("doc_numbers") or []
         except (ValueError, json.JSONDecodeError):
+            fallback = _extract_answer_fallback(result.text)
+            logger.warning("phase2 JSON 解析失败，fallback answer=%s", bool(fallback))
             yield Stage("done", "完成")
-            yield AnswerResult(answer=result.text.strip(), sources=[])
+            yield AnswerResult(answer=fallback or "抱歉，处理回答时出现格式问题，请重新提问。", sources=[])
             return
     else:
         # mode == "answer"：摘要已够，直接用 Phase 1 的结果
@@ -225,9 +241,12 @@ async def answer_question_streamed(
         if isinstance(num, int) and 1 <= num <= len(index):
             sources.append(await _build_source(index[num - 1][0]))
 
+    if not answer:
+        logger.warning("answer 字段为空，尝试 fallback")
+        answer = _extract_answer_fallback(phase1_result.text) or "抱歉，未能获取有效回答，请重新提问。"
     logger.info("answer done workspace=%s sources=%d", workspace_id, len(sources))
     yield Stage("done", "完成")
-    yield AnswerResult(answer=answer or phase1_result.text.strip(), sources=sources)
+    yield AnswerResult(answer=answer, sources=sources)
 
 
 async def answer_question(

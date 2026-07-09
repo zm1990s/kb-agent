@@ -1,5 +1,6 @@
 """认证路由。api 层只做校验、调 service、映射错误到 HTTP，不写业务逻辑。"""
 
+import logging
 import uuid
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
@@ -18,8 +19,8 @@ from app.schemas.auth import (
     TokenResponse,
     UserPublic,
 )
-from app.services.usage_service import record_event
 from app.services.rbac_service import delete_user
+from app.services.usage_service import record_event
 from app.services.user_service import (
     DomainNotAllowedError,
     EmailExistsError,
@@ -31,6 +32,8 @@ from app.services.user_service import (
     register_user,
     remove_allowed_domain,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -152,10 +155,13 @@ async def get_allowed_domains(
 )
 async def create_allowed_domain(
     body: AllowedDomainCreate,
-    _admin: User = Depends(require_admin),
+    admin: User = Depends(require_admin),
     session: AsyncSession = Depends(get_session),
 ) -> AllowedDomainPublic:
     row = await add_allowed_domain(session, domain=body.domain)
+    logger.info("audit admin add_allowed_domain admin=%s domain=%s", admin.id, body.domain)
+    await record_event(session, action="admin_add_allowed_domain", user_id=admin.id,
+                       meta={"domain": body.domain})
     return AllowedDomainPublic.model_validate(row)
 
 
@@ -164,9 +170,12 @@ async def create_allowed_domain(
 )
 async def delete_allowed_domain(
     domain_id: uuid.UUID,
-    _admin: User = Depends(require_admin),
+    admin: User = Depends(require_admin),
     session: AsyncSession = Depends(get_session),
 ) -> None:
     ok = await remove_allowed_domain(session, domain_id=domain_id)
     if not ok:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "域名不存在")
+    logger.info("audit admin remove_allowed_domain admin=%s domain_id=%s", admin.id, domain_id)
+    await record_event(session, action="admin_remove_allowed_domain", user_id=admin.id,
+                       meta={"domain_id": str(domain_id)})
