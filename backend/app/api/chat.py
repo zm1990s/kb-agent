@@ -3,11 +3,11 @@
 import json
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.db import get_session
+from app.core.db import SessionLocal, get_session
 from app.core.deps import get_current_user
 from app.models.auth import User
 from app.schemas.chat import (
@@ -34,6 +34,7 @@ from app.services.chat_service import (
     list_messages,
     recent_history,
 )
+from app.services.usage_service import record_event
 from app.services.workspace_service import is_member
 
 router = APIRouter(tags=["chat"])
@@ -42,6 +43,7 @@ router = APIRouter(tags=["chat"])
 @router.post("/chat", response_model=ChatResponse)
 async def chat(
     body: ChatRequest,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> ChatResponse:
@@ -79,6 +81,16 @@ async def chat(
         sources=result.sources,
     )
 
+    async def _log_chat() -> None:
+        async with SessionLocal() as s:
+            await record_event(
+                s,
+                action="chat",
+                user_id=current_user.id,
+                workspace_id=body.workspace_id,
+            )
+
+    background_tasks.add_task(_log_chat)
     return ChatResponse(
         answer=result.answer,
         sources=[SourceRef(**s) for s in result.sources],

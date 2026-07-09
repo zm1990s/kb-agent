@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import StatsTab from "@/components/admin/StatsTab";
 import NavBar from "@/components/NavBar";
 import { api, ApiError } from "@/lib/api";
 import { isAdmin } from "@/lib/auth";
@@ -41,7 +42,7 @@ const MODULES = [
 export default function UsersPage() {
   const ready = useAuthGuard();
   const router = useRouter();
-  const [tab, setTab] = useState<"users" | "groups">("users");
+  const [tab, setTab] = useState<"users" | "groups" | "stats">("users");
   const [users, setUsers] = useState<UserRow[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -71,7 +72,7 @@ export default function UsersPage() {
       <main className="mx-auto w-full max-w-5xl flex-1 p-4">
         <h1 className="mb-4 text-lg font-semibold">用户管理</h1>
         <div className="mb-4 flex gap-1 border-b">
-          {(["users", "groups"] as const).map((t) => (
+          {(["users", "groups", "stats"] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -81,16 +82,18 @@ export default function UsersPage() {
                   : "text-gray-500 hover:text-gray-800"
               }`}
             >
-              {t === "users" ? "用户" : "用户组与权限"}
+              {t === "users" ? "用户" : t === "groups" ? "用户组与权限" : "使用报表"}
             </button>
           ))}
         </div>
         {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
-        {tab === "users" ? (
+        {tab === "users" && (
           <UsersTab users={users} reload={load} setError={setError} />
-        ) : (
+        )}
+        {tab === "groups" && (
           <GroupsTab groups={groups} reload={load} setError={setError} />
         )}
+        {tab === "stats" && <StatsTab />}
       </main>
     </div>
   );

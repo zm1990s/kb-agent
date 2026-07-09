@@ -27,6 +27,7 @@ services:
         required: false
     # Claude CLI 认证凭据：从 .env 透传（支持 API key / 网关 / Bedrock 等不同方式）。
     # 未设置的变量不会注入，按实际认证方式在 .env 里填对应项即可。
+    # 单端口暴露：后端不再对宿主暴露端口，仅 compose 网络内可达（由 frontend 反代）。
     environment:
       - ANTHROPIC_API_KEY
       - ANTHROPIC_AUTH_TOKEN
@@ -37,13 +38,15 @@ services:
       - AWS_SECRET_ACCESS_KEY
       - AWS_SESSION_TOKEN
       - AWS_REGION
-    # 单端口暴露：后端不再对宿主暴露端口，仅 compose 网络内可达（由 frontend 反代）。
+      - LOG_DIR=/app/logs
     expose:
       - "8000"
     volumes:
       - ./backend:/app
       # 本地存储目录（原始文件落盘处，不入 git）
       - ./local_storage:/app/local_storage
+      # 应用日志（RotatingFileHandler，10MB×10文件）
+      - ./logs:/app/logs
 
   frontend:
     build: ./frontend

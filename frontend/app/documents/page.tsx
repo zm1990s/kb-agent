@@ -16,6 +16,16 @@ const STATUS_LABEL: Record<string, string> = {
   failed: "失败",
 };
 
+// 规范化文件/目录名：空格→_, 控制字符移除, 合并连续下划线
+function sanitizeName(name: string): string {
+  return name
+    .replace(/[\x00-\x1f\x7f]/g, "")
+    .replace(/[ \t]+/g, "_")
+    .replace(/[/\\]/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "") || "untitled";
+}
+
 // 特殊过滤值：全部 / 未归目录
 const ALL = "__all__";
 const ROOT = "__root__";
@@ -39,6 +49,8 @@ export default function DocumentsPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   // 搜索关键词
   const [query, setQuery] = useState("");
+  // 点击标签快速过滤
+  const [tagFilter, setTagFilter] = useState<string | null>(null);
   // 自定义展示列
   const [cols, setCols] = useState<Record<string, boolean>>({
     folder: true,
@@ -103,19 +115,19 @@ export default function DocumentsPage() {
 
   // 客户端搜索：标题/摘要/标签/分类名
   const q = query.trim().toLowerCase();
-  const shownDocs = q
-    ? docs.filter((d) => {
-        const hay = [
-          d.title,
-          d.summary ?? "",
-          (d.tags ?? []).join(" "),
-          categoryName(d.category_id),
-        ]
-          .join(" ")
-          .toLowerCase();
-        return hay.includes(q);
-      })
-    : docs;
+  const shownDocs = docs.filter((d) => {
+    if (tagFilter && !(d.tags ?? []).includes(tagFilter)) return false;
+    if (!q) return true;
+    const hay = [
+      d.title,
+      d.summary ?? "",
+      (d.tags ?? []).join(" "),
+      categoryName(d.category_id),
+    ]
+      .join(" ")
+      .toLowerCase();
+    return hay.includes(q);
+  });
 
   const COLS: { key: string; label: string }[] = [
     { key: "folder", label: "目录" },
@@ -244,7 +256,8 @@ export default function DocumentsPage() {
           .webkitRelativePath;
         let folderId = baseFolder;
         if (rel && rel.includes("/")) {
-          const segs = rel.split("/").slice(0, -1); // 去掉文件名
+          // 规范化路径中每个目录名（去掉顶层目录名，保留子目录层级）
+          const segs = rel.split("/").slice(0, -1).map(sanitizeName);
           folderId = await ensureFolderPath(segs, baseFolder, pathCache);
         }
         await uploadOne(file, folderId);
@@ -446,6 +459,18 @@ export default function DocumentsPage() {
               placeholder="搜索标题/摘要/标签/分类…"
               className="w-64 rounded-full border px-4 py-1.5 text-sm focus:border-blue-500 focus:outline-none"
             />
+            {tagFilter && (
+              <span className="flex items-center gap-1 rounded-full bg-blue-100 px-3 py-0.5 text-xs text-blue-700">
+                标签：{tagFilter}
+                <button
+                  onClick={() => setTagFilter(null)}
+                  className="ml-0.5 font-bold hover:text-blue-900"
+                  aria-label="清除标签过滤"
+                >
+                  ×
+                </button>
+              </span>
+            )}
             <span className="text-xs text-gray-400">共 {shownDocs.length} 篇</span>
             <details className="relative ml-auto text-sm">
               <summary className="cursor-pointer rounded border px-3 py-1.5 text-gray-600 hover:bg-gray-100">
@@ -552,7 +577,13 @@ export default function DocumentsPage() {
                           {(d.tags ?? []).map((t) => (
                             <span
                               key={t}
-                              className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600"
+                              onClick={() => setTagFilter(tagFilter === t ? null : t)}
+                              className={`cursor-pointer rounded-full px-2 py-0.5 text-xs transition-colors ${
+                                tagFilter === t
+                                  ? "bg-blue-200 text-blue-800"
+                                  : "bg-gray-100 text-gray-600 hover:bg-blue-100 hover:text-blue-700"
+                              }`}
+                              title="点击过滤该标签"
                             >
                               {t}
                             </span>

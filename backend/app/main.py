@@ -18,11 +18,13 @@ from app.api import (
     workspaces,
 )
 from app.core.db import SessionLocal
+from app.core.logging_setup import configure_logging
 from app.services.user_service import seed_admin
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
+    configure_logging()
     # 幂等创建首个管理员（读 ADMIN_EMAIL/ADMIN_PASSWORD）
     async with SessionLocal() as session:
         await seed_admin(session)

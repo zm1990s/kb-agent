@@ -21,6 +21,7 @@ from app.schemas.rbac import (
     UserAdminView,
 )
 from app.services import rbac_service
+from app.services.usage_service import get_stats
 
 router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(require_admin)])
 
@@ -162,3 +163,16 @@ async def my_permissions(
 ):
     # 注：此端点在 admin 下永远全 write；非 admin 的权限查询见 /auth/my-permissions
     return await rbac_service.effective_permissions(session, user=current_user)
+
+
+# ── F9-5 用量报表 ─────────────────────────────────────
+
+@router.get("/stats")
+async def usage_stats(
+    days: int = 30,
+    session: AsyncSession = Depends(get_session),
+):
+    """近 N 天用量统计：按天+动作聚合、活跃用户、总计。"""
+    if days < 1 or days > 365:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "days 须在 1-365 之间")
+    return await get_stats(session, days=days)

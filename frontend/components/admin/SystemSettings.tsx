@@ -14,12 +14,19 @@ interface EngineConfig {
   current: string;
   options: EngineOption[];
 }
+interface Branding {
+  name: string;
+  logo_url: string;
+}
 
-// 系统设置分区：注册域名白名单 + 引擎（Claude/Codex/OpenClaw）选择。
+// 系统设置分区：品牌配置 + 注册域名白名单 + 引擎（Claude/Codex/OpenClaw）选择。
 export default function SystemSettings() {
   const [domains, setDomains] = useState<AllowedDomain[]>([]);
   const [domainName, setDomainName] = useState("");
   const [engine, setEngine] = useState<EngineConfig | null>(null);
+  const [branding, setBranding] = useState<Branding>({ name: "", logo_url: "" });
+  const [brandingName, setBrandingName] = useState("");
+  const [brandingLogo, setBrandingLogo] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [savedMsg, setSavedMsg] = useState<string | null>(null);
 
@@ -39,10 +46,22 @@ export default function SystemSettings() {
     }
   }, []);
 
+  const loadBranding = useCallback(async () => {
+    try {
+      const b = await api.get<Branding>("/settings/branding");
+      setBranding(b);
+      setBrandingName(b.name);
+      setBrandingLogo(b.logo_url);
+    } catch {
+      // 非管理员读不到也没关系
+    }
+  }, []);
+
   useEffect(() => {
     loadDomains();
     loadEngine();
-  }, [loadDomains, loadEngine]);
+    loadBranding();
+  }, [loadDomains, loadEngine, loadBranding]);
 
   async function addDomain(e: React.FormEvent) {
     e.preventDefault();
@@ -66,6 +85,22 @@ export default function SystemSettings() {
     }
   }
 
+  async function saveBranding(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setSavedMsg(null);
+    try {
+      const updated = await api.put<Branding>("/settings/branding", {
+        name: brandingName,
+        logo_url: brandingLogo,
+      });
+      setBranding(updated);
+      setSavedMsg("品牌配置已保存，刷新页面生效");
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "保存失败");
+    }
+  }
+
   async function selectEngine(backend: string) {
     setError(null);
     setSavedMsg(null);
@@ -80,6 +115,46 @@ export default function SystemSettings() {
 
   return (
     <div className="space-y-6">
+      {/* 平台品牌配置 */}
+      <section className="rounded border bg-white p-4">
+        <h2 className="mb-1 text-sm font-medium">平台品牌</h2>
+        <p className="mb-3 text-xs text-gray-400">自定义左上角显示的平台名称和 Logo。</p>
+        <form onSubmit={saveBranding} className="space-y-3">
+          <div>
+            <label className="mb-1 block text-xs text-gray-500">平台名称</label>
+            <input
+              value={brandingName}
+              onChange={(e) => setBrandingName(e.target.value)}
+              placeholder="KB-Agent"
+              className="w-full rounded border px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs text-gray-500">Logo 图片 URL（留空使用默认缩写）</label>
+            <input
+              value={brandingLogo}
+              onChange={(e) => setBrandingLogo(e.target.value)}
+              placeholder="https://example.com/logo.png"
+              className="w-full rounded border px-3 py-2 text-sm"
+            />
+          </div>
+          {branding.logo_url && (
+            <img
+              src={branding.logo_url}
+              alt="logo 预览"
+              className="h-10 w-10 rounded object-contain"
+            />
+          )}
+          <button
+            type="submit"
+            className="rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700"
+          >
+            保存品牌配置
+          </button>
+        </form>
+        {savedMsg && <p className="mt-2 text-xs text-green-600">{savedMsg}</p>}
+      </section>
+
       {/* 引擎配置 */}
       <section className="rounded border bg-white p-4">
         <h2 className="mb-1 text-sm font-medium">Agent 引擎</h2>

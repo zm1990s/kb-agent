@@ -1,9 +1,13 @@
 """文档路由。上传需管理员 + 空间成员；触发后台归类任务。"""
 
+import re
+import unicodedata
 import uuid
+from pathlib import PurePosixPath
 
 from fastapi import (
     APIRouter,
+    BackgroundTasks,
     Depends,
     File,
     Form,
@@ -14,7 +18,7 @@ from fastapi import (
 from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.db import get_session
+from app.core.db import SessionLocal, get_session
 from app.core.deps import get_current_user
 from app.models.auth import User
 from app.models.document import Document
@@ -35,11 +39,29 @@ from app.services.document_service import (
     upload_document,
 )
 from app.services.folder_service import get_folder_in_workspace
+from app.services.usage_service import record_event
 from app.services.workspace_service import is_member
 from app.storage.base import get_storage
 from app.tasks.worker import enqueue_classification
 
 router = APIRouter(tags=["documents"])
+
+
+def sanitize_filename(name: str) -> str:
+    """规范化文件名：NFC Unicode → 移除控制字符 → 空格/不可见字符→下划线 → 合并连续下划线 → 保留扩展名。"""
+    name = unicodedata.normalize("NFC", name)
+    # 移除控制字符（\x00-\x1f \x7f）
+    name = re.sub(r"[\x00-\x1f\x7f]", "", name)
+    # 替换空格、制表符等空白字符为下划线
+    name = re.sub(r"[ \t]+", "_", name)
+    # 路径分隔符也替换（防路径注入）
+    name = re.sub(r"[/\\]", "_", name)
+    # 合并连续下划线
+    name = re.sub(r"_+", "_", name)
+    # 去掉首尾下划线
+    name = name.strip("_")
+    # 保底：空文件名则 untitled
+    return name or "untitled"
 
 
 async def _ensure_member(session: AsyncSession, ws_id: uuid.UUID, user: User) -> None:
@@ -66,6 +88,7 @@ async def _get_doc_for_member(
 )
 async def upload(
     workspace_id: uuid.UUID,
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     folder_id: uuid.UUID | None = Form(default=None),
     current_user: User = Depends(get_current_user),
@@ -84,10 +107,13 @@ async def upload(
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "目录不存在")
 
     data = await file.read()
+    # 保留原始文件名（仅截取末段），规范化特殊字符，不添加路径前缀
+    raw_name = PurePosixPath(file.filename or "untitled").name
+    clean_name = sanitize_filename(raw_name)
     doc, task = await upload_document(
         session,
         workspace_id=workspace_id,
-        filename=file.filename or "untitled",
+        filename=clean_name,
         mime_type=file.content_type or "application/octet-stream",
         data=data,
         uploaded_by=current_user.id,
@@ -95,6 +121,18 @@ async def upload(
     )
     # 触发后台归类 worker（进程内 asyncio，见 tasks/worker.py）
     enqueue_classification(task.id)
+
+    async def _log_upload() -> None:
+        async with SessionLocal() as s:
+            await record_event(
+                s,
+                action="upload",
+                user_id=current_user.id,
+                workspace_id=workspace_id,
+                meta={"filename": clean_name},
+            )
+
+    background_tasks.add_task(_log_upload)
     return DocumentUploadAccepted(id=doc.id, status=doc.status, task_id=task.id)
 
 
@@ -180,10 +218,12 @@ async def replace_doc(
     if current_user.role != "admin":
         raise HTTPException(status.HTTP_403_FORBIDDEN, "需要管理员权限")
     data = await file.read()
+    raw_name = PurePosixPath(file.filename or doc.title).name
+    clean_name = sanitize_filename(raw_name)
     task = await replace_document_content(
         session,
         doc=doc,
-        filename=file.filename or doc.title,
+        filename=clean_name,
         mime_type=file.content_type or "application/octet-stream",
         data=data,
     )
@@ -194,12 +234,25 @@ async def replace_doc(
 @router.get("/documents/{document_id}/download")
 async def download_document(
     document_id: uuid.UUID,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> Response:
     """下载原文。JWT + 空间成员校验（Q7）；强制 attachment + nosniff（SECURITY #5）。"""
     doc = await _get_doc_for_member(session, document_id, current_user)
     data = await get_storage().read_bytes(doc.storage_key)
+
+    async def _log_download() -> None:
+        async with SessionLocal() as s:
+            await record_event(
+                s,
+                action="download",
+                user_id=current_user.id,
+                workspace_id=doc.workspace_id,
+                meta={"document_id": str(document_id)},
+            )
+
+    background_tasks.add_task(_log_download)
     return Response(
         content=data,
         media_type=doc.mime_type,

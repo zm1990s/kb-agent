@@ -23,7 +23,7 @@ export default function LoginPage() {
         await api.post<UserPublic>("/auth/register", { email, password });
       }
       const tok = await api.post<TokenResponse>("/auth/login", { email, password });
-      setAuth(tok.access_token, tok.role);
+      setAuth(tok.access_token, tok.role, email);
       router.replace("/chat");
     } catch (err) {
       if (err instanceof ApiError) {

@@ -2,10 +2,10 @@
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.db import get_session
+from app.core.db import SessionLocal, get_session
 from app.core.deps import get_current_user, require_admin
 from app.core.security import create_access_token
 from app.models.auth import User
@@ -18,6 +18,7 @@ from app.schemas.auth import (
     TokenResponse,
     UserPublic,
 )
+from app.services.usage_service import record_event
 from app.services.user_service import (
     DomainNotAllowedError,
     EmailExistsError,
@@ -62,6 +63,7 @@ async def register(
 @router.post("/login", response_model=TokenResponse)
 async def login(
     body: LoginRequest,
+    background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
 ) -> TokenResponse:
     user = await authenticate(session, email=body.email, password=body.password)
@@ -71,6 +73,12 @@ async def login(
             detail="邮箱或密码错误",
         )
     token = create_access_token(user_id=user.id, role=user.role)
+
+    async def _log() -> None:
+        async with SessionLocal() as s:
+            await record_event(s, action="login", user_id=user.id)
+
+    background_tasks.add_task(_log)
     return TokenResponse(access_token=token, role=user.role)
 
 

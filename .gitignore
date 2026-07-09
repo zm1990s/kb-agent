@@ -17,6 +17,9 @@ venv/
 storage/
 local_storage/
 
+# 应用日志（RotatingFileHandler，不入库）
+logs/
+
 # 编辑器 / 系统
 .DS_Store
 .idea/

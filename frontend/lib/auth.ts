@@ -3,11 +3,18 @@
 
 const TOKEN_KEY = "kb_token";
 const ROLE_KEY = "kb_role";
+const EMAIL_KEY = "kb_email";
 
-export function setAuth(token: string, role: string): void {
+export function setAuth(token: string, role: string, email?: string): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(TOKEN_KEY, token);
   localStorage.setItem(ROLE_KEY, role);
+  if (email) localStorage.setItem(EMAIL_KEY, email);
+}
+
+export function getEmail(): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem(EMAIL_KEY);
 }
 
 export function getToken(): string | null {
@@ -28,6 +35,7 @@ export function clearAuth(): void {
   if (typeof window === "undefined") return;
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(ROLE_KEY);
+  localStorage.removeItem(EMAIL_KEY);
 }
 
 export function isLoggedIn(): boolean {
