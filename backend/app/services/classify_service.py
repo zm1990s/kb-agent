@@ -23,12 +23,38 @@ logger = logging.getLogger(__name__)
 
 
 def _parse_engine_json(text: str) -> dict:
-    """从引擎输出中提取 JSON 对象（容忍前后包裹的代码块/文字）。"""
+    """从引擎输出中提取 JSON 对象（容忍前后包裹的代码块/文字）。
+
+    LLM 有时在字符串值内输出未转义的换行/制表/控制字符，导致 JSONDecodeError。
+    先尝试直接解析，失败后用 re 把字符串字面量内的裸控制字符转义再重试。
+    """
+    import re
+
     start = text.find("{")
     end = text.rfind("}")
     if start == -1 or end == -1 or end < start:
         raise ValueError("引擎输出中未找到 JSON 对象")
-    return json.loads(text[start : end + 1])
+    raw = text[start : end + 1]
+
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        pass
+
+    # 将字符串字面量内的裸控制字符（\x00-\x1f，排除已转义的 \\ 和 \"）转义
+    def _escape_ctrl(m: re.Match) -> str:
+        s = m.group(0)
+        # 只处理双引号包裹的字符串内容部分
+        inner = s[1:-1]
+        inner = inner.replace("\\", "\x00BACKSLASH\x00")  # 临时占位保护已有转义
+        inner = re.sub(r'[\x00-\x1f]', lambda c: (
+            {"\\": "\\\\", "\n": "\\n", "\r": "\\r", "\t": "\\t"}.get(c.group(), f"\\u{ord(c.group()):04x}")
+        ), inner)
+        inner = inner.replace("\x00BACKSLASH\x00", "\\")
+        return f'"{inner}"'
+
+    fixed = re.sub(r'"(?:[^"\\]|\\.)*"', _escape_ctrl, raw, flags=re.DOTALL)
+    return json.loads(fixed)
 
 
 async def _resolve_category_id(

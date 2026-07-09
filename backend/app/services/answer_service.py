@@ -92,11 +92,24 @@ def _build_catalog(index: list[tuple[Document, str | None]]) -> str:
 
 
 def _parse_engine_json(text: str) -> dict:
+    import re
     start = text.find("{")
     end = text.rfind("}")
     if start == -1 or end == -1 or end < start:
         raise ValueError("引擎输出中未找到 JSON 对象")
-    return json.loads(text[start : end + 1])
+    raw = text[start : end + 1]
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        pass
+    # 转义字符串字面量内的裸控制字符
+    def _escape_ctrl(m: re.Match) -> str:
+        inner = m.group(0)[1:-1].replace("\\", "\x00BS\x00")
+        inner = re.sub(r'[\x00-\x1f]', lambda c: (
+            {"\\": "\\\\", "\n": "\\n", "\r": "\\r", "\t": "\\t"}.get(c.group(), f"\\u{ord(c.group()):04x}")
+        ), inner)
+        return f'"{inner.replace(chr(0) + "BS" + chr(0), "\\")}"'
+    return json.loads(re.sub(r'"(?:[^"\\]|\\.)*"', _escape_ctrl, raw, flags=re.DOTALL))
 
 
 @dataclass
