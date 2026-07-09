@@ -2,7 +2,6 @@
 
 # 启动本地依赖 + 后端（后台）
 dev:
-	mkdir -p local_storage
 	docker compose up --build -d
 
 # 停止并移除容器
