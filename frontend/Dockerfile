@@ -2,13 +2,15 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# 先装依赖以利用层缓存
 COPY package.json package-lock.json ./
 RUN npm ci
 
 COPY . .
 
+# BUILD_ENV=production 时在构建阶段完成 next build，容器启动直接 next start
+ARG BUILD_ENV=development
+RUN if [ "$BUILD_ENV" = "production" ]; then npm run build; fi
+
 EXPOSE 80
 
-# 开发模式：HMR 友好；生产可改为 build + start
-CMD ["npm", "run", "dev"]
+CMD ["sh", "-c", "if [ \"$BUILD_ENV\" = \"production\" ]; then npm run start; else npm run dev; fi"]

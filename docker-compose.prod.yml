@@ -53,8 +53,10 @@ services:
       - ./data/logs:/app/logs
 
   frontend:
-    build: ./frontend
-    command: sh -c "npm run build && npm run start"
+    build:
+      context: ./frontend
+      args:
+        BUILD_ENV: production
     depends_on:
       - backend
     environment:
