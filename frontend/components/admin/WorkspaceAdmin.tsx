@@ -173,7 +173,7 @@ export default function WorkspaceAdmin() {
 
       <section className="rounded border bg-white p-4">
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-sm font-medium">空间授权</h2>
+          <h2 className="text-sm font-medium">空间授权及配置</h2>
           {selected && (
             <button
               onClick={openDeleteModal}
@@ -283,6 +283,10 @@ export default function WorkspaceAdmin() {
             {grants.length === 0 && <li className="text-gray-400">暂无组授权</li>}
           </ul>
         </div>
+
+        <div className="border-t pt-4 mt-4">
+          <CategoryManager />
+        </div>
       </section>
 
       {error && <p className="text-sm text-red-600">{error}</p>}
@@ -362,7 +366,6 @@ export default function WorkspaceAdmin() {
           </div>
         </div>
       )}
-      <CategoryManager />
     </div>
   );
 }
