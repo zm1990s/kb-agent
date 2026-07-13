@@ -73,10 +73,10 @@ export default function NavBar() {
 
   return (
     <>
-      <nav className="relative flex items-center border-b border-gray-200 bg-white px-4 py-2 shadow-sm">
+      <nav className="relative flex items-center bg-gray-900 px-4 py-2">
         {/* 左：Logo + 平台名（点击回首页） */}
         <div className="flex w-48 shrink-0 items-center">
-          <Link href="/chat" className="flex items-center gap-2 text-gray-800 hover:text-blue-700">
+          <Link href="/chat" className="flex items-center gap-2 text-white/90 hover:text-white">
             {branding.logo_url ? (
               <Image
                 src={branding.logo_url}
@@ -87,24 +87,24 @@ export default function NavBar() {
                 unoptimized
               />
             ) : (
-              <span className="flex h-7 w-7 items-center justify-center rounded bg-blue-600 text-xs font-bold text-white">
+              <span className="flex h-7 w-7 items-center justify-center rounded bg-blue-500 text-xs font-bold text-white">
                 {branding.name.slice(0, 2)}
               </span>
             )}
-            <span className="font-semibold">{branding.name}</span>
+            <span className="font-semibold tracking-wide">{branding.name}</span>
           </Link>
         </div>
 
         {/* 中：菜单居中 */}
-        <div className="absolute left-1/2 flex -translate-x-1/2 items-center gap-1">
+        <div className="absolute left-1/2 flex -translate-x-1/2 items-center gap-0.5">
           {visible.map((l) => (
             <Link
               key={l.href}
               href={l.href}
-              className={`rounded px-3 py-1.5 text-sm ${
+              className={`rounded px-3 py-1.5 text-sm transition-colors ${
                 pathname === l.href
-                  ? "bg-blue-50 text-blue-700"
-                  : "text-gray-600 hover:bg-gray-100"
+                  ? "bg-white/15 text-white font-medium"
+                  : "text-gray-300 hover:bg-white/10 hover:text-white"
               }`}
             >
               {l.label}
@@ -116,26 +116,26 @@ export default function NavBar() {
         <div className="ml-auto flex items-center" ref={dropRef}>
           <button
             onClick={() => setDropOpen((v) => !v)}
-            className="flex items-center gap-1.5 rounded px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100"
+            className="flex items-center gap-1.5 rounded px-3 py-1.5 text-sm text-gray-300 hover:bg-white/10 hover:text-white transition-colors"
           >
             <span className="max-w-[120px] truncate">{email ?? "用户"}</span>
-            <svg className="h-3 w-3 opacity-50" viewBox="0 0 10 6" fill="currentColor">
+            <svg className="h-3 w-3 opacity-60" viewBox="0 0 10 6" fill="currentColor">
               <path d="M0 0l5 6 5-6z" />
             </svg>
           </button>
           {dropOpen && (
-            <div className="absolute right-4 top-full z-50 mt-1 w-40 rounded border bg-white py-1 shadow-lg">
+            <div className="absolute right-4 top-full z-50 mt-1 w-40 rounded border border-gray-700 bg-gray-800 py-1 shadow-xl">
               <Link
                 href="/account"
                 onClick={() => setDropOpen(false)}
-                className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                className="block px-4 py-2 text-sm text-gray-200 hover:bg-white/10 hover:text-white"
               >
                 账户管理
               </Link>
-              <div className="my-1 border-t" />
+              <div className="my-1 border-t border-gray-700" />
               <button
                 onClick={logout}
-                className="block w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50"
+                className="block w-full px-4 py-2 text-left text-sm text-red-400 hover:bg-white/10 hover:text-red-300"
               >
                 退出登录
               </button>
