@@ -320,6 +320,40 @@ async def set_suggested_questions(session: AsyncSession, questions: list[str]) -
     return questions
 
 
+WS_SQ_KEY_PREFIX = "suggested_questions::"
+
+
+async def get_workspace_suggested_questions(
+    session: AsyncSession, workspace_id: str
+) -> list[str] | None:
+    """返回空间级引导问题；未配置（key 不存在）时返回 None。"""
+    import json
+    stored = await get_setting(session, f"{WS_SQ_KEY_PREFIX}{workspace_id}")
+    if stored is None:
+        return None
+    try:
+        parsed = json.loads(stored)
+        if isinstance(parsed, list):
+            return [str(q) for q in parsed if str(q).strip()]
+    except (ValueError, TypeError):
+        pass
+    return []
+
+
+async def set_workspace_suggested_questions(
+    session: AsyncSession, workspace_id: str, questions: list[str]
+) -> list[str]:
+    """保存空间级引导问题（最多 10 条）。"""
+    import json
+    questions = [q.strip() for q in questions if q.strip()][:10]
+    await set_setting(
+        session,
+        f"{WS_SQ_KEY_PREFIX}{workspace_id}",
+        json.dumps(questions, ensure_ascii=False),
+    )
+    return questions
+
+
 async def get_whatsnew_freq(session: AsyncSession) -> str:
     """返回新动态摘要生成频率（daily/weekly/biweekly/monthly）。"""
     stored = await get_setting(session, WHATSNEW_FREQ_KEY)

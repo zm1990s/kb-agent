@@ -29,6 +29,8 @@ export default function WorkspaceAdmin() {
   const [memberRole, setMemberRole] = useState("viewer");
   const [grantGroup, setGrantGroup] = useState("");
   const [grantRole, setGrantRole] = useState("viewer");
+  const [sqText, setSqText] = useState("");
+  const [sqMsg, setSqMsg] = useState<string | null>(null);
 
   // 删除流程
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -60,13 +62,25 @@ export default function WorkspaceAdmin() {
     }
   }, [selected]);
 
+  const loadSq = useCallback(async () => {
+    if (!selected) { setSqText(""); return; }
+    try {
+      const d = await api.get<{ questions: string[] }>(`/settings/workspaces/${selected}/suggested-questions`);
+      setSqText(d.questions.join("\n"));
+    } catch {
+      setSqText("");
+    }
+    setSqMsg(null);
+  }, [selected]);
+
   useEffect(() => {
     loadWorkspaces();
     loadGroups();
   }, [loadWorkspaces, loadGroups]);
   useEffect(() => {
     loadGrants();
-  }, [loadGrants]);
+    loadSq();
+  }, [loadGrants, loadSq]);
 
   function wrap(fn: () => Promise<void>) {
     return async (e: React.FormEvent) => {
@@ -286,6 +300,48 @@ export default function WorkspaceAdmin() {
 
         <div className="border-t pt-4 mt-4">
           <CategoryManager workspaceId={selected} />
+        </div>
+
+        <div className="border-t pt-4 mt-4">
+          <h3 className="mb-1 text-xs font-medium text-gray-600">聊天引导问题</h3>
+          <p className="mb-3 text-xs text-gray-400">
+            空置时使用全局引导问题；每行一条，最多 10 条。
+          </p>
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault();
+              setError(null);
+              setSqMsg(null);
+              try {
+                const questions = sqText.split("\n").map((q) => q.trim()).filter(Boolean);
+                const updated = await api.put<{ questions: string[] }>(
+                  `/settings/workspaces/${selected}/suggested-questions`,
+                  { questions }
+                );
+                setSqText(updated.questions.join("\n"));
+                setSqMsg(`已保存 ${updated.questions.length} 条引导问题`);
+              } catch (err) {
+                setError(err instanceof ApiError ? err.message : "保存失败");
+              }
+            }}
+            className="space-y-2"
+          >
+            <textarea
+              value={sqText}
+              onChange={(e) => setSqText(e.target.value)}
+              rows={4}
+              placeholder={"最近一周有哪些新文档？\n该空间有哪些产品资料？"}
+              className="w-full rounded border px-3 py-2 text-sm font-mono leading-relaxed focus:border-blue-400 focus:outline-none"
+            />
+            <button
+              type="submit"
+              disabled={!selected}
+              className="rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700 disabled:opacity-50"
+            >
+              保存引导问题
+            </button>
+          </form>
+          {sqMsg && <p className="mt-2 text-xs text-green-600">{sqMsg}</p>}
         </div>
       </section>
 

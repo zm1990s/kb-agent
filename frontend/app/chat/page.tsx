@@ -110,12 +110,13 @@ export default function ChatPage() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [turns, stage, busy]);
 
-  // 拉取引导问题（仅挂载时一次）
+  // 随空间切换拉取该空间引导问题（未配置时后端回退全局默认）
   useEffect(() => {
-    api.get<{ questions: string[] }>("/settings/suggested-questions")
+    if (!workspaceId) { setSuggestedQuestions([]); return; }
+    api.get<{ questions: string[] }>(`/settings/workspaces/${workspaceId}/suggested-questions`)
       .then((r) => setSuggestedQuestions(r.questions))
-      .catch(() => {});
-  }, []);
+      .catch(() => setSuggestedQuestions([]));
+  }, [workspaceId]);
 
   // Auto-resize textarea
   useEffect(() => {

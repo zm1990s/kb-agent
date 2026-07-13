@@ -22,6 +22,7 @@ from app.services.settings_service import (
     get_suggested_questions,
     get_whatsnew_freq,
     get_whatsnew_hour,
+    get_workspace_suggested_questions,
     list_prompt_history,
     rollback_prompt,
     set_engine_backend,
@@ -30,6 +31,7 @@ from app.services.settings_service import (
     set_suggested_questions,
     set_whatsnew_freq,
     set_whatsnew_hour,
+    set_workspace_suggested_questions,
 )
 from app.services.usage_service import record_event
 
@@ -364,6 +366,34 @@ async def update_suggested_questions(
     logger.info("audit admin update_suggested_questions admin=%s count=%d", admin.id, len(questions))
     await record_event(session, action="admin_update_suggested_questions", user_id=admin.id,
                        meta={"count": len(questions)})
+    return SuggestedQuestionsOut(questions=questions)
+
+
+@router.get("/workspaces/{workspace_id}/suggested-questions", response_model=SuggestedQuestionsOut)
+async def get_ws_suggested_questions(
+    workspace_id: str,
+    _user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> SuggestedQuestionsOut:
+    """登录用户均可读；空间未配置时回退全局默认。"""
+    qs = await get_workspace_suggested_questions(session, workspace_id)
+    if qs is None:
+        qs = await get_suggested_questions(session)
+    return SuggestedQuestionsOut(questions=qs)
+
+
+@router.put("/workspaces/{workspace_id}/suggested-questions", response_model=SuggestedQuestionsOut)
+async def update_ws_suggested_questions(
+    workspace_id: str,
+    body: SuggestedQuestionsIn,
+    admin: User = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+) -> SuggestedQuestionsOut:
+    """仅管理员可写。"""
+    questions = await set_workspace_suggested_questions(session, workspace_id, body.questions)
+    logger.info("audit admin update_ws_suggested_questions ws=%s count=%d", workspace_id, len(questions))
+    await record_event(session, action="admin_update_ws_suggested_questions", user_id=admin.id,
+                       meta={"workspace_id": workspace_id, "count": len(questions)})
     return SuggestedQuestionsOut(questions=questions)
 
 
