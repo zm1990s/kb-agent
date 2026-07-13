@@ -13,11 +13,10 @@ venv/
 .mypy_cache/
 .ruff_cache/
 
-# 本地存储的原始文件（不入库）
-local_storage/
-
-# 应用日志（RotatingFileHandler，不入库）
-logs/
+# 运行时数据目录各子目录内容由其自身 .gitignore 控制
+# 旧根目录路径（已迁移到 data/）
+/local_storage/
+/logs/
 
 # 编辑器 / 系统
 .DS_Store

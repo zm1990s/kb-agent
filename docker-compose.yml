@@ -8,7 +8,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - ./data/postgres/pgdata:/var/lib/postgresql/data
       - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U kbagent"]
@@ -18,18 +18,12 @@ services:
 
   backend:
     build: ./backend
-    # logs/ 目录须由宿主机预建并可写，否则容器内 appuser(10001) 无权创建文件。
-    # 首次部署时 docker compose 会自动执行：mkdir -p ./logs ./local_storage
     depends_on:
       postgres:
         condition: service_healthy
     env_file:
-      # 本地开发请先 `cp .env.example .env` 并填值；缺失时不阻断工具链。
       - path: .env
         required: false
-    # Claude CLI 认证凭据：从 .env 透传（支持 API key / 网关 / Bedrock 等不同方式）。
-    # 未设置的变量不会注入，按实际认证方式在 .env 里填对应项即可。
-    # 单端口暴露：后端不再对宿主暴露端口，仅 compose 网络内可达（由 frontend 反代）。
     environment:
       - ANTHROPIC_API_KEY
       - ANTHROPIC_AUTH_TOKEN
@@ -45,30 +39,18 @@ services:
       - "8000"
     volumes:
       - ./backend:/app
-      # 迁移脚本需要读取 infra/postgres/migrations/*.sql
       - ./infra:/app/infra:ro
-      # 本地存储目录（原始文件落盘处，不入 git）
-      - local_storage_data:/app/local_storage
-      # 应用日志：named volume，由 Docker 管理权限（appuser 可写）
-      # bind mount 会被宿主机 root 目录覆盖权限，导致 appuser 无法写入
-      - logs_data:/app/logs
+      - ./data/local_storage:/app/local_storage
+      - ./data/logs:/app/logs
 
   frontend:
     build: ./frontend
     depends_on:
       - backend
     environment:
-      # 反代目标：compose 网络内的后端服务名
       BACKEND_URL: http://backend:8000
-    # 用户唯一入口：宿主 80 -> 前端 80
     ports:
       - "80:80"
     volumes:
       - ./frontend:/app
-      # 保留容器内 node_modules，不被宿主目录覆盖
       - /app/node_modules
-
-volumes:
-  pgdata:
-  logs_data:
-  local_storage_data:
