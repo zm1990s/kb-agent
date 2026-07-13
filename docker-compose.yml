@@ -40,7 +40,7 @@ services:
     volumes:
       - ./backend:/app
       - ./infra:/app/infra:ro
-      - ./data/local_storage:/app/local_storage
+      - ./data/documents:/app/local_storage
       - ./data/logs:/app/logs
 
   frontend:

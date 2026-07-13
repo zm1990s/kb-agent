@@ -13,10 +13,8 @@ venv/
 .mypy_cache/
 .ruff_cache/
 
-# 运行时数据目录各子目录内容由其自身 .gitignore 控制
-# 旧根目录路径（已迁移到 data/）
-/local_storage/
-/logs/
+# 运行时数据目录（postgres、文档存储、日志）不进库
+/data/
 
 # 编辑器 / 系统
 .DS_Store
