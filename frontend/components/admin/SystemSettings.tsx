@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import PromptsTab from "@/components/admin/PromptsTab";
+import UserAdmin from "@/components/admin/UserAdmin";
+import WorkspaceAdmin from "@/components/admin/WorkspaceAdmin";
 import { api, ApiError } from "@/lib/api";
 import type { AllowedDomain } from "@/lib/types";
 
@@ -19,10 +21,23 @@ interface Branding {
   logo_url: string;
 }
 
-type Tab = "general" | "prompts";
+type Tab = "workspaces" | "users" | "general" | "prompts";
 
-export default function SystemSettings() {
-  const [tab, setTab] = useState<Tab>("general");
+interface Props {
+  // null = admin（全部可见）；Record = 普通用户权限表
+  perms?: Record<string, string> | null;
+}
+
+export default function SystemSettings({ perms }: Props) {
+  const isAdmin = perms === undefined || perms === null;
+  const canSee = (module: string) => isAdmin || (perms?.[module] ?? "none") !== "none";
+
+  const defaultTab: Tab =
+    canSee("workspaces") ? "workspaces"
+    : canSee("users") ? "users"
+    : "general";
+
+  const [tab, setTab] = useState<Tab>(defaultTab);
   const [domains, setDomains] = useState<AllowedDomain[]>([]);
   const [domainName, setDomainName] = useState("");
   const [engine, setEngine] = useState<EngineConfig | null>(null);
@@ -199,23 +214,36 @@ export default function SystemSettings() {
 
   return (
     <div>
-      {/* 标签切换 */}
+      {/* 标签切换：按权限过滤 */}
       <div className="mb-4 flex gap-1 border-b">
-        {([["general", "系统设置"], ["prompts", "内置提示词管理"]] as [Tab, string][]).map(([t, label]) => (
-          <button
-            key={t}
-            onClick={() => { setTab(t); setError(null); setBrandingMsg(null); setEngineMsg(null); }}
-            className={`px-4 py-2 text-sm ${
-              tab === t
-                ? "border-b-2 border-blue-600 font-medium text-blue-700"
-                : "text-gray-500 hover:text-gray-800"
-            }`}
-          >
-            {label}
-          </button>
-        ))}
+        {([
+          ["workspaces", "空间管理"],
+          ["users", "用户管理"],
+          ["general", "系统设置"],
+          ["prompts", "内置提示词管理"],
+        ] as [Tab, string][])
+          .filter(([t]) => {
+            if (t === "workspaces") return canSee("workspaces");
+            if (t === "users") return canSee("users");
+            return isAdmin; // general / prompts 仅管理员
+          })
+          .map(([t, label]) => (
+            <button
+              key={t}
+              onClick={() => { setTab(t); setError(null); setBrandingMsg(null); setEngineMsg(null); }}
+              className={`px-4 py-2 text-sm ${
+                tab === t
+                  ? "border-b-2 border-blue-600 font-medium text-blue-700"
+                  : "text-gray-500 hover:text-gray-800"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
       </div>
 
+      {tab === "workspaces" && <WorkspaceAdmin />}
+      {tab === "users" && <UserAdmin />}
       {tab === "prompts" && <PromptsTab />}
 
       {tab === "general" && (

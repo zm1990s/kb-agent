@@ -4,7 +4,7 @@ WORKDIR /app
 
 # 系统依赖：编译工具 + Node.js(Claude CLI) + poppler-utils(pdftotext 抽取 PDF)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential curl ca-certificates poppler-utils \
+    build-essential curl ca-certificates poppler-utils gosu \
     && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y --no-install-recommends nodejs \
     && rm -rf /var/lib/apt/lists/*
@@ -24,9 +24,10 @@ COPY . .
 RUN useradd -m -u 10001 appuser \
     && mkdir -p /app/local_storage /app/logs \
     && chown -R appuser:appuser /app
-USER appuser
+# entrypoint 以 root 启动，修复 bind-mount 目录权限后用 gosu 降权到 appuser
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 ENV HOME=/home/appuser
 
 EXPOSE 8000
-# 启动时先跑增量迁移（幂等），再起 uvicorn
-CMD ["sh", "-c", "python migrate.py && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+ENTRYPOINT ["/entrypoint.sh"]

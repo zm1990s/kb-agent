@@ -288,7 +288,7 @@ export default function ChatPage() {
                 </div>
                 <p className="text-sm font-medium text-gray-600">向知识库提问</p>
                 <p className="mt-1 text-xs text-gray-400">AI 会基于文档智能作答并附上原文来源</p>
-                {suggestedQuestions.length > 0 && workspaceId && (
+                {suggestedQuestions.length > 0 && (
                   <div className="mt-6 flex flex-col gap-2 w-full max-w-md px-4">
                     {suggestedQuestions.map((q) => (
                       <button

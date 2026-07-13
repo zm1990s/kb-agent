@@ -4,19 +4,26 @@ import { useCallback, useEffect, useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import type { Category, Workspace } from "@/lib/types";
 
-// 分类体系管理（F8：从空间管理移到系统设置）。按空间维护 Agent 归类分类。
-export default function CategoryManager() {
+interface Props {
+  workspaceId?: string | null;
+}
+
+export default function CategoryManager({ workspaceId: externalId }: Props) {
+  // 独立使用时自己管理空间选择；嵌入 WorkspaceAdmin 时直接继承外部选中空间
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
-  const [selected, setSelected] = useState<string | null>(null);
+  const [internalId, setInternalId] = useState<string | null>(null);
+  const selected = externalId ?? internalId;
+
   const [categories, setCategories] = useState<Category[]>([]);
   const [catName, setCatName] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const loadWorkspaces = useCallback(async () => {
+    if (externalId !== undefined) return; // 外部托管，不需要自己拉空间列表
     const ws = await api.get<Workspace[]>("/workspaces");
     setWorkspaces(ws);
-    setSelected((cur) => cur ?? (ws.length > 0 ? ws[0].id : null));
-  }, []);
+    setInternalId((cur) => cur ?? (ws.length > 0 ? ws[0].id : null));
+  }, [externalId]);
 
   const loadCategories = useCallback(async () => {
     if (!selected) return;
@@ -48,25 +55,27 @@ export default function CategoryManager() {
   }
 
   return (
-    <section className="rounded border bg-white p-4">
+    <section className={externalId !== undefined ? "" : "rounded border bg-white p-4"}>
       <h2 className="mb-1 text-sm font-medium">分类体系</h2>
       <p className="mb-3 text-xs text-gray-400">
         管理员预定义分类，Agent 归类时归入最匹配的分类。按空间维护。
       </p>
-      <div className="mb-3">
-        <select
-          value={selected ?? ""}
-          onChange={(e) => setSelected(e.target.value)}
-          className="w-full rounded border px-2 py-1.5 text-sm"
-        >
-          {workspaces.length === 0 && <option value="">（暂无空间）</option>}
-          {workspaces.map((w) => (
-            <option key={w.id} value={w.id}>
-              {w.name}
-            </option>
-          ))}
-        </select>
-      </div>
+      {externalId === undefined && (
+        <div className="mb-3">
+          <select
+            value={selected ?? ""}
+            onChange={(e) => setInternalId(e.target.value)}
+            className="w-full rounded border px-2 py-1.5 text-sm"
+          >
+            {workspaces.length === 0 && <option value="">（暂无空间）</option>}
+            {workspaces.map((w) => (
+              <option key={w.id} value={w.id}>
+                {w.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
       <form onSubmit={createCat} className="mb-3 flex gap-2">
         <input
           value={catName}

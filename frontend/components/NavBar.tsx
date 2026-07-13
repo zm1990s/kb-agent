@@ -12,8 +12,6 @@ const links = [
   { href: "/whatsnew", label: "新动态", module: "whatsnew" },
   { href: "/chat", label: "聊天", module: "chat" },
   { href: "/documents", label: "文档管理", module: "documents" },
-  { href: "/admin", label: "空间管理", module: "workspaces" },
-  { href: "/users", label: "用户管理", module: "users" },
   { href: "/stats", label: "数据统计", module: "stats" },
   { href: "/settings", label: "系统设置", module: "settings" },
 ];
@@ -64,6 +62,12 @@ export default function NavBar() {
     if (admin) return true;
     if (l.module === "chat") return true;
     if (!perms) return false;
+    // /settings 合并了空间管理和用户管理，三个模块任一有权限即可见
+    if (l.href === "/settings") {
+      return ["settings", "workspaces", "users"].some(
+        (m) => (perms[m] ?? "none") !== "none"
+      );
+    }
     return (perms[l.module] ?? "none") !== "none";
   });
 

@@ -285,7 +285,7 @@ export default function WorkspaceAdmin() {
         </div>
 
         <div className="border-t pt-4 mt-4">
-          <CategoryManager />
+          <CategoryManager workspaceId={selected} />
         </div>
       </section>
 
