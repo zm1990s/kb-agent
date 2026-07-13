@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import CategoryManager from "@/components/admin/CategoryManager";
 import { api, ApiError } from "@/lib/api";
 import { getToken } from "@/lib/auth";
 import type { Workspace } from "@/lib/types";
@@ -361,6 +362,7 @@ export default function WorkspaceAdmin() {
           </div>
         </div>
       )}
+      <CategoryManager />
     </div>
   );
 }

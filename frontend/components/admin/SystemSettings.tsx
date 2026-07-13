@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import CategoryManager from "@/components/admin/CategoryManager";
 import PromptsTab from "@/components/admin/PromptsTab";
 import { api, ApiError } from "@/lib/api";
 import type { AllowedDomain } from "@/lib/types";
@@ -407,9 +406,6 @@ export default function SystemSettings() {
             </form>
             {sqMsg && <p className="mt-2 text-xs text-green-600">{sqMsg}</p>}
           </section>
-
-          {/* F8：分类体系（从空间管理移来） */}
-          <CategoryManager />
 
           {error && <p className="text-sm text-red-600">{error}</p>}
         </div>
