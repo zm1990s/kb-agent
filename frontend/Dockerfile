@@ -9,6 +9,7 @@ COPY . .
 
 # BUILD_ENV=production 时在构建阶段完成 next build，容器启动直接 next start
 ARG BUILD_ENV=development
+ENV BUILD_ENV=${BUILD_ENV}
 RUN if [ "$BUILD_ENV" = "production" ]; then npm run build; fi
 
 EXPOSE 80
