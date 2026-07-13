@@ -19,6 +19,7 @@ from app.services.settings_service import (
     get_engine_backend,
     get_prompt,
     get_setting,
+    get_suggested_questions,
     get_whatsnew_freq,
     get_whatsnew_hour,
     list_prompt_history,
@@ -26,6 +27,7 @@ from app.services.settings_service import (
     set_engine_backend,
     set_prompt,
     set_setting,
+    set_suggested_questions,
     set_whatsnew_freq,
     set_whatsnew_hour,
 )
@@ -330,6 +332,39 @@ async def update_whatsnew_schedule(
         meta={"hour": body.hour, "frequency": body.frequency},
     )
     return await _get_schedule_out(session)
+
+
+# ── 引导问题 ─────────────────────────────────────────────────
+
+
+class SuggestedQuestionsOut(BaseModel):
+    questions: list[str]
+
+
+class SuggestedQuestionsIn(BaseModel):
+    questions: list[str]
+
+
+@router.get("/suggested-questions", response_model=SuggestedQuestionsOut)
+async def get_suggested_questions_endpoint(
+    _user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> SuggestedQuestionsOut:
+    """任意登录用户可读（chat 页用）。"""
+    return SuggestedQuestionsOut(questions=await get_suggested_questions(session))
+
+
+@router.put("/suggested-questions", response_model=SuggestedQuestionsOut)
+async def update_suggested_questions(
+    body: SuggestedQuestionsIn,
+    admin: User = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+) -> SuggestedQuestionsOut:
+    questions = await set_suggested_questions(session, body.questions)
+    logger.info("audit admin update_suggested_questions admin=%s count=%d", admin.id, len(questions))
+    await record_event(session, action="admin_update_suggested_questions", user_id=admin.id,
+                       meta={"count": len(questions)})
+    return SuggestedQuestionsOut(questions=questions)
 
 
 @router.put("/branding", response_model=BrandingOut)

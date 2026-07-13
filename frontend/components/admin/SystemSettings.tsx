@@ -37,6 +37,8 @@ export default function SystemSettings() {
   const [wnFreqOptions, setWnFreqOptions] = useState<string[]>([]);
   const [wnTriggering, setWnTriggering] = useState(false);
   const [wnMsg, setWnMsg] = useState<string | null>(null);
+  const [sqText, setSqText] = useState("");
+  const [sqMsg, setSqMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [brandingMsg, setBrandingMsg] = useState<string | null>(null);
   const [engineMsg, setEngineMsg] = useState<string | null>(null);
@@ -79,12 +81,20 @@ export default function SystemSettings() {
     } catch { /* 非 admin 正常 */ }
   }, []);
 
+  const loadSuggestedQuestions = useCallback(async () => {
+    try {
+      const d = await api.get<{ questions: string[] }>("/settings/suggested-questions");
+      setSqText(d.questions.join("\n"));
+    } catch { /* 非 admin 正常 */ }
+  }, []);
+
   useEffect(() => {
     loadDomains();
     loadEngine();
     loadBranding();
     loadWnSchedule();
-  }, [loadDomains, loadEngine, loadBranding, loadWnSchedule]);
+    loadSuggestedQuestions();
+  }, [loadDomains, loadEngine, loadBranding, loadWnSchedule, loadSuggestedQuestions]);
 
   async function addDomain(e: React.FormEvent) {
     e.preventDefault();
@@ -171,6 +181,20 @@ export default function SystemSettings() {
       setEngineMsg("引擎已更新");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "更新失败");
+    }
+  }
+
+  async function saveSuggestedQuestions(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setSqMsg(null);
+    try {
+      const questions = sqText.split("\n").map((q) => q.trim()).filter(Boolean);
+      const updated = await api.put<{ questions: string[] }>("/settings/suggested-questions", { questions });
+      setSqText(updated.questions.join("\n"));
+      setSqMsg(`已保存 ${updated.questions.length} 条引导问题`);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "保存失败");
     }
   }
 
@@ -358,6 +382,30 @@ export default function SystemSettings() {
               </button>
               {wnMsg && <p className="mt-2 text-xs text-green-600">{wnMsg}</p>}
             </div>
+          </section>
+
+          {/* 引导问题 */}
+          <section className="rounded border bg-white p-4">
+            <h2 className="mb-1 text-sm font-medium">聊天引导问题</h2>
+            <p className="mb-3 text-xs text-gray-400">
+              新对话空白页展示的快捷问题，点击即发送。每行一条，最多 10 条。
+            </p>
+            <form onSubmit={saveSuggestedQuestions} className="space-y-3">
+              <textarea
+                value={sqText}
+                onChange={(e) => setSqText(e.target.value)}
+                rows={6}
+                placeholder={"最近一周有哪些新文档？\n知识库里有哪些产品的文档？\n如何提交技术支持请求？"}
+                className="w-full rounded border px-3 py-2 text-sm font-mono leading-relaxed focus:border-blue-400 focus:outline-none"
+              />
+              <button
+                type="submit"
+                className="rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700"
+              >
+                保存引导问题
+              </button>
+            </form>
+            {sqMsg && <p className="mt-2 text-xs text-green-600">{sqMsg}</p>}
           </section>
 
           {/* F8：分类体系（从空间管理移来） */}

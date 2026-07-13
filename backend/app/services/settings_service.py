@@ -290,6 +290,36 @@ async def set_whatsnew_hour(session: AsyncSession, hour: int) -> None:
     await set_setting(session, WHATSNEW_HOUR_KEY, str(hour))
 
 
+SUGGESTED_QUESTIONS_KEY = "suggested_questions"
+DEFAULT_SUGGESTED_QUESTIONS = [
+    "最近一周有哪些新文档？",
+    "知识库里有哪些产品的文档？",
+    "如何提交技术支持请求？",
+]
+
+
+async def get_suggested_questions(session: AsyncSession) -> list[str]:
+    """返回引导问题列表；DB 无值时返回默认。"""
+    import json
+    stored = await get_setting(session, SUGGESTED_QUESTIONS_KEY)
+    if stored:
+        try:
+            parsed = json.loads(stored)
+            if isinstance(parsed, list):
+                return [str(q) for q in parsed if str(q).strip()]
+        except (ValueError, TypeError):
+            pass
+    return DEFAULT_SUGGESTED_QUESTIONS
+
+
+async def set_suggested_questions(session: AsyncSession, questions: list[str]) -> list[str]:
+    """保存引导问题列表（最多 10 条，每条不超过 200 字）。"""
+    import json
+    questions = [q.strip() for q in questions if q.strip()][:10]
+    await set_setting(session, SUGGESTED_QUESTIONS_KEY, json.dumps(questions, ensure_ascii=False))
+    return questions
+
+
 async def get_whatsnew_freq(session: AsyncSession) -> str:
     """返回新动态摘要生成频率（daily/weekly/biweekly/monthly）。"""
     stored = await get_setting(session, WHATSNEW_FREQ_KEY)

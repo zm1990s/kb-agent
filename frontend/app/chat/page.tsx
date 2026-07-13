@@ -40,6 +40,7 @@ export default function ChatPage() {
   const [stage, setStage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [interrupted, setInterrupted] = useState(false);
+  const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -108,6 +109,13 @@ export default function ChatPage() {
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [turns, stage, busy]);
+
+  // 拉取引导问题（仅挂载时一次）
+  useEffect(() => {
+    api.get<{ questions: string[] }>("/settings/suggested-questions")
+      .then((r) => setSuggestedQuestions(r.questions))
+      .catch(() => {});
+  }, []);
 
   // Auto-resize textarea
   useEffect(() => {
@@ -280,6 +288,19 @@ export default function ChatPage() {
                 </div>
                 <p className="text-sm font-medium text-gray-600">向知识库提问</p>
                 <p className="mt-1 text-xs text-gray-400">AI 会基于文档智能作答并附上原文来源</p>
+                {suggestedQuestions.length > 0 && workspaceId && (
+                  <div className="mt-6 flex flex-col gap-2 w-full max-w-md px-4">
+                    {suggestedQuestions.map((q) => (
+                      <button
+                        key={q}
+                        onClick={() => sendMessage(q)}
+                        className="rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-left text-sm text-gray-700 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 transition-colors shadow-sm"
+                      >
+                        {q}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
             {turns.map((t, i) => (
