@@ -109,14 +109,14 @@ async def move_document(
 
 
 async def delete_document(session: AsyncSession, *, doc: Document) -> None:
-    """删除文档：先删存储原文，再删 DB 记录（任务/索引随外键级联清除）。"""
-    storage = get_storage()
-    try:
-        await storage.delete(doc.storage_key)
-    except FileNotFoundError:
-        pass  # 原文已不在也不阻断删除
+    """删除文档：先提交 DB 删除，再删存储文件，避免文件删后 DB 回滚造成僵尸记录。"""
+    storage_key = doc.storage_key
     await session.delete(doc)
     await session.commit()
+    try:
+        await get_storage().delete(storage_key)
+    except FileNotFoundError:
+        pass  # 原文已不在也不阻断删除
 
 
 async def replace_document_content(

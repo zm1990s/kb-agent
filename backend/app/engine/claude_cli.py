@@ -82,6 +82,7 @@ class ClaudeCliEngine:
         chunks: list[bytes] = []
         assert proc.stdout is not None
         idle = self._idle_timeout
+        timed_out = False
         try:
             while True:
                 chunk = await asyncio.wait_for(
@@ -91,13 +92,16 @@ class ClaudeCliEngine:
                     break  # EOF
                 chunks.append(chunk)
         except TimeoutError:
-            proc.kill()
-            await proc.wait()
-            raise EngineError(
-                f"Claude CLI 超过 {idle}s 无输出，判定为无响应"
-            )
+            timed_out = True
+        finally:
+            # 无论何种异常（Timeout、CancelledError、其他），确保子进程不泄漏。
+            if proc.returncode is None:
+                proc.kill()
+                await proc.wait()
+        if timed_out:
+            raise EngineError(f"Claude CLI 超过 {idle}s 无输出，判定为无响应")
 
-        stderr_bytes = await proc.stderr.read()
+        stderr_bytes = await asyncio.wait_for(proc.stderr.read(), timeout=idle)
         await proc.wait()
 
         if proc.returncode != 0:

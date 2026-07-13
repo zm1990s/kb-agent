@@ -4,6 +4,7 @@ import io
 import logging
 import uuid
 import zipfile
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
@@ -210,12 +211,11 @@ async def export_workspace(
             zf.writestr(name, data)
 
     buf.seek(0)
-    safe_name = ws.name.replace('"', "")
     return StreamingResponse(
         buf,
         media_type="application/zip",
         headers={
-            "Content-Disposition": f'attachment; filename="{safe_name}.zip"',
+            "Content-Disposition": f"attachment; filename*=UTF-8''{quote(ws.name + '.zip')}",
             "X-Content-Type-Options": "nosniff",
         },
     )

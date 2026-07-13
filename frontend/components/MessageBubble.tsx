@@ -10,9 +10,10 @@ interface Props {
   sources?: SourceRef[];
   onDownload?: (s: SourceRef) => void;
   onEdit?: (newContent: string) => void;
+  onResend?: () => void;
 }
 
-export default function MessageBubble({ role, content, sources, onDownload, onEdit }: Props) {
+export default function MessageBubble({ role, content, sources, onDownload, onEdit, onResend }: Props) {
   const isUser = role === "user";
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(content);
@@ -76,10 +77,7 @@ export default function MessageBubble({ role, content, sources, onDownload, onEd
               className="w-full rounded-2xl rounded-tr-sm border border-blue-400 bg-blue-50 px-4 py-3 text-sm text-gray-900 outline-none resize-none"
             />
             <div className="mt-1 flex justify-end gap-2">
-              <button
-                onClick={cancelEdit}
-                className="rounded px-3 py-1 text-xs text-gray-500 hover:bg-gray-100"
-              >
+              <button onClick={cancelEdit} className="rounded px-3 py-1 text-xs text-gray-500 hover:bg-gray-100">
                 取消
               </button>
               <button
@@ -114,6 +112,18 @@ export default function MessageBubble({ role, content, sources, onDownload, onEd
               </button>
             )}
           </div>
+        )}
+
+        {isUser && onResend && (
+          <button
+            onClick={onResend}
+            className="flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs text-amber-700 hover:bg-amber-100 transition-colors"
+          >
+            <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+            </svg>
+            重新发送
+          </button>
         )}
 
         {sources && sources.length > 0 && (

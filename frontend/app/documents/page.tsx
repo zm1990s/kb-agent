@@ -415,7 +415,7 @@ export default function DocumentsPage() {
                 onDrop={(e) => {
                   e.preventDefault();
                   const raw = e.dataTransfer.getData("application/kb-item");
-                  if (raw) onDropItem(null, JSON.parse(raw));
+                  if (raw) { try { onDropItem(null, JSON.parse(raw)); } catch { /* ignore malformed drag payload */ } }
                 }}
                 className="mt-1 rounded border border-dashed border-gray-300 px-3 py-2 text-center text-xs text-gray-400"
               >
@@ -815,6 +815,7 @@ export default function DocumentsPage() {
                   src={previewUrl}
                   className="h-full w-full border-0"
                   title={previewDoc.title}
+                  sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
                 />
               ) : (
                 <iframe

@@ -4,7 +4,7 @@ import logging
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_session
@@ -102,6 +102,16 @@ class BrandingOut(BaseModel):
 class BrandingIn(BaseModel):
     name: str | None = None
     logo_url: str | None = None
+
+    @field_validator("logo_url")
+    @classmethod
+    def validate_logo_url(cls, v: str | None) -> str | None:
+        if v is None or v == "":
+            return v
+        v = v.strip()
+        if not (v.startswith("http://") or v.startswith("https://") or v.startswith("/")):
+            raise ValueError("logo_url 须以 http://、https:// 或 / 开头")
+        return v
 
 
 BRANDING_NAME_KEY = "branding_name"

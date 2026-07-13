@@ -20,27 +20,30 @@ _RETRY_BASE_DELAY = 5
 
 async def _run_task_with_retry(task_id: uuid.UUID) -> None:
     """执行归类任务，失败后按 max_attempts 自动重试（指数退避）。"""
-    retry = 0
-    while True:
-        async with SessionLocal() as session:
-            await run_classification(session, task_id)
-            task = await session.get(ProcessingTask, task_id)
-            if task is None or task.status == "succeeded":
-                return
-            if task.attempts >= task.max_attempts:
-                logger.warning(
-                    "classify task %s 已达最大尝试次数 %d，停止重试",
-                    task_id, task.max_attempts,
+    try:
+        retry = 0
+        while True:
+            async with SessionLocal() as session:
+                await run_classification(session, task_id)
+                task = await session.get(ProcessingTask, task_id)
+                if task is None or task.status == "succeeded":
+                    return
+                if task.attempts >= task.max_attempts:
+                    logger.warning(
+                        "classify task %s 已达最大尝试次数 %d，停止重试",
+                        task_id, task.max_attempts,
+                    )
+                    return
+                delay = _RETRY_BASE_DELAY * (2 ** retry)
+                logger.info(
+                    "classify task %s 第 %d 次失败，%ds 后自动重试…",
+                    task_id, task.attempts, delay,
                 )
-                return
-            delay = _RETRY_BASE_DELAY * (2 ** retry)
-            logger.info(
-                "classify task %s 第 %d 次失败，%ds 后自动重试…",
-                task_id, task.attempts, delay,
-            )
 
-        retry += 1
-        await asyncio.sleep(delay)
+            retry += 1
+            await asyncio.sleep(delay)
+    except Exception:
+        logger.exception("classify task %s 发生未预期异常，任务终止", task_id)
 
 
 def enqueue_classification(task_id: uuid.UUID) -> None:

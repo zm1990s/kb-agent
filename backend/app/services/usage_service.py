@@ -1,7 +1,7 @@
 """用量事件记录与统计。"""
 
 import uuid
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 
 from sqlalchemy import cast, func, select, text
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
@@ -113,7 +113,7 @@ async def get_download_events(
     offset: int = 0,
     limit: int = 50,
 ) -> dict:
-    since = datetime.now(UTC) - timedelta(days=days)
+    since = datetime.utcnow() - timedelta(days=days)
     total = (
         await session.execute(
             select(func.count()).select_from(UsageEvent).where(
@@ -161,7 +161,7 @@ async def get_chat_events(
     offset: int = 0,
     limit: int = 50,
 ) -> dict:
-    since = datetime.now(UTC) - timedelta(days=days)
+    since = datetime.utcnow() - timedelta(days=days)
     total = (
         await session.execute(
             select(func.count()).select_from(UsageEvent).where(

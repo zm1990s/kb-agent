@@ -1,5 +1,6 @@
 """管理后台路由（F4-F6）：用户管理、用户组、RBAC。均需 admin。"""
 
+import asyncio
 import collections
 import logging
 import os
@@ -243,12 +244,11 @@ async def my_permissions(
 
 @router.get("/stats")
 async def usage_stats(
-    days: int = 30,
+    days: int = Query(30, ge=1, le=365),
+    _admin: User = Depends(require_admin),
     session: AsyncSession = Depends(get_session),
 ):
     """近 N 天用量统计：按天+动作聚合、活跃用户、总计。"""
-    if days < 1 or days > 365:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "days 须在 1-365 之间")
     return await get_stats(session, days=days)
 
 
@@ -328,5 +328,6 @@ async def read_log_file(
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "非法文件名")
     if not os.path.isfile(path):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "日志文件不存在")
-    content = _tail_file(path, lines)
+    loop = asyncio.get_event_loop()
+    content = await loop.run_in_executor(None, _tail_file, path, lines)
     return PlainTextResponse(content)

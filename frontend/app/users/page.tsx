@@ -211,9 +211,13 @@ function GroupsTab({
   const [perms, setPerms] = useState<GroupPerm[]>([]);
 
   const loadDetail = useCallback(async (gid: string) => {
-    setRules(await api.get<GroupRule[]>(`/admin/groups/${gid}/rules`));
-    setPerms(await api.get<GroupPerm[]>(`/admin/groups/${gid}/permissions`));
-  }, []);
+    try {
+      setRules(await api.get<GroupRule[]>(`/admin/groups/${gid}/rules`));
+      setPerms(await api.get<GroupPerm[]>(`/admin/groups/${gid}/permissions`));
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "加载组详情失败");
+    }
+  }, [setError]);
 
   useEffect(() => {
     if (selected) loadDetail(selected);

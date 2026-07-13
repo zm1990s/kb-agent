@@ -27,6 +27,8 @@ interface DonePayload {
   conversation_id: string;
 }
 
+const SESSION_KEY = "chat_state";
+
 export default function ChatPage() {
   const ready = useAuthGuard();
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
@@ -37,9 +39,38 @@ export default function ChatPage() {
   const [busy, setBusy] = useState(false);
   const [stage, setStage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [interrupted, setInterrupted] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  // 标记正在从 sessionStorage 恢复，避免 workspace 变更 effect 重置 turns
+  const restoringRef = useRef(false);
+
+  // 从 sessionStorage 恢复（仅挂载时）
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(SESSION_KEY);
+      if (!raw) return;
+      const s = JSON.parse(raw) as {
+        workspaceId: string;
+        conversationId: string | null;
+        turns: Turn[];
+      };
+      restoringRef.current = true;
+      setWorkspaceId(s.workspaceId);
+      setConversationId(s.conversationId);
+      setTurns(s.turns);
+      // 最后一条是 user 说明 assistant 回复未收到
+      if (s.turns.length > 0 && s.turns[s.turns.length - 1].role === "user") {
+        setInterrupted(true);
+      }
+    } catch {}
+  }, []);
+
+  // unmount 时 abort 正在进行的流
+  useEffect(() => {
+    return () => { abortRef.current?.abort(); };
+  }, []);
 
   const loadConversations = useCallback(async () => {
     if (!workspaceId) return;
@@ -55,10 +86,24 @@ export default function ChatPage() {
   }, [workspaceId]);
 
   useEffect(() => {
+    // 恢复时只加载会话列表，不重置当前对话状态
+    if (restoringRef.current) {
+      restoringRef.current = false;
+      loadConversations();
+      return;
+    }
     setConversationId(null);
     setTurns([]);
     loadConversations();
   }, [workspaceId, loadConversations]);
+
+  // 持久化到 sessionStorage
+  useEffect(() => {
+    if (!workspaceId) return;
+    try {
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify({ workspaceId, conversationId, turns }));
+    } catch {}
+  }, [workspaceId, conversationId, turns]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
@@ -104,6 +149,7 @@ export default function ChatPage() {
   async function sendMessage(message: string, historyOverride?: Turn[]) {
     if (!message || !workspaceId || busy) return;
     setError(null);
+    setInterrupted(false);
     setBusy(true);
     setStage("正在准备…");
 
@@ -244,9 +290,10 @@ export default function ChatPage() {
                 sources={t.sources}
                 onDownload={download}
                 onEdit={t.role === "user" && !busy ? (newContent) => handleEdit(i, newContent) : undefined}
+                onResend={interrupted && !busy && t.role === "user" && i === turns.length - 1 ? () => sendMessage(t.content) : undefined}
               />
             ))}
-            {busy && <ThinkingBubble stage={stage} />}
+{busy && <ThinkingBubble stage={stage} />}
           </div>
 
           {error && (

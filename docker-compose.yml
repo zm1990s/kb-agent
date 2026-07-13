@@ -5,8 +5,8 @@ services:
       POSTGRES_USER: kbagent
       POSTGRES_PASSWORD: kbagent
       POSTGRES_DB: kbagent
-    ports:
-      - "5432:5432"
+    # 不对宿主暴露 5432：后端经 Docker 内网（hostname postgres）连接即可。
+    # 如需 psql 调试，用：docker compose exec postgres psql -U kbagent
     volumes:
       - ./data/postgres/pgdata:/var/lib/postgresql/data
       - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro

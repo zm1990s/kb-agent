@@ -7,6 +7,7 @@
 import uuid
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
@@ -156,7 +157,11 @@ async def register_user(
         role=role,
     )
     session.add(user)
-    await session.commit()
+    try:
+        await session.commit()
+    except IntegrityError:
+        await session.rollback()
+        raise EmailExistsError(email)
     await session.refresh(user)
 
     # 注册时按规则自动入组

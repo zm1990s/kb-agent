@@ -4,6 +4,7 @@ import re
 import unicodedata
 import uuid
 from pathlib import PurePosixPath
+from urllib.parse import quote
 
 from fastapi import (
     APIRouter,
@@ -257,7 +258,7 @@ async def download_document(
         content=data,
         media_type=doc.mime_type,
         headers={
-            "Content-Disposition": f'attachment; filename="{doc.title}"',
+            "Content-Disposition": f"attachment; filename*=UTF-8''{quote(doc.title)}",
             "X-Content-Type-Options": "nosniff",
         },
     )
@@ -269,10 +270,8 @@ _PREVIEWABLE_INLINE = {
     "image/jpeg",
     "image/gif",
     "image/webp",
-    "image/svg+xml",
+    # text/html 和 image/svg+xml 可嵌入脚本，不允许 inline 渲染（改走 content_text 回退）
     "text/plain",
-    "text/html",
-    "text/markdown",
     "text/csv",
 }
 
@@ -293,7 +292,7 @@ async def preview_document(
             content=data,
             media_type=mime,
             headers={
-                "Content-Disposition": f'inline; filename="{doc.title}"',
+                "Content-Disposition": f"inline; filename*=UTF-8''{quote(doc.title)}",
                 "X-Content-Type-Options": "nosniff",
                 "Cache-Control": "private, max-age=300",
             },
@@ -305,7 +304,7 @@ async def preview_document(
         content=text,
         media_type="text/plain; charset=utf-8",
         headers={
-            "Content-Disposition": f'inline; filename="{doc.title}.txt"',
+            "Content-Disposition": f"inline; filename*=UTF-8''{quote(doc.title + '.txt')}",
             "X-Content-Type-Options": "nosniff",
         },
     )
