@@ -30,6 +30,13 @@ export default function SystemSettings() {
   const [branding, setBranding] = useState<Branding>({ name: "", logo_url: "" });
   const [brandingName, setBrandingName] = useState("");
   const [brandingLogo, setBrandingLogo] = useState("");
+  const [wnHour, setWnHour] = useState<number>(2);
+  const [wnHourInput, setWnHourInput] = useState<number>(2);
+  const [wnFreq, setWnFreq] = useState<string>("weekly");
+  const [wnFreqInput, setWnFreqInput] = useState<string>("weekly");
+  const [wnFreqOptions, setWnFreqOptions] = useState<string[]>([]);
+  const [wnTriggering, setWnTriggering] = useState(false);
+  const [wnMsg, setWnMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [savedMsg, setSavedMsg] = useState<string | null>(null);
 
@@ -60,11 +67,23 @@ export default function SystemSettings() {
     }
   }, []);
 
+  const loadWnSchedule = useCallback(async () => {
+    try {
+      const d = await api.get<{ hour: number; frequency: string; frequency_options: string[] }>("/settings/whatsnew-schedule");
+      setWnHour(d.hour);
+      setWnHourInput(d.hour);
+      setWnFreq(d.frequency);
+      setWnFreqInput(d.frequency);
+      setWnFreqOptions(d.frequency_options);
+    } catch { /* 非 admin 正常 */ }
+  }, []);
+
   useEffect(() => {
     loadDomains();
     loadEngine();
     loadBranding();
-  }, [loadDomains, loadEngine, loadBranding]);
+    loadWnSchedule();
+  }, [loadDomains, loadEngine, loadBranding, loadWnSchedule]);
 
   async function addDomain(e: React.FormEvent) {
     e.preventDefault();
@@ -101,6 +120,44 @@ export default function SystemSettings() {
       setSavedMsg("品牌配置已保存，刷新页面生效");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "保存失败");
+    }
+  }
+
+  const FREQ_LABELS: Record<string, string> = {
+    daily: "每天",
+    weekly: "每周",
+    biweekly: "每两周",
+    monthly: "每月",
+  };
+
+  async function saveWnSchedule(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setWnMsg(null);
+    try {
+      const d = await api.put<{ hour: number; frequency: string }>(
+        "/settings/whatsnew-schedule",
+        { hour: wnHourInput, frequency: wnFreqInput },
+      );
+      setWnHour(d.hour);
+      setWnFreq(d.frequency);
+      setWnMsg(`新动态将${FREQ_LABELS[d.frequency] ?? d.frequency}在 ${d.hour}:00 UTC 生成`);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "保存失败");
+    }
+  }
+
+  async function triggerWnNow() {
+    setWnTriggering(true);
+    setWnMsg(null);
+    setError(null);
+    try {
+      await api.post("/whatsnew/trigger", {});
+      setWnMsg("摘要生成任务已提交，请稍后在新动态页面查看结果。");
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "触发失败");
+    } finally {
+      setWnTriggering(false);
     }
   }
 
@@ -250,6 +307,56 @@ export default function SystemSettings() {
                 <li className="text-gray-400">暂无域名（当前无人可注册）</li>
               )}
             </ul>
+          </section>
+
+          {/* 新动态定时 */}
+          <section className="rounded border bg-white p-4">
+            <h2 className="mb-1 text-sm font-medium">新动态定时</h2>
+            <p className="mb-3 text-xs text-gray-400">
+              当前配置：{FREQ_LABELS[wnFreq] ?? wnFreq}在 {wnHour}:00 UTC 自动生成一次摘要。
+            </p>
+            <form onSubmit={saveWnSchedule} className="flex flex-wrap items-end gap-3">
+              <div>
+                <label className="mb-1 block text-xs text-gray-500">生成频率</label>
+                <select
+                  value={wnFreqInput}
+                  onChange={(e) => setWnFreqInput(e.target.value)}
+                  className="rounded border px-3 py-2 text-sm focus:border-blue-400 focus:outline-none"
+                >
+                  {(wnFreqOptions.length > 0 ? wnFreqOptions : Object.keys(FREQ_LABELS)).map((f) => (
+                    <option key={f} value={f}>{FREQ_LABELS[f] ?? f}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs text-gray-500">触发整点（UTC 0–23）</label>
+                <input
+                  type="number"
+                  min={0}
+                  max={23}
+                  value={wnHourInput}
+                  onChange={(e) => setWnHourInput(Number(e.target.value))}
+                  className="w-24 rounded border px-3 py-2 text-sm"
+                />
+              </div>
+              <button
+                type="submit"
+                className="rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700"
+              >
+                保存
+              </button>
+            </form>
+            <div className="mt-4 border-t border-gray-100 pt-4">
+              <p className="mb-2 text-xs text-gray-400">手动触发一次摘要生成（用于测试）</p>
+              <button
+                onClick={triggerWnNow}
+                disabled={wnTriggering}
+                className="rounded border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                {wnTriggering ? "生成中…" : "立即生成"}
+              </button>
+              {wnMsg && <p className="mt-2 text-xs text-green-600">{wnMsg}</p>}
+            </div>
           </section>
 
           {/* F8：分类体系（从空间管理移来） */}

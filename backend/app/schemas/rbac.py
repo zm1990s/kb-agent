@@ -64,7 +64,7 @@ class GroupRulePublic(BaseModel):
 # ── F6 RBAC ────────────────────────────────────────────
 
 class PermissionSet(BaseModel):
-    module: Literal["chat", "documents", "workspaces", "users", "settings", "stats"]
+    module: Literal["chat", "documents", "workspaces", "users", "settings", "stats", "whatsnew"]
     level: Literal["none", "read", "write"]
 
 

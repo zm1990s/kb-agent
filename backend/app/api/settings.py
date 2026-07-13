@@ -13,16 +13,21 @@ from app.models.auth import User
 from app.services.settings_service import (
     ENGINE_CATALOG,
     PROMPT_CATALOG,
+    WHATSNEW_FREQ_DAYS,
     EngineNotAvailableError,
     InvalidPromptError,
     get_engine_backend,
     get_prompt,
     get_setting,
+    get_whatsnew_freq,
+    get_whatsnew_hour,
     list_prompt_history,
     rollback_prompt,
     set_engine_backend,
     set_prompt,
     set_setting,
+    set_whatsnew_freq,
+    set_whatsnew_hour,
 )
 from app.services.usage_service import record_event
 
@@ -256,6 +261,65 @@ async def rollback_prompt_version(
         value=value,
         required_placeholders=tpl.required_placeholders,
     )
+
+
+# ── 新动态定时配置 ────────────────────────────────────────────
+
+
+class WhatsnewScheduleOut(BaseModel):
+    hour: int
+    frequency: str
+    frequency_options: list[str]
+
+
+class WhatsnewScheduleIn(BaseModel):
+    hour: int | None = None
+    frequency: str | None = None
+
+
+async def _get_schedule_out(session: AsyncSession) -> WhatsnewScheduleOut:
+    return WhatsnewScheduleOut(
+        hour=await get_whatsnew_hour(session),
+        frequency=await get_whatsnew_freq(session),
+        frequency_options=list(WHATSNEW_FREQ_DAYS.keys()),
+    )
+
+
+@router.get("/whatsnew-schedule", response_model=WhatsnewScheduleOut)
+async def get_whatsnew_schedule(
+    _admin: User = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+) -> WhatsnewScheduleOut:
+    return await _get_schedule_out(session)
+
+
+@router.put("/whatsnew-schedule", response_model=WhatsnewScheduleOut)
+async def update_whatsnew_schedule(
+    body: WhatsnewScheduleIn,
+    admin: User = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+) -> WhatsnewScheduleOut:
+    if body.hour is not None:
+        try:
+            await set_whatsnew_hour(session, body.hour)
+        except ValueError as exc:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+    if body.frequency is not None:
+        try:
+            await set_whatsnew_freq(session, body.frequency)
+        except ValueError as exc:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+    logger.info(
+        "audit admin set_whatsnew_schedule admin=%s hour=%s freq=%s",
+        admin.id, body.hour, body.frequency,
+    )
+    await record_event(
+        session,
+        action="admin_set_whatsnew_schedule",
+        user_id=admin.id,
+        meta={"hour": body.hour, "frequency": body.frequency},
+    )
+    return await _get_schedule_out(session)
 
 
 @router.put("/branding", response_model=BrandingOut)

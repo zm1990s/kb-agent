@@ -36,6 +36,14 @@ class Settings(BaseSettings):
     local_storage_dir: str = Field("./local_storage", alias="LOCAL_STORAGE_DIR")
     download_url_ttl_sec: int = Field(300, alias="DOWNLOAD_URL_TTL_SEC")
 
+    # ── 邮件（SMTP）──────────────────────────────────────
+    smtp_host: str = Field("", alias="SMTP_HOST")
+    smtp_port: int = Field(587, alias="SMTP_PORT")
+    smtp_user: str = Field("", alias="SMTP_USER")
+    smtp_password: str = Field("", alias="SMTP_PASSWORD")
+    smtp_from: str = Field("", alias="SMTP_FROM")
+    smtp_tls: bool = Field(True, alias="SMTP_TLS")
+
 @lru_cache
 def get_settings() -> Settings:
     return Settings()  # type: ignore[call-arg]  # 值来自环境变量

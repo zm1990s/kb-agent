@@ -39,6 +39,7 @@ export default function ChatPage() {
   const [error, setError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   const loadConversations = useCallback(async () => {
     if (!workspaceId) return;
@@ -94,17 +95,20 @@ export default function ChatPage() {
     setError(null);
   }
 
+  function stopGeneration() {
+    abortRef.current?.abort();
+  }
+
   if (!ready) return null;
 
-  async function send(e: React.FormEvent) {
-    e.preventDefault();
-    const message = input.trim();
+  async function sendMessage(message: string, historyOverride?: Turn[]) {
     if (!message || !workspaceId || busy) return;
     setError(null);
-    setInput("");
-    setTurns((t) => [...t, { role: "user", content: message }]);
     setBusy(true);
     setStage("正在准备…");
+
+    const ac = new AbortController();
+    abortRef.current = ac;
 
     const isNew = conversationId === null;
     try {
@@ -126,16 +130,38 @@ export default function ChatPage() {
               { role: "assistant", content: d.answer, sources: d.sources },
             ]);
           }
-        }
+        },
+        ac.signal,
       );
-      // Always refresh after a chat — picks up AI-generated title on new convs
       await loadConversations();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "请求失败");
+      if (err instanceof DOMException && err.name === "AbortError") {
+        // user stopped — keep turns as-is
+      } else {
+        setError(err instanceof ApiError ? err.message : "请求失败");
+      }
     } finally {
       setBusy(false);
       setStage(null);
+      abortRef.current = null;
     }
+  }
+
+  async function send(e: React.FormEvent) {
+    e.preventDefault();
+    const message = input.trim();
+    if (!message) return;
+    setInput("");
+    setTurns((t) => [...t, { role: "user", content: message }]);
+    await sendMessage(message);
+  }
+
+  async function handleEdit(turnIndex: number, newContent: string) {
+    // Truncate turns up to and including the edited user message, then re-send
+    const newTurns = turns.slice(0, turnIndex);
+    newTurns.push({ role: "user", content: newContent });
+    setTurns(newTurns);
+    await sendMessage(newContent);
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -190,6 +216,10 @@ export default function ChatPage() {
                 })
             )
           }
+          onDeleted={(id) => {
+            setConversations((prev) => prev.filter((c) => c.id !== id));
+            if (conversationId === id) newConversation();
+          }}
         />
 
         <main className="flex flex-1 flex-col overflow-hidden">
@@ -213,6 +243,7 @@ export default function ChatPage() {
                 content={t.content}
                 sources={t.sources}
                 onDownload={download}
+                onEdit={t.role === "user" && !busy ? (newContent) => handleEdit(i, newContent) : undefined}
               />
             ))}
             {busy && <ThinkingBubble stage={stage} />}
@@ -239,22 +270,28 @@ export default function ChatPage() {
                   className="flex-1 resize-none bg-transparent text-sm text-gray-900 placeholder-gray-400 outline-none disabled:opacity-60"
                   style={{ minHeight: "1.5rem", maxHeight: "10rem" }}
                 />
-                <button
-                  type="submit"
-                  disabled={!workspaceId || busy || !input.trim()}
-                  className="shrink-0 rounded-lg bg-blue-600 p-2 text-white hover:bg-blue-700 disabled:bg-gray-300 disabled:text-gray-500 transition-colors"
-                >
-                  {busy ? (
-                    <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                {busy ? (
+                  <button
+                    type="button"
+                    onClick={stopGeneration}
+                    className="shrink-0 rounded-lg border border-gray-300 bg-white p-2 text-gray-600 hover:bg-gray-100 transition-colors"
+                    title="停止生成"
+                  >
+                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
+                      <rect x="6" y="6" width="12" height="12" rx="2" />
                     </svg>
-                  ) : (
+                  </button>
+                ) : (
+                  <button
+                    type="submit"
+                    disabled={!workspaceId || !input.trim()}
+                    className="shrink-0 rounded-lg bg-blue-600 p-2 text-white hover:bg-blue-700 disabled:bg-gray-300 disabled:text-gray-500 transition-colors"
+                  >
                     <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
                       <path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z" />
                     </svg>
-                  )}
-                </button>
+                  </button>
+                )}
               </div>
             </form>
           </div>

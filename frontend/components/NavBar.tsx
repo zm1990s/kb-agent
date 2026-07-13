@@ -9,6 +9,7 @@ import { clearAuth, getEmail, isAdmin } from "@/lib/auth";
 
 // 每个导航项对应一个 RBAC 模块；level != none 才显示。
 const links = [
+  { href: "/whatsnew", label: "新动态", module: "whatsnew" },
   { href: "/chat", label: "聊天", module: "chat" },
   { href: "/documents", label: "文档管理", module: "documents" },
   { href: "/admin", label: "空间管理", module: "workspaces" },

@@ -37,6 +37,7 @@ const MODULES = [
   { key: "users", label: "用户管理" },
   { key: "settings", label: "系统设置" },
   { key: "stats", label: "数据统计" },
+  { key: "whatsnew", label: "新动态" },
 ];
 
 export default function UsersPage() {

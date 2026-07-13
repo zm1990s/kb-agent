@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, ApiError } from "@/lib/api";
+import { getToken } from "@/lib/auth";
 
 interface DailyAction {
   day: string;
@@ -146,7 +147,10 @@ function LogViewer() {
     try {
       const f = await api.get<LogFile[]>("/admin/logs");
       setFiles(f);
-      if (f.length > 0 && !selected) setSelected(f[0].name);
+      if (f.length > 0 && !selected) {
+        const preferred = f.find((x) => x.name === "kb-agent.log") ?? f[0];
+        setSelected(preferred.name);
+      }
     } catch (err) {
       setLogError(err instanceof ApiError ? err.message : "获取日志列表失败");
     } finally {
@@ -159,7 +163,7 @@ function LogViewer() {
     setLogError(null);
     try {
       // read log as plain text via api.get (returns undefined for non-JSON) — use fetch directly
-      const token = typeof window !== "undefined" ? localStorage.getItem("kb_token") : null;
+      const token = getToken();
       const res = await fetch(`/api/admin/logs/${encodeURIComponent(name)}?lines=${n}`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });

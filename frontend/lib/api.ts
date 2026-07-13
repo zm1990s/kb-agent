@@ -65,10 +65,12 @@ async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
 
 // SSE 流式请求：逐个回调 (event, data)。用 fetch+ReadableStream，
 // 因为 EventSource 不支持 POST / 自定义 Authorization 头。
+// signal 可传入 AbortController.signal 以中途取消。
 export async function stream(
   path: string,
   body: unknown,
-  onEvent: (event: string, data: unknown) => void
+  onEvent: (event: string, data: unknown) => void,
+  signal?: AbortSignal,
 ): Promise<void> {
   const token = getToken();
   const headers: Record<string, string> = { "Content-Type": "application/json" };
@@ -78,6 +80,7 @@ export async function stream(
     method: "POST",
     headers,
     body: JSON.stringify(body),
+    signal,
   });
   if (res.status === 401) {
     clearAuth();
@@ -89,28 +92,33 @@ export async function stream(
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    // SSE 事件以空行分隔
-    const blocks = buffer.split("\n\n");
-    buffer = blocks.pop() ?? "";
-    for (const block of blocks) {
-      let event = "message";
-      let data = "";
-      for (const line of block.split("\n")) {
-        if (line.startsWith("event: ")) event = line.slice(7);
-        else if (line.startsWith("data: ")) data += line.slice(6);
-      }
-      if (data) {
-        try {
-          onEvent(event, JSON.parse(data));
-        } catch {
-          /* 忽略非 JSON 数据行 */
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      // SSE 事件以空行分隔
+      const blocks = buffer.split("\n\n");
+      buffer = blocks.pop() ?? "";
+      for (const block of blocks) {
+        let event = "message";
+        let data = "";
+        for (const line of block.split("\n")) {
+          if (line.startsWith("event: ")) event = line.slice(7);
+          else if (line.startsWith("data: ")) data += line.slice(6);
+        }
+        if (data) {
+          try {
+            onEvent(event, JSON.parse(data));
+          } catch {
+            /* 忽略非 JSON 数据行 */
+          }
         }
       }
     }
+  } catch (err) {
+    if (err instanceof DOMException && err.name === "AbortError") return;
+    throw err;
   }
 }
 

@@ -30,6 +30,7 @@ from app.services.answer_service import (
 from app.services.chat_service import (
     add_message,
     create_conversation,
+    delete_conversation,
     generate_conversation_title,
     get_conversation_for_user,
     get_or_create_conversation,
@@ -263,6 +264,20 @@ async def get_conversation(
         conversation_id=conv.id,
         messages=[MessagePublic.model_validate(m) for m in msgs],
     )
+
+
+@router.delete("/conversations/{conversation_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_conversation_endpoint(
+    conversation_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> None:
+    """删除会话及其所有消息（仅限归属本人）。"""
+    ok = await delete_conversation(
+        session, conversation_id=conversation_id, user_id=current_user.id
+    )
+    if not ok:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "会话不存在")
 
 
 @router.patch("/conversations/{conversation_id}", response_model=ConversationSummary)

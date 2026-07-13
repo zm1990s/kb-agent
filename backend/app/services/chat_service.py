@@ -121,6 +121,21 @@ async def list_conversations(
     return list(result.scalars().all())
 
 
+async def delete_conversation(
+    session: AsyncSession,
+    *,
+    conversation_id: uuid.UUID,
+    user_id: uuid.UUID,
+) -> bool:
+    """删除会话及其所有消息；校验归属，不匹配返回 False。"""
+    conv = await session.get(Conversation, conversation_id)
+    if conv is None or conv.user_id != user_id:
+        return False
+    await session.delete(conv)
+    await session.commit()
+    return True
+
+
 async def update_conversation(
     session: AsyncSession,
     *,

@@ -720,21 +720,21 @@ export default function DocumentsPage() {
       </div>
 
       {detailDoc && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setDetailDoc(null)}>
-          <div className="w-full max-w-2xl rounded-xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setDetailDoc(null)}>
+          <div className="w-full max-w-6xl rounded-xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between border-b px-5 py-4">
-              <h2 className="max-w-lg truncate text-sm font-semibold text-gray-800">{detailDoc.title}</h2>
-              <button onClick={() => setDetailDoc(null)} className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700">
+              <h2 className="flex-1 truncate pr-4 text-sm font-semibold text-gray-800">{detailDoc.title}</h2>
+              <button onClick={() => setDetailDoc(null)} className="shrink-0 rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700">
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
             </div>
-            <div className="max-h-[70vh] overflow-y-auto p-5">
+            <div className="max-h-[85vh] overflow-y-auto p-5">
               <table className="w-full text-sm">
                 <tbody className="divide-y divide-gray-100">
                   <tr className="align-top">
-                    <td className="w-28 shrink-0 py-3 pr-4 font-medium text-gray-500">分类</td>
+                    <td className="w-24 shrink-0 py-3 pr-4 font-medium text-gray-500">分类</td>
                     <td className="py-3 text-gray-800">{categoryName(detailDoc.category_id)}</td>
                   </tr>
                   <tr className="align-top">
@@ -761,7 +761,7 @@ export default function DocumentsPage() {
                     <td className="py-3 pr-4 font-medium text-gray-500">正文全文</td>
                     <td className="py-3">
                       {detailDoc.content_text ? (
-                        <div className="max-h-96 overflow-y-auto rounded border border-gray-200 bg-gray-50 p-3 text-xs leading-relaxed">
+                        <div className="max-h-[55vh] overflow-y-auto rounded border border-gray-200 bg-gray-50 p-3 text-xs leading-relaxed">
                           <Markdown content={detailDoc.content_text} />
                         </div>
                       ) : "—"}

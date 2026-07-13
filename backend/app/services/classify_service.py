@@ -23,12 +23,15 @@ logger = logging.getLogger(__name__)
 
 
 def _parse_engine_json(text: str) -> dict:
-    """从引擎输出中提取 JSON 对象（容忍前后包裹的代码块/文字）。
-
-    LLM 有时在字符串值内输出未转义的换行/制表/控制字符，导致 JSONDecodeError。
-    先尝试直接解析，失败后用 re 把字符串字面量内的裸控制字符转义再重试。
+    """从引擎输出中提取 JSON 对象，三级容错：
+    1. 直接 json.loads
+    2. 转义字符串内的裸控制字符（\\n / \\r / \\t / 其余 \\x00-\\x1f）
+    3. 逐字段提取（处理 content_text 内含未转义双引号的情况）
     """
     import re
+
+    # 去掉 markdown 代码围栏
+    text = re.sub(r"```(?:json)?\s*", "", text, flags=re.DOTALL).strip()
 
     start = text.find("{")
     end = text.rfind("}")
@@ -36,25 +39,71 @@ def _parse_engine_json(text: str) -> dict:
         raise ValueError("引擎输出中未找到 JSON 对象")
     raw = text[start : end + 1]
 
+    # ── Pass 1：直接解析 ──────────────────────────────────
     try:
         return json.loads(raw)
     except json.JSONDecodeError:
         pass
 
-    # 将字符串字面量内的裸控制字符（\x00-\x1f，排除已转义的 \\ 和 \"）转义
-    def _escape_ctrl(m: re.Match) -> str:
-        s = m.group(0)
-        # 只处理双引号包裹的字符串内容部分
-        inner = s[1:-1]
-        inner = inner.replace("\\", "\x00BACKSLASH\x00")  # 临时占位保护已有转义
-        inner = re.sub(r'[\x00-\x1f]', lambda c: (
-            {"\\": "\\\\", "\n": "\\n", "\r": "\\r", "\t": "\\t"}.get(c.group(), f"\\u{ord(c.group()):04x}")
-        ), inner)
-        inner = inner.replace("\x00BACKSLASH\x00", "\\")
-        return f'"{inner}"'
+    # ── Pass 2：转义字符串内的裸控制字符 ──────────────────
+    def _fix_string(m: re.Match) -> str:
+        inner = m.group(1)
+        out: list[str] = []
+        i = 0
+        while i < len(inner):
+            c = inner[i]
+            if c == "\\" and i + 1 < len(inner):
+                out.append(c)
+                out.append(inner[i + 1])
+                i += 2
+            elif c == "\n":
+                out.append("\\n"); i += 1
+            elif c == "\r":
+                out.append("\\r"); i += 1
+            elif c == "\t":
+                out.append("\\t"); i += 1
+            elif ord(c) < 0x20:
+                out.append(f"\\u{ord(c):04x}"); i += 1
+            else:
+                out.append(c); i += 1
+        return '"' + "".join(out) + '"'
 
-    fixed = re.sub(r'"(?:[^"\\]|\\.)*"', _escape_ctrl, raw, flags=re.DOTALL)
-    return json.loads(fixed)
+    fixed = re.sub(r'"((?:[^"\\]|\\.)*)"', _fix_string, raw, flags=re.DOTALL)
+    try:
+        return json.loads(fixed)
+    except json.JSONDecodeError:
+        pass
+
+    # ── Pass 3：逐字段提取（应对 content_text 含裸双引号）─
+    result: dict = {}
+
+    for field in ("category", "brief", "summary"):
+        m = re.search(rf'"{field}"\s*:\s*("(?:[^"\\]|\\.)*"|null)', raw)
+        if m:
+            try:
+                result[field] = json.loads(m.group(1))
+            except json.JSONDecodeError:
+                result[field] = None
+
+    m_tags = re.search(r'"tags"\s*:\s*(\[[^\]]*\])', raw, re.DOTALL)
+    if m_tags:
+        try:
+            result["tags"] = json.loads(m_tags.group(1))
+        except json.JSONDecodeError:
+            result["tags"] = []
+
+    # content_text 通常是最后一个字段；用贪婪匹配取首个 " 到最后一个 " 之间的全部内容
+    m_ct = re.search(r'"content_text"\s*:\s*"(.*)"\s*[,}]', raw, re.DOTALL)
+    if m_ct:
+        ct = m_ct.group(1)
+        # 反转义 JSON 转义序列（\\n → \n 等），使存入 DB 的是真实字符
+        ct = ct.replace("\\n", "\n").replace("\\r", "\r").replace("\\t", "\t").replace('\\"', '"').replace("\\\\", "\\")
+        result["content_text"] = ct
+
+    if result:
+        return result
+
+    raise ValueError(f"无法解析引擎输出为 JSON: {text[:300]}")
 
 
 async def _resolve_category_id(
@@ -102,7 +151,6 @@ async def run_classification(session: AsyncSession, task_id: uuid.UUID) -> None:
         prompt_tpl = await get_prompt(session, CLASSIFY_PROMPT_KEY)
         prompt = prompt_tpl.format(
             categories=", ".join(cat_names) if cat_names else "（无预定义分类）",
-            timestamp=datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC"),
         )
 
         # 经 engine 让 CLI 读原文（唯一 LLM 出口）；引擎后端取管理员在应用内的选择

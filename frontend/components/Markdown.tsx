@@ -1,22 +1,30 @@
 "use client";
 
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 // LLM 产物的 Markdown 渲染。react-markdown 默认不解析裸 HTML，
 // 且未启用 rehype-raw，故不会执行 <script> 等 —— 天然防存储型 XSS（SECURITY #6）。
 export default function Markdown({ content }: { content: string }) {
+  // 兜底：LLM 有时输出字面量 \n 而非真实换行，导致 Markdown 解析失败
+  const normalized = content.replace(/\\n/g, "\n").replace(/\\t/g, "\t");
   return (
     <div className="max-w-none break-words text-sm leading-relaxed text-gray-900">
       <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
         components={{
-          a: ({ ...props }) => (
-            <a
-              {...props}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-blue-600 underline hover:text-blue-700"
-            />
-          ),
+          a: ({ href, ...props }) => {
+            const safe = href && /^(https?:\/\/|mailto:|\/)/i.test(href) ? href : undefined;
+            return (
+              <a
+                {...props}
+                href={safe}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 underline hover:text-blue-700"
+              />
+            );
+          },
           p: ({ ...props }) => <p className="my-1 leading-relaxed" {...props} />,
           ul: ({ ...props }) => <ul className="my-1 ml-5 list-disc space-y-1" {...props} />,
           ol: ({ ...props }) => <ol className="my-1 ml-5 list-decimal space-y-1" {...props} />,
@@ -52,7 +60,7 @@ export default function Markdown({ content }: { content: string }) {
           ),
         }}
       >
-        {content}
+        {normalized}
       </ReactMarkdown>
     </div>
   );

@@ -10,7 +10,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.core.db import Base
 
 # RBAC 模块与权限级别
-MODULES = ("chat", "documents", "workspaces", "users", "settings")
+MODULES = ("chat", "documents", "workspaces", "users", "settings", "stats", "whatsnew")
 LEVELS = ("none", "read", "write")
 RULE_FIELDS = ("email_domain", "email", "role")
 RULE_OPS = ("equals", "endswith", "contains")

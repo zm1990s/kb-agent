@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef, useState } from "react";
 import Markdown from "@/components/Markdown";
 import type { SourceRef } from "@/lib/types";
 
@@ -8,12 +9,49 @@ interface Props {
   content: string;
   sources?: SourceRef[];
   onDownload?: (s: SourceRef) => void;
+  onEdit?: (newContent: string) => void;
 }
 
-export default function MessageBubble({ role, content, sources, onDownload }: Props) {
+export default function MessageBubble({ role, content, sources, onDownload, onEdit }: Props) {
   const isUser = role === "user";
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(content);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  function startEdit() {
+    setDraft(content);
+    setEditing(true);
+    setTimeout(() => {
+      const el = textareaRef.current;
+      if (!el) return;
+      el.focus();
+      el.selectionStart = el.value.length;
+    }, 0);
+  }
+
+  function cancelEdit() {
+    setEditing(false);
+    setDraft(content);
+  }
+
+  function commitEdit() {
+    const trimmed = draft.trim();
+    if (trimmed && trimmed !== content) {
+      onEdit?.(trimmed);
+    }
+    setEditing(false);
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      commitEdit();
+    }
+    if (e.key === "Escape") cancelEdit();
+  }
+
   return (
-    <div className={`flex gap-3 ${isUser ? "flex-row-reverse" : "flex-row"}`}>
+    <div className={`group flex gap-3 ${isUser ? "flex-row-reverse" : "flex-row"}`}>
       {/* Avatar */}
       <div
         className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
@@ -27,15 +65,56 @@ export default function MessageBubble({ role, content, sources, onDownload }: Pr
       </div>
 
       <div className={`flex max-w-[75%] flex-col gap-1.5 ${isUser ? "items-end" : "items-start"}`}>
-        <div
-          className={`rounded-2xl px-4 py-3 text-sm leading-relaxed ${
-            isUser
-              ? "rounded-tr-sm bg-blue-600 text-white whitespace-pre-wrap"
-              : "rounded-tl-sm bg-white text-gray-900 border border-gray-200 shadow-sm"
-          }`}
-        >
-          {isUser ? content : <Markdown content={content} />}
-        </div>
+        {isUser && editing ? (
+          <div className="w-full min-w-[240px]">
+            <textarea
+              ref={textareaRef}
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={handleKeyDown}
+              rows={3}
+              className="w-full rounded-2xl rounded-tr-sm border border-blue-400 bg-blue-50 px-4 py-3 text-sm text-gray-900 outline-none resize-none"
+            />
+            <div className="mt-1 flex justify-end gap-2">
+              <button
+                onClick={cancelEdit}
+                className="rounded px-3 py-1 text-xs text-gray-500 hover:bg-gray-100"
+              >
+                取消
+              </button>
+              <button
+                onClick={commitEdit}
+                disabled={!draft.trim()}
+                className="rounded bg-blue-600 px-3 py-1 text-xs text-white hover:bg-blue-700 disabled:opacity-50"
+              >
+                重新发送
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="relative">
+            <div
+              className={`rounded-2xl px-4 py-3 text-sm leading-relaxed ${
+                isUser
+                  ? "rounded-tr-sm bg-blue-600 text-white whitespace-pre-wrap"
+                  : "rounded-tl-sm bg-white text-gray-900 border border-gray-200 shadow-sm"
+              }`}
+            >
+              {isUser ? content : <Markdown content={content} />}
+            </div>
+            {isUser && onEdit && (
+              <button
+                onClick={startEdit}
+                title="编辑并重新发送"
+                className="absolute -left-7 top-1/2 -translate-y-1/2 rounded p-1 text-gray-300 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-gray-100 hover:text-gray-500"
+              >
+                <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+              </button>
+            )}
+          </div>
+        )}
 
         {sources && sources.length > 0 && (
           <div className="flex flex-wrap gap-1.5">

@@ -84,9 +84,10 @@ def _build_catalog(index: list[tuple[Document, str | None]]) -> str:
     for n, (doc, cat) in enumerate(index, start=1):
         tags = "、".join(doc.tags or []) or "无"
         summary = (doc.summary or "").replace("\n", " ")
+        upload_date = doc.created_at.strftime("%Y-%m-%d")
         lines.append(
-            f"[{n}] 标题：{doc.title} | 分类：{cat or '未分类'} | "
-            f"标签：{tags}\n    摘要：{summary}"
+            f"[{n}] 标题：{doc.title} | 分类：{cat or '未分类'} | 标签：{tags}\n"
+            f"    上传：{upload_date} | 摘要：{summary}"
         )
     return "\n".join(lines)
 
