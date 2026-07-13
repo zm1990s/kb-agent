@@ -1,4 +1,11 @@
 services:
+  init-dirs:
+    image: alpine
+    command: sh -c "mkdir -p /mnt/logs /mnt/documents /mnt/pgdata && chmod 777 /mnt/logs /mnt/documents"
+    volumes:
+      - ./data/logs:/mnt/logs
+      - ./data/documents:/mnt/documents
+
   postgres:
     image: postgres:16
     environment:
@@ -19,6 +26,8 @@ services:
   backend:
     build: ./backend
     depends_on:
+      init-dirs:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
     env_file:
