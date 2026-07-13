@@ -1,0 +1,63 @@
+# 生产模式：完整独立配置，不依赖 docker-compose.yml。
+# make prod 仅使用此文件。与 dev 的区别：
+#   - backend / frontend 不挂载源码（代码烤入镜像）
+#   - frontend 改为 build + start（编译优化后的生产服务器）
+services:
+  init-dirs:
+    image: alpine
+    command: sh -c "mkdir -p /mnt/logs /mnt/documents /mnt/pgdata && chmod 777 /mnt/logs /mnt/documents"
+    volumes:
+      - ./data/logs:/mnt/logs
+      - ./data/documents:/mnt/documents
+
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: kbagent
+      POSTGRES_PASSWORD: kbagent
+      POSTGRES_DB: kbagent
+    volumes:
+      - ./data/postgres/pgdata:/var/lib/postgresql/data
+      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kbagent"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  backend:
+    build: ./backend
+    depends_on:
+      init-dirs:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      - ANTHROPIC_API_KEY
+      - ANTHROPIC_AUTH_TOKEN
+      - ANTHROPIC_BASE_URL
+      - ANTHROPIC_MODEL
+      - CLAUDE_CODE_USE_BEDROCK
+      - AWS_ACCESS_KEY_ID
+      - AWS_SECRET_ACCESS_KEY
+      - AWS_SESSION_TOKEN
+      - AWS_REGION
+      - LOG_DIR=/app/logs
+    expose:
+      - "8000"
+    volumes:
+      - ./data/documents:/app/local_storage
+      - ./data/logs:/app/logs
+
+  frontend:
+    build: ./frontend
+    command: sh -c "npm run build && npm run start"
+    depends_on:
+      - backend
+    environment:
+      BACKEND_URL: http://backend:8000
+    ports:
+      - "80:80"

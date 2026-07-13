@@ -7,7 +7,13 @@ import remarkGfm from "remark-gfm";
 // 且未启用 rehype-raw，故不会执行 <script> 等 —— 天然防存储型 XSS（SECURITY #6）。
 export default function Markdown({ content }: { content: string }) {
   // 兜底：LLM 有时输出字面量 \n 而非真实换行，导致 Markdown 解析失败
-  const normalized = content.replace(/\\n/g, "\n").replace(/\\t/g, "\t");
+  // CommonMark 规范中，** 紧邻 CJK 字符或全角标点时不满足 flanking 条件，无法解析为加粗。
+  // 在 ** 与 CJK 之间插入空格使解析器正确识别。
+  const normalized = content
+    .replace(/\\n/g, "\n")
+    .replace(/\\t/g, "\t")
+    .replace(/([　-鿿＀-￯])(\*\*)/g, "$1 $2")
+    .replace(/(\*\*)([　-鿿＀-￯])/g, "$1 $2");
   return (
     <div className="max-w-none break-words text-sm leading-relaxed text-gray-900">
       <ReactMarkdown
