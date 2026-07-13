@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Image from "next/image";
 import PromptsTab from "@/components/admin/PromptsTab";
 import UserAdmin from "@/components/admin/UserAdmin";
 import WorkspaceAdmin from "@/components/admin/WorkspaceAdmin";
@@ -272,10 +273,13 @@ export default function SystemSettings({ perms }: Props) {
                 />
               </div>
               {branding.logo_url && (
-                <img
+                <Image
                   src={branding.logo_url}
                   alt="logo 预览"
+                  width={40}
+                  height={40}
                   className="h-10 w-10 rounded object-contain"
+                  unoptimized
                 />
               )}
               <button

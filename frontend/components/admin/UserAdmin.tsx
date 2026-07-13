@@ -268,7 +268,7 @@ function GroupsTab({
             <section className="rounded border bg-white p-4">
               <h3 className="mb-2 text-sm font-medium">自动入组规则</h3>
               <p className="mb-2 text-xs text-gray-400">
-                任一规则命中即入组。改规则后可点击"重算全部用户入组"刷新。
+                {'任一规则命中即入组。改规则后可点击"重算全部用户入组"刷新。'}
               </p>
               <ul className="mb-3 space-y-1 text-sm">
                 {rules.map((r) => (

@@ -392,7 +392,7 @@ export default function WorkspaceAdmin() {
                   文件已开始下载。请确认下载完成后再执行删除。
                 </div>
                 <p className="mb-4 text-sm text-gray-600">
-                  下载完成了吗？点击"确认删除"将永久删除该空间。
+                  {'下载完成了吗？点击"确认删除"将永久删除该空间。'}
                 </p>
                 {deleteError && <p className="mb-3 text-sm text-red-600">{deleteError}</p>}
                 <div className="flex justify-end gap-2">
