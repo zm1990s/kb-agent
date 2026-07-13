@@ -38,7 +38,8 @@ export default function SystemSettings() {
   const [wnTriggering, setWnTriggering] = useState(false);
   const [wnMsg, setWnMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [savedMsg, setSavedMsg] = useState<string | null>(null);
+  const [brandingMsg, setBrandingMsg] = useState<string | null>(null);
+  const [engineMsg, setEngineMsg] = useState<string | null>(null);
 
   const loadDomains = useCallback(async () => {
     try {
@@ -110,14 +111,14 @@ export default function SystemSettings() {
   async function saveBranding(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    setSavedMsg(null);
+    setBrandingMsg(null);
     try {
       const updated = await api.put<Branding>("/settings/branding", {
         name: brandingName,
         logo_url: brandingLogo,
       });
       setBranding(updated);
-      setSavedMsg("品牌配置已保存，刷新页面生效");
+      setBrandingMsg("品牌配置已保存，刷新页面生效");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "保存失败");
     }
@@ -163,11 +164,11 @@ export default function SystemSettings() {
 
   async function selectEngine(backend: string) {
     setError(null);
-    setSavedMsg(null);
+    setEngineMsg(null);
     try {
       const updated = await api.put<EngineConfig>("/settings/engine", { backend });
       setEngine(updated);
-      setSavedMsg("引擎已更新");
+      setEngineMsg("引擎已更新");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "更新失败");
     }
@@ -180,7 +181,7 @@ export default function SystemSettings() {
         {([["general", "系统设置"], ["prompts", "内置提示词管理"]] as [Tab, string][]).map(([t, label]) => (
           <button
             key={t}
-            onClick={() => { setTab(t); setError(null); setSavedMsg(null); }}
+            onClick={() => { setTab(t); setError(null); setBrandingMsg(null); setEngineMsg(null); }}
             className={`px-4 py-2 text-sm ${
               tab === t
                 ? "border-b-2 border-blue-600 font-medium text-blue-700"
@@ -233,7 +234,7 @@ export default function SystemSettings() {
                 保存品牌配置
               </button>
             </form>
-            {savedMsg && <p className="mt-2 text-xs text-green-600">{savedMsg}</p>}
+            {brandingMsg && <p className="mt-2 text-xs text-green-600">{brandingMsg}</p>}
           </section>
 
           {/* 引擎配置 */}
@@ -267,7 +268,7 @@ export default function SystemSettings() {
               ))}
               {!engine && <p className="text-sm text-gray-400">加载中…</p>}
             </div>
-            {savedMsg && <p className="mt-2 text-xs text-green-600">{savedMsg}</p>}
+            {engineMsg && <p className="mt-2 text-xs text-green-600">{engineMsg}</p>}
           </section>
 
           {/* 域名白名单 */}

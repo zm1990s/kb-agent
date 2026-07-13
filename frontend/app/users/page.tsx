@@ -31,13 +31,13 @@ interface GroupPerm {
 }
 
 const MODULES = [
+  { key: "whatsnew", label: "新动态" },
   { key: "chat", label: "对话查询" },
   { key: "documents", label: "文档管理" },
   { key: "workspaces", label: "空间管理" },
   { key: "users", label: "用户管理" },
   { key: "settings", label: "系统设置" },
   { key: "stats", label: "数据统计" },
-  { key: "whatsnew", label: "新动态" },
 ];
 
 export default function UsersPage() {

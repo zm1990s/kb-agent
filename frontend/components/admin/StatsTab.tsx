@@ -269,12 +269,60 @@ function LogViewer() {
 
 // ── 主组件 ────────────────────────────────────────────
 
+interface DownloadItem {
+  created_at: string;
+  email: string;
+  document_id: string;
+  document_title: string;
+}
+interface DownloadList { total: number; items: DownloadItem[]; }
+
+interface ChatItem {
+  created_at: string;
+  email: string;
+  conversation_id: string;
+  question: string;
+  answer: string;
+}
+interface ChatList { total: number; items: ChatItem[]; }
+
+function truncate(s: string, n: number) {
+  return s.length > n ? s.slice(0, n) + "…" : s;
+}
+
+function fmtTime(iso: string) {
+  return new Date(iso).toLocaleString("zh-CN", { hour12: false });
+}
+
 export default function StatsTab() {
-  const [innerTab, setInnerTab] = useState<"stats" | "logs">("stats");
+  const [innerTab, setInnerTab] = useState<"stats" | "downloads" | "chats" | "logs">("stats");
   const [stats, setStats] = useState<Stats | null>(null);
   const [days, setDays] = useState(30);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  const [dlData, setDlData] = useState<DownloadList | null>(null);
+  const [dlPage, setDlPage] = useState(1);
+  const [dlLoading, setDlLoading] = useState(false);
+
+  const [chatData, setChatData] = useState<ChatList | null>(null);
+  const [chatPage, setChatPage] = useState(1);
+  const [chatLoading, setChatLoading] = useState(false);
+  const [expandedChat, setExpandedChat] = useState<string | null>(null);
+
+  const loadDownloads = useCallback(async (d: number, page: number) => {
+    setDlLoading(true);
+    try {
+      setDlData(await api.get<DownloadList>(`/admin/usage/downloads?days=${d}&page=${page}&page_size=50`));
+    } catch { /* ignore */ } finally { setDlLoading(false); }
+  }, []);
+
+  const loadChats = useCallback(async (d: number, page: number) => {
+    setChatLoading(true);
+    try {
+      setChatData(await api.get<ChatList>(`/admin/usage/chats?days=${d}&page=${page}&page_size=50`));
+    } catch { /* ignore */ } finally { setChatLoading(false); }
+  }, []);
 
   const load = useCallback(async (d: number) => {
     setLoading(true);
@@ -296,7 +344,9 @@ export default function StatsTab() {
 
   useEffect(() => {
     if (innerTab === "stats") load(days);
-  }, [days, load, innerTab]);
+    if (innerTab === "downloads") loadDownloads(days, dlPage);
+    if (innerTab === "chats") loadChats(days, chatPage);
+  }, [days, load, loadDownloads, loadChats, innerTab, dlPage, chatPage]);
 
   function byAction(action: string) {
     const map: Record<string, number> = {};
@@ -311,19 +361,28 @@ export default function StatsTab() {
 
   return (
     <div className="space-y-4">
-      {/* 子 Tab：报表 / 日志 */}
+      {/* 子 Tab */}
       <div className="flex gap-1 border-b">
-        {(["stats", "logs"] as const).map((t) => (
+        {([
+          ["stats", "使用报表"],
+          ["downloads", "下载记录"],
+          ["chats", "对话记录"],
+          ["logs", "系统日志"],
+        ] as const).map(([t, label]) => (
           <button
             key={t}
-            onClick={() => setInnerTab(t)}
+            onClick={() => {
+              setInnerTab(t);
+              if (t === "downloads") setDlPage(1);
+              if (t === "chats") { setChatPage(1); setExpandedChat(null); }
+            }}
             className={`px-4 py-2 text-sm ${
               innerTab === t
                 ? "border-b-2 border-blue-600 font-medium text-blue-700"
                 : "text-gray-500 hover:text-gray-800"
             }`}
           >
-            {t === "stats" ? "使用报表" : "系统日志"}
+            {label}
           </button>
         ))}
       </div>
@@ -423,6 +482,180 @@ export default function StatsTab() {
               </div>
             </>
           )}
+        </div>
+      )}
+
+      {/* ── 下载记录 ── */}
+      {innerTab === "downloads" && (
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm text-gray-600">时间范围：</span>
+            {DAY_OPTIONS.map((d) => (
+              <button
+                key={d}
+                onClick={() => { setDays(d); setDlPage(1); }}
+                className={`rounded px-3 py-1 text-sm ${
+                  days === d ? "bg-blue-600 text-white" : "border text-gray-600 hover:bg-gray-100"
+                }`}
+              >
+                近 {d} 天
+              </button>
+            ))}
+            {dlLoading && <span className="text-xs text-gray-400">加载中…</span>}
+          </div>
+          <div className="rounded border bg-white">
+            <div className="border-b px-4 py-3 flex items-center justify-between">
+              <h3 className="text-sm font-medium">下载记录</h3>
+              {dlData && <span className="text-xs text-gray-400">共 {dlData.total} 条</span>}
+            </div>
+            {!dlData || dlData.items.length === 0 ? (
+              <p className="px-4 py-6 text-center text-sm text-gray-400">
+                {dlLoading ? "加载中…" : "暂无下载记录"}
+              </p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 text-xs text-gray-500">
+                    <tr>
+                      <th className="px-4 py-2 text-left">时间</th>
+                      <th className="px-4 py-2 text-left">用户</th>
+                      <th className="px-4 py-2 text-left">文档</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {dlData.items.map((item, i) => (
+                      <tr key={i} className="hover:bg-gray-50">
+                        <td className="px-4 py-2 text-xs text-gray-500 whitespace-nowrap">{fmtTime(item.created_at)}</td>
+                        <td className="px-4 py-2 font-mono text-xs">{item.email}</td>
+                        <td className={`px-4 py-2 text-xs ${!item.document_title || item.document_title === "(文档已删除)" ? "text-gray-400 italic" : ""}`}>
+                          {item.document_title}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            {dlData && dlData.total > 50 && (
+              <div className="flex items-center justify-between border-t px-4 py-2 text-xs text-gray-500">
+                <span>第 {dlPage} 页 / 共 {Math.ceil(dlData.total / 50)} 页</span>
+                <div className="flex gap-2">
+                  <button
+                    disabled={dlPage <= 1}
+                    onClick={() => setDlPage((p) => p - 1)}
+                    className="rounded border px-2 py-1 disabled:opacity-40 hover:bg-gray-100"
+                  >
+                    上一页
+                  </button>
+                  <button
+                    disabled={dlPage >= Math.ceil(dlData.total / 50)}
+                    onClick={() => setDlPage((p) => p + 1)}
+                    className="rounded border px-2 py-1 disabled:opacity-40 hover:bg-gray-100"
+                  >
+                    下一页
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── 对话记录 ── */}
+      {innerTab === "chats" && (
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm text-gray-600">时间范围：</span>
+            {DAY_OPTIONS.map((d) => (
+              <button
+                key={d}
+                onClick={() => { setDays(d); setChatPage(1); }}
+                className={`rounded px-3 py-1 text-sm ${
+                  days === d ? "bg-blue-600 text-white" : "border text-gray-600 hover:bg-gray-100"
+                }`}
+              >
+                近 {d} 天
+              </button>
+            ))}
+            {chatLoading && <span className="text-xs text-gray-400">加载中…</span>}
+          </div>
+          <div className="rounded border bg-white">
+            <div className="border-b px-4 py-3 flex items-center justify-between">
+              <h3 className="text-sm font-medium">对话记录</h3>
+              {chatData && <span className="text-xs text-gray-400">共 {chatData.total} 条</span>}
+            </div>
+            {!chatData || chatData.items.length === 0 ? (
+              <p className="px-4 py-6 text-center text-sm text-gray-400">
+                {chatLoading ? "加载中…" : "暂无对话记录"}
+              </p>
+            ) : (
+              <div className="divide-y">
+                {chatData.items.map((item, i) => {
+                  const key = `${item.conversation_id}-${i}`;
+                  const expanded = expandedChat === key;
+                  return (
+                    <div
+                      key={key}
+                      className="px-4 py-3 hover:bg-gray-50 cursor-pointer"
+                      onClick={() => setExpandedChat(expanded ? null : key)}
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-xs text-gray-400 whitespace-nowrap">{fmtTime(item.created_at)}</span>
+                            <span className="font-mono text-xs text-gray-600">{item.email}</span>
+                          </div>
+                          {expanded ? (
+                            <div className="space-y-2 text-xs">
+                              <div>
+                                <span className="font-medium text-gray-700">提问：</span>
+                                <span className="text-gray-800 whitespace-pre-wrap">{item.question}</span>
+                              </div>
+                              <div>
+                                <span className="font-medium text-gray-700">回答：</span>
+                                <span className="text-gray-600 whitespace-pre-wrap">{item.answer}</span>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="text-xs text-gray-700">
+                              <span className="font-medium">Q：</span>{truncate(item.question, 80)}
+                              {item.answer && (
+                                <span className="ml-2 text-gray-400">
+                                  <span className="font-medium">A：</span>{truncate(item.answer, 100)}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                        <span className="text-xs text-gray-400 shrink-0">{expanded ? "▲" : "▼"}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            {chatData && chatData.total > 50 && (
+              <div className="flex items-center justify-between border-t px-4 py-2 text-xs text-gray-500">
+                <span>第 {chatPage} 页 / 共 {Math.ceil(chatData.total / 50)} 页</span>
+                <div className="flex gap-2">
+                  <button
+                    disabled={chatPage <= 1}
+                    onClick={() => setChatPage((p) => p - 1)}
+                    className="rounded border px-2 py-1 disabled:opacity-40 hover:bg-gray-100"
+                  >
+                    上一页
+                  </button>
+                  <button
+                    disabled={chatPage >= Math.ceil(chatData.total / 50)}
+                    onClick={() => setChatPage((p) => p + 1)}
+                    className="rounded border px-2 py-1 disabled:opacity-40 hover:bg-gray-100"
+                  >
+                    下一页
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
 

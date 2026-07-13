@@ -1,12 +1,14 @@
 """用量事件记录与统计。"""
 
 import uuid
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import func, select, text
+from sqlalchemy import cast, func, select, text
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.auth import User
+from app.models.document import Document
 from app.models.usage import UsageEvent
 
 
@@ -103,3 +105,97 @@ async def get_stats(session: AsyncSession, days: int = 30) -> dict:
     )
 
     return {"days": days, "daily": daily, "active_users": active_users, "totals": totals, "per_user": per_user}
+
+
+async def get_download_events(
+    session: AsyncSession,
+    days: int = 30,
+    offset: int = 0,
+    limit: int = 50,
+) -> dict:
+    since = datetime.now(UTC) - timedelta(days=days)
+    total = (
+        await session.execute(
+            select(func.count()).select_from(UsageEvent).where(
+                UsageEvent.action == "download",
+                UsageEvent.created_at >= since,
+            )
+        )
+    ).scalar_one()
+    rows = (
+        await session.execute(
+            select(
+                UsageEvent.created_at,
+                User.email,
+                UsageEvent.meta["document_id"].as_string().label("document_id"),
+                Document.title,
+            )
+            .outerjoin(User, User.id == UsageEvent.user_id)
+            .outerjoin(
+                Document,
+                Document.id == cast(UsageEvent.meta["document_id"].as_string(), PG_UUID(as_uuid=True)),
+            )
+            .where(UsageEvent.action == "download", UsageEvent.created_at >= since)
+            .order_by(UsageEvent.created_at.desc())
+            .offset(offset)
+            .limit(limit)
+        )
+    ).all()
+    return {
+        "total": total,
+        "items": [
+            {
+                "created_at": r.created_at.isoformat(),
+                "email": r.email or "(匿名)",
+                "document_id": r.document_id,
+                "document_title": r.title or "(文档已删除)",
+            }
+            for r in rows
+        ],
+    }
+
+
+async def get_chat_events(
+    session: AsyncSession,
+    days: int = 30,
+    offset: int = 0,
+    limit: int = 50,
+) -> dict:
+    since = datetime.now(UTC) - timedelta(days=days)
+    total = (
+        await session.execute(
+            select(func.count()).select_from(UsageEvent).where(
+                UsageEvent.action == "chat",
+                UsageEvent.created_at >= since,
+            )
+        )
+    ).scalar_one()
+    rows = (
+        await session.execute(
+            select(
+                UsageEvent.created_at,
+                User.email,
+                UsageEvent.meta["question"].as_string().label("question"),
+                UsageEvent.meta["answer"].as_string().label("answer"),
+                UsageEvent.meta["conversation_id"].as_string().label("conversation_id"),
+            )
+            .outerjoin(User, User.id == UsageEvent.user_id)
+            .where(UsageEvent.action == "chat", UsageEvent.created_at >= since)
+            .order_by(UsageEvent.created_at.desc())
+            .offset(offset)
+            .limit(limit)
+        )
+    ).all()
+    return {
+        "total": total,
+        "items": [
+            {
+                "created_at": r.created_at.isoformat(),
+                "email": r.email or "(匿名)",
+                "conversation_id": r.conversation_id,
+                "question": r.question or "",
+                "answer": r.answer or "",
+            }
+            for r in rows
+        ],
+    }

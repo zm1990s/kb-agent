@@ -27,7 +27,7 @@ from app.schemas.rbac import (
 )
 from app.services import rbac_service
 from app.services.rbac_service import delete_user
-from app.services.usage_service import get_stats, record_event
+from app.services.usage_service import get_chat_events, get_download_events, get_stats, record_event
 
 logger = logging.getLogger(__name__)
 
@@ -250,6 +250,28 @@ async def usage_stats(
     if days < 1 or days > 365:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "days 须在 1-365 之间")
     return await get_stats(session, days=days)
+
+
+@router.get("/usage/downloads")
+async def get_download_list(
+    days: int = Query(30, ge=1, le=365),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=200),
+    _admin: User = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+):
+    return await get_download_events(session, days=days, offset=(page - 1) * page_size, limit=page_size)
+
+
+@router.get("/usage/chats")
+async def get_chat_list(
+    days: int = Query(30, ge=1, le=365),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=200),
+    _admin: User = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+):
+    return await get_chat_events(session, days=days, offset=(page - 1) * page_size, limit=page_size)
 
 
 # ── 日志查看 ──────────────────────────────────────────
