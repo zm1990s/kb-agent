@@ -25,35 +25,44 @@
 
 ## 快速启动
 
-前置：本机已安装 Docker。
+前置：本机已安装 Docker，将仓库 clone 到本地后在根目录操作。
+
+### 开发模式
+
+源码 bind-mount 进容器，改动立即生效（前端 HMR）：
 
 ```bash
-# 运行测试（自带测试环境变量，无需 .env）
-./scripts/test.sh                     # 全部
-./scripts/test.sh tests/test_m3_u4_chat.py   # 指定文件
-./scripts/test.sh -k chat             # 传任意 pytest 参数
-
-# lint + 类型检查
-./scripts/lint.sh
-
-# 启动本地开发环境（前端+后端+DB，单端口入口，应用迁移）
-./scripts/dev.sh
-# 之后（用户只访问一个端口 :80）：
-open http://localhost/                 # 前端（登录/对话/文档/管理）
-curl http://localhost/api/health       # {"status":"ok"}（经前端反代到后端）
-open http://localhost/api/docs          # Swagger UI
-docker compose logs -f frontend backend # 看日志
-docker compose down                     # 停止
-
-# 前端 e2e 冒烟（需先起栈）
-./scripts/e2e.sh
+make dev          # 构建并启动（首次较慢）
+make down         # 停止并移除容器
 ```
 
-> **单端口**：用户只访问 `:80`（Next.js），后端不对宿主暴露，`/api/*` 由前端反代。
+### 生产模式
+
+代码烤入镜像，`next build` 在构建阶段完成，容器启动即可提供服务：
+
+```bash
+make prod         # 构建并启动（docker build 时执行 next build）
+make prod-down    # 停止并移除容器
+```
+
+启动后访问（两种模式均相同）：
+
+```bash
+open http://localhost/          # 前端入口
+open http://localhost/api/docs  # Swagger UI
+docker compose logs -f frontend backend   # 查看日志（dev 模式）
+```
+
+### 其他命令
+
+```bash
+make test   # 在 backend 容器内运行 pytest
+make lint   # 在 backend 容器内运行 ruff + pyright
+```
+
+> **单端口**：用户只访问 `:80`（Next.js），`/api/*` 由前端反代到后端，后端不对宿主暴露。
 >
-> **注意**：`.env` 存密钥，不入 git（已 gitignore）。`dev.sh` 首次会生成一份本地默认值，
-> 请务必修改 `JWT_SECRET`，并把 `CLAUDE_CLI_PATH` 指向可用的 `claude` CLI（归类/问答需要）。
-> 端到端跑通归类与问答，需容器内能访问 `claude` CLI 且已配置凭据。
+> **首次部署**：复制 `.env.example` 为 `.env`，修改 `JWT_SECRET` 及 Claude 凭据（API key 或 AWS Bedrock 环境变量）。归类与问答需容器内可访问 Claude CLI 且凭据已配置。
 
 ## 目录说明
 
