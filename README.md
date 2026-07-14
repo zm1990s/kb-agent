@@ -77,7 +77,7 @@ backend/app/
   skills/     # 【预留】skill 插拔框架
   storage/    # StorageProtocol + LocalStorage
   tasks/      # 后台任务：归类 worker、任务状态与重试
-infra/postgres/  # init.sql（按 DESIGN.md 建表）
+infra/postgres/  # init.sql（CREATE EXTENSION）+ migrations/（001…016，按序应用）
 docs/            # PRD / DESIGN / ROADMAP / WORKFLOW / SECURITY
 prompts/         # 分步实现提示词
 ```

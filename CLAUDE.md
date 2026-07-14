@@ -32,15 +32,15 @@ backend/
     tasks/        # 后台任务：归类 worker、任务状态与重试
   tests/
 frontend/         # Next.js（App Router）+ TS + Tailwind，用户唯一入口
-  app/            # 路由页面：login/chat/documents/admin/users/settings
+  app/            # 路由页面：login/chat/documents/admin/users/settings/stats/whatsnew/account
   lib/            # api client（统一走 /api，含 stream SSE）、auth、useAuthGuard
   components/     # NavBar(RBAC 显隐) / MessageBubble / Markdown / FolderTree
-                  # / TaskLogPanel / admin(WorkspaceAdmin/SystemSettings/CategoryManager)
+                  # / TaskLogPanel / admin(WorkspaceAdmin/SystemSettings/CategoryManager/UserAdmin/PromptsTab/StatsTab)
   next.config.js  # rewrites: /api/* -> 后端 FastAPI（单端口暴露）
 infra/
   postgres/
     init.sql          # CREATE EXTENSION
-    migrations/       # 001_m1_auth … 008_rbac，按序应用
+    migrations/       # 001_m1_auth … 016_constraints，按序应用
 scripts/          # dev.sh / test.sh(独立库 kbagent_test) / lint.sh / e2e.sh
 docs/                 # PRD / DESIGN / ROADMAP / WORKFLOW / SECURITY
 prompts/              # 分步系统提示词
@@ -71,11 +71,11 @@ prompts/              # 分步系统提示词
 
 ### 权限模型（RBAC，F4–F7）
 - **admin 绕过一切 RBAC**（`effective_permissions` 对 admin 返回全模块 write）——改动权限逻辑时保持这条不变，避免锁死管理员。
-- 权限绑**用户组**（组→模块→none/read/write）；用户取所属组权限并集最高。模块 = chat/documents/workspaces/users/settings/**stats**（共 6 个，`PermissionSet.module` Literal 必须包含全部，新增模块时同步更新）。
+- 权限绑**用户组**（组→模块→none/read/write）；用户取所属组权限并集最高。模块 = chat/documents/workspaces/users/settings/stats/**whatsnew**（共 7 个，`PermissionSet.module` Literal 必须包含全部，新增模块时同步更新）。
 - 空间访问 = 个人成员 ∪ 所属组授权（`is_member`/`list_my_workspaces` 两者都要查）。
 - 自动入组规则：注册时 `sync_user_groups`；改规则后靠 `recompute-memberships` 全量重算。
 - 引擎工具：**已按决策放开 Claude 全部工具**（含 Bash，供 pdftotext 等）；容器以非 root 运行；提示词注入由外部 Guardrails 兜底。不要再收窄成 allowedTools 而破坏大文件抽取。
-- 引擎超时：使用**闲置超时**（`ENGINE_IDLE_TIMEOUT_SEC`，默认 60s）——连续无输出时才计时，每收到输出块重置；已废弃固定总时长 `ENGINE_TIMEOUT_SEC`。
+- 引擎超时：使用**闲置超时**（`ENGINE_IDLE_TIMEOUT_SEC`，默认 300s）——连续无输出时才计时，每收到输出块重置；已废弃固定总时长 `ENGINE_TIMEOUT_SEC`。
 - 提示词管理：4 个运行时可配置提示词（`answer_fetch_prompt / answer_prompt / classify_prompt / title_prompt`），DB 覆盖优先于代码默认。**修改代码默认值后，若 DB 有旧记录则不生效**，需 `DELETE FROM app_settings WHERE key='<key>'` 再重启。
 - 系统日志：`logs/kb-agent.log`（应用）+ `logs/access.log`（uvicorn HTTP），均 RotatingFileHandler（10MB×10）。
 

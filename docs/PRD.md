@@ -12,9 +12,9 @@
 | （未来）任意用户 | 通过 skill（如 SCM）借助知识生成 PANW 配置 | 生成配置方案，人工确认后下发 |
 
 **权限模型（现状）**：
-- **全局角色** `admin / internal / partner`；**admin 绕过一切 RBAC**。
+- **全局角色** `admin / user`；**admin 绕过一切 RBAC**（migration 012 已合并 internal/partner → user）。
 - **用户组**：多维规则（邮箱域名/邮箱/角色 × equals/endswith/contains）自动入组（注册时 + 手动全量重算）。
-- **RBAC**：权限绑在用户组上，`模块 × {none/read/write}`；模块 = 对话查询 / 文档管理 / 空间管理 / 用户管理 / 系统设置；用户取所属组权限并集最高。
+- **RBAC**：权限绑在用户组上，`模块 × {none/read/write}`；模块 = 对话查询 / 文档管理 / 空间管理 / 用户管理 / 系统设置 / 数据统计 / 新动态（共 7 个）；用户取所属组权限并集最高。
 - **空间访问**：个人成员 ∪ 所属组被授权（并存）。
 
 ## 2. 功能需求表（MVP F-00~F-19 + 增强 F1~F8）
@@ -73,7 +73,7 @@
 |---|------|------|
 | Q1 | 支持哪些文件类型？ | **所有常见文档格式（Word/PDF/图片/Excel/PPT/md/txt）**，交给 Claude CLI 原生读取，MVP 不自建解析库 |
 | Q3 | 对象存储用哪个？ | **MVP 用本地文件系统**（LOCAL_STORAGE_DIR），经 StorageProtocol 抽象，未来换云 |
-| Q4 | 用户从哪来？ | **自建用户表 + 邮箱密码**，注册按 **域名后缀白名单**（ALLOWED_EMAIL_DOMAINS）准入 |
+| Q4 | 用户从哪来？ | **自建用户表 + 邮箱密码**，注册按 **域名后缀白名单**（DB `allowed_domains` 表，管理员在系统设置维护）准入 |
 | Q5 | 归类同步还是后台？ | **后台任务**，processing_tasks 表记录进度/日志，失败可重试（reprocess） |
 | Q1b | 可搜正文从哪来？ | **复用 CLI 产物**：归类时让 CLI 一趟输出 content_text，供 PG 全文检索 |
 

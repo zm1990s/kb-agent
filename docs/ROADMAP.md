@@ -9,6 +9,8 @@
 | M3 | 对话式检索取件 | Agent 式索引问答、答案+原文链接、多轮上下文、SSE 流式 | ✅ 已交付 |
 | MF | 前端（单端口入口） | Next.js+Tailwind、登录/对话(气泡+流式)/文档(目录树)/空间/用户/设置页 | ✅ 已交付 |
 | F1–F11 | 增强批次 | 拖拽、批量/目录上传、全字段展示、用户管理、用户组、RBAC（含 stats 模块）、空间按组授权、分类迁移、体验优化、功能扩展、Agent 增强（两阶段全文拉取、Markdown 正文、时间戳注入、提示词版本管理） | ✅ 已交付 |
+| F12 | 收尾优化 | NavBar 深色主题、管理入口合并（admin+settings）、聊天引导问题（全局 + 每空间独立）、用户角色合并（internal/partner→user，migration 012） | ✅ 已交付 |
+| F13 | 生产部署 | docker-compose.prod.yml（代码烤入镜像，next build 构建阶段完成）、Makefile prod/prod-down、entrypoint.sh 非 root 运行 | ✅ 已交付 |
 | M4 | Skill 插拔框架 | SkillBase 抽象、registry、invoke、审批契约 | 预留（未实现） |
 | M5 | SCM 示范 skill | PANW 配置生成，pending_approval→approve→下发 | 预留（未实现） |
 
@@ -45,7 +47,7 @@
 | M1-U1 | 表+迁移 | users/workspaces/workspace_members 建表 | ~50 行 | 迁移跑通，字段齐全 |
 | M1-U2 | schema+model | Pydantic + ORM | ~70 行 | pyright 通过 |
 | M1-U3 | 密码哈希+JWT 工具 | bcrypt 封装、JWT 签发/校验 + 单测 | ~60 行 | pytest 含边界用例 |
-| M1-U3b | 注册+域名白名单 | POST /auth/register，校验 ALLOWED_EMAIL_DOMAINS | ~60 行 | 白名单内返 201；白名单外返 403；重复返 409 |
+| M1-U3b | 注册+域名白名单 | POST /auth/register，校验 DB `allowed_domains` 表 | ~60 行 | 白名单内返 201；白名单外返 403；重复返 409 |
 | M1-U4 | 登录+/auth/me | POST /auth/login、GET /auth/me | ~80 行 | 正确凭据返 JWT；无 token 返 401 |
 | M1-U5 | 鉴权依赖 | require_auth / require_admin | ~50 行 | 非 admin 访问管理端点返 403 |
 | M1-U6 | 空间 CRUD+成员 | 建空间、加成员、空间列表 | ~120 行 | 非成员看不到空间；Partner 隔离生效 |
@@ -145,6 +147,7 @@
 - **Phase 4**：MF 前端（用户可用的完整 MVP）✅
 - **Phase 5**：运维/接入收尾（Bedrock 接入、大 PDF 抽取、测试库隔离）✅
 - **Phase 6**：增强批次 F1–F11（拖拽/批量上传/全字段/用户管理/组/RBAC/空间组授权/分类迁移/体验优化/功能扩展/Agent 增强）✅
+- **Phase 6b**：收尾与生产部署 F12–F13（NavBar/管理入口/引导问题/角色合并/生产 Docker）✅
 - **Phase 7（未来）**：M4 Skill 框架 → M5 SCM skill
 
 每完成一个 Unit，建议 `git tag M<N>-U<N>-done`，方便回退。

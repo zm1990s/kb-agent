@@ -55,7 +55,7 @@ class EngineProtocol(Protocol):
 - **单端口**：用户只与 Next.js 交互；所有后端调用走相对路径 `/api/*`，由 rewrites 反代到 FastAPI。规避 CORS，收敛公网暴露面（SECURITY #8）。
 - **鉴权**：登录拿 JWT，前端 `lib/auth` 存取；`lib/api` 统一在请求头注入 `Authorization: Bearer`。路由守卫拦截未登录访问。
 - **角色显隐**：上传/建空间/建分类/reprocess 等管理功能仅对 admin 显示（仅体验层；后端仍是强制防线）。
-- **页面**：①登录/注册 ②对话查询（答案 + 每条来源的原文下载链接）③文档管理（上传、归类状态、列表、下载）④管理后台（分两个 Tab：**空间管理**=建空间/成员/分类；**系统设置**=注册域名白名单 + 引擎选择）。
+- **页面**：①登录/注册 ②对话查询（答案 + 每条来源的原文下载链接）③文档管理（上传、归类状态、列表、下载）④管理后台（空间授权及配置/用户管理）⑤系统设置（通用/提示词/空间管理/用户管理）⑥数据统计 ⑦新动态 ⑧账户设置。
 - **引擎选择**：管理员在系统设置切换 Agent 引擎，选择持久化于 `app_settings`（键 `engine_backend`），归类/问答运行时按此解析。Claude CLI 可用；Codex / OpenClaw 前端灰显、后端拒绝（`available=false`），为未来预留。
 - **XSS**：LLM 产物（summary/answer）渲染必须净化（SECURITY #6）。
 
@@ -147,6 +147,48 @@ class StorageProtocol(Protocol):
 | GET/PUT | /settings/engine | 查/设引擎后端（Claude 可用；Codex/OpenClaw 灰显） |
 | GET/POST | /auth/allowed-domains | 注册域名白名单（DB 维护） |
 | DELETE | /auth/allowed-domains/{id} | 删白名单域名 |
+| GET/PUT | /settings/brand | 品牌配置（Logo/名称） |
+| GET/PUT | /settings/smtp | SMTP 邮件配置 |
+| GET/PUT | /settings/whatsnew-schedule | 新动态定时配置（频率/小时） |
+| GET/PUT | /settings/prompts/{key} | 提示词查/设（含版本历史） |
+| GET | /settings/prompts/{key}/history | 提示词版本历史 |
+| POST | /settings/prompts/{key}/rollback/{version_id} | 回滚到指定版本 |
+| GET | /settings/workspaces/{ws}/suggested-questions | 查空间引导词（登录用户，fallback 全局） |
+| PUT | /settings/workspaces/{ws}/suggested-questions | 设空间引导词（管理员） |
+
+### 数据统计（F9/admin）
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | /stats/usage | 用量报表（按天/用户/动作聚合） |
+| GET | /stats/downloads | 下载记录清单 |
+| GET | /stats/conversations | 对话记录清单 |
+| GET | /stats/logs | 系统日志查看 |
+
+### 新动态（F10/F11）
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | /whatsnew | 当前用户可见的新动态报告列表 |
+| POST | /whatsnew/trigger | 手动触发所有空间新动态生成（管理员） |
+| GET | /whatsnew/subscription | 查当前用户订阅 |
+| PUT | /whatsnew/subscription | 设订阅频率（weekly/biweekly/monthly）|
+| DELETE | /whatsnew/subscription | 取消订阅 |
+
+### 空间管理增强（F10）
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| DELETE | /workspaces/{id} | 删除空间（管理员） |
+| GET | /workspaces/{id}/download-all | 打包下载空间全部文档（管理员） |
+
+### 会话管理增强（F10/F11）
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| PATCH | /conversations/{id} | 改会话标题 / Pin |
+| DELETE | /conversations/{id} | 删除会话 |
+
+### 账户设置
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | /auth/change-password | 改自己的密码 |
 
 ### Skill（M4 预留，未实现，仅登记契约）
 | 方法 | 路径 | 说明 |
@@ -163,10 +205,10 @@ class StorageProtocol(Protocol):
 | id | UUID | PK | |
 | email | TEXT | UNIQUE, NOT NULL | 登录名；注册时域名后缀须在白名单内 |
 | password_hash | TEXT | NOT NULL | bcrypt |
-| role | TEXT | NOT NULL, CHECK in ('admin','internal','partner') | 全局角色 |
+| role | TEXT | NOT NULL, CHECK in ('admin','user') | 全局角色 |
 | created_at | TIMESTAMPTZ | NOT NULL default now() | |
 
-> **注册白名单**：配置项 `ALLOWED_EMAIL_DOMAINS`（如 `company.com,partner-a.com`）。`POST /auth/register` 校验邮箱域名后缀，不在白名单返 403。
+> **注册白名单**：存储在 DB `allowed_domains` 表（管理员在系统设置维护）。`POST /auth/register` 校验邮箱域名后缀，不在白名单返 403；白名单为空则全拒绝。
 >
 > **首个管理员**：配置 `ADMIN_EMAIL` / `ADMIN_PASSWORD`，应用启动时（lifespan）**幂等种子**创建 role=admin 用户，密码 bcrypt 存库。已存在则跳过（尊重用户后续改过的密码）。用户经 `POST /auth/change-password` 自行改密。
 
@@ -245,16 +287,24 @@ class StorageProtocol(Protocol):
 | sources | JSONB | 引用的 doc_id 列表 |
 | created_at | TIMESTAMPTZ | default now() |
 
-### 增强批次新增表（migration 005–008）
+### 增强批次新增表（migration 005–016）
 - **folders**（F1/F2）：`id, workspace_id(FK), name, parent_id(FK self, ON DELETE CASCADE), created_at`；`documents.folder_id`（FK, ON DELETE SET NULL）。用户手动目录树，与分类/标签解耦。
 - **allowed_domains**（M1-U9）：`id, domain(UNIQUE), created_at`。注册白名单迁到 DB。
 - **app_settings**（MF-U7）：`key(PK), value, updated_at`。如 `engine_backend`。
 - **groups**（F5）：`id, name(UNIQUE), description, created_at`。
 - **group_rules**（F5）：`id, group_id(FK), field(email_domain/email/role), op(equals/endswith/contains), value`。
 - **group_members**（F5）：`(group_id, user_id)` PK。
-- **group_permissions**（F6）：`(group_id, module)` PK, `level CHECK(none/read/write)`；module ∈ chat/documents/workspaces/users/settings。
+- **group_permissions**（F6）：`(group_id, module)` PK, `level CHECK(none/read/write)`；module ∈ chat/documents/workspaces/users/settings/stats/whatsnew。
 - **workspace_group_grants**（F7）：`(workspace_id, group_id)` PK, `role_in_ws CHECK(owner/editor/viewer)`。
 - **users**（F4）新增 `is_active BOOLEAN default true`。
+- **usage_events**（migration 009）：用量统计事件表（用户/动作/时间）。
+- **document_brief**（migration 010）：文档 `brief` 字段（两阶段索引摘要）。
+- **conversations**（migration 011）新增 `title, is_pinned` 字段（会话命名 + Pin）。
+- **users**（migration 012）：合并角色 internal/partner → user；CHECK `('admin','user')`。
+- **prompt_history**（migration 013）：提示词版本历史表（key/content/created_at）。
+- **whatsnew_reports**（migration 014）：新动态报告表（workspace 级，定时生成）。
+- **whatsnew_subscriptions**（migration 015）：用户订阅频率表（weekly/biweekly/monthly）。
+- **constraints**（migration 016）：补全约束与索引。
 
 ## 关键技术选型的“为什么”
 - **不上向量库 / Agent 式索引问答**：以原文为准、减少幻觉。对话不做关键词硬匹配，而是把**整个空间的结构化索引**（标题/分类/标签/摘要）喂给 Claude，由它理解意图、组织答案、按编号挑相关文档（服务端映射回真实文档，防 ID 幻觉）。文档量上千后再评估 pgvector。
