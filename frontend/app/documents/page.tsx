@@ -174,7 +174,7 @@ export default function DocumentsPage() {
     }
   }
 
-  async function renameDoc(d: Doc) {
+  async function renameDoc(d: DocumentPublic) {
     const title = window.prompt("重命名文件", d.title);
     if (!title || title === d.title) return;
     setError(null);
