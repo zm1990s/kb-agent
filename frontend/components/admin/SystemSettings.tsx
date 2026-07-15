@@ -21,6 +21,15 @@ interface Branding {
   name: string;
   logo_url: string;
 }
+interface TaskModel {
+  key: string;
+  label: string;
+  model: string | null;
+}
+interface TaskModelsConfig {
+  default_model: string;
+  tasks: TaskModel[];
+}
 
 type Tab = "workspaces" | "users" | "general" | "prompts";
 
@@ -50,6 +59,9 @@ export default function SystemSettings({ perms }: Props) {
   const [wnFreq, setWnFreq] = useState<string>("weekly");
   const [wnFreqInput, setWnFreqInput] = useState<string>("weekly");
   const [wnFreqOptions, setWnFreqOptions] = useState<string[]>([]);
+  const [taskModels, setTaskModels] = useState<TaskModelsConfig | null>(null);
+  const [taskModelInputs, setTaskModelInputs] = useState<Record<string, string>>({});
+  const [taskModelMsg, setTaskModelMsg] = useState<string | null>(null);
   const [wnTriggering, setWnTriggering] = useState(false);
   const [wnMsg, setWnMsg] = useState<string | null>(null);
   const [sqText, setSqText] = useState("");
@@ -103,13 +115,24 @@ export default function SystemSettings({ perms }: Props) {
     } catch { /* 非 admin 正常 */ }
   }, []);
 
+  const loadTaskModels = useCallback(async () => {
+    try {
+      const d = await api.get<TaskModelsConfig>("/settings/models");
+      setTaskModels(d);
+      const inputs: Record<string, string> = {};
+      for (const t of d.tasks) inputs[t.key] = t.model ?? "";
+      setTaskModelInputs(inputs);
+    } catch { /* 非 admin 正常 */ }
+  }, []);
+
   useEffect(() => {
     loadDomains();
     loadEngine();
     loadBranding();
     loadWnSchedule();
     loadSuggestedQuestions();
-  }, [loadDomains, loadEngine, loadBranding, loadWnSchedule, loadSuggestedQuestions]);
+    loadTaskModels();
+  }, [loadDomains, loadEngine, loadBranding, loadWnSchedule, loadSuggestedQuestions, loadTaskModels]);
 
   async function addDomain(e: React.FormEvent) {
     e.preventDefault();
@@ -184,6 +207,19 @@ export default function SystemSettings({ perms }: Props) {
       setError(err instanceof ApiError ? err.message : "触发失败");
     } finally {
       setWnTriggering(false);
+    }
+  }
+
+  async function saveTaskModel(key: string) {
+    setError(null);
+    setTaskModelMsg(null);
+    try {
+      const model = taskModelInputs[key]?.trim() || null;
+      await api.put(`/settings/models/${key}`, { model });
+      await loadTaskModels();
+      setTaskModelMsg("模型配置已保存");
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "保存失败");
     }
   }
 
@@ -324,6 +360,41 @@ export default function SystemSettings({ perms }: Props) {
               {!engine && <p className="text-sm text-gray-400">加载中…</p>}
             </div>
             {engineMsg && <p className="mt-2 text-xs text-green-600">{engineMsg}</p>}
+          </section>
+
+          {/* 任务级模型配置 */}
+          <section className="rounded border bg-white p-4">
+            <h2 className="mb-1 text-sm font-medium">任务模型配置</h2>
+            <p className="mb-3 text-xs text-gray-400">
+              为每种任务单独指定模型。留空表示使用全局默认（
+              {taskModels ? <code className="rounded bg-gray-100 px-1">{taskModels.default_model}</code> : "加载中"}）。
+            </p>
+            {taskModels ? (
+              <div className="space-y-3">
+                {taskModels.tasks.map((t) => (
+                  <div key={t.key} className="flex items-center gap-2">
+                    <label className="w-36 flex-shrink-0 text-xs text-gray-600">{t.label}</label>
+                    <input
+                      value={taskModelInputs[t.key] ?? ""}
+                      onChange={(e) =>
+                        setTaskModelInputs((prev) => ({ ...prev, [t.key]: e.target.value }))
+                      }
+                      placeholder={taskModels.default_model}
+                      className="flex-1 rounded border px-3 py-1.5 text-sm font-mono focus:border-blue-400 focus:outline-none"
+                    />
+                    <button
+                      onClick={() => saveTaskModel(t.key)}
+                      className="rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700"
+                    >
+                      保存
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-400">加载中…</p>
+            )}
+            {taskModelMsg && <p className="mt-2 text-xs text-green-600">{taskModelMsg}</p>}
           </section>
 
           {/* 域名白名单 */}

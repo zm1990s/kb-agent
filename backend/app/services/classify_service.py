@@ -154,9 +154,9 @@ async def run_classification(session: AsyncSession, task_id: uuid.UUID) -> None:
         )
 
         # 经 engine 让 CLI 读原文（唯一 LLM 出口）；引擎后端取管理员在应用内的选择
-        from app.services.settings_service import get_engine_backend
+        from app.services.settings_service import MODEL_CLASSIFY_KEY, get_engine_backend, get_task_model
 
-        engine = get_engine(await get_engine_backend(session))
+        engine = get_engine(await get_engine_backend(session), model=await get_task_model(session, MODEL_CLASSIFY_KEY))
         from app.storage.base import get_storage
 
         path = await get_storage().open_path(doc.storage_key)

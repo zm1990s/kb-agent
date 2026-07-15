@@ -23,10 +23,11 @@ class EngineError(RuntimeError):
 class ClaudeCliEngine:
     """封装 Claude CLI 子进程调用。"""
 
-    def __init__(self) -> None:
+    def __init__(self, model: str | None = None) -> None:
         settings = get_settings()
         self._cli_path = settings.claude_cli_path
-        self._model = settings.claude_model
+        # model 参数优先；均为空时回退到环境变量 CLAUDE_MODEL
+        self._model = model or settings.claude_model
         self._idle_timeout = settings.engine_idle_timeout_sec
 
     def _build_argv(self, prompt: str, files: list[Path] | None) -> list[str]:

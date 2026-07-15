@@ -12,6 +12,10 @@ from app.core.deps import get_current_user, require_admin
 from app.models.auth import User
 from app.services.settings_service import (
     ENGINE_CATALOG,
+    MODEL_CHAT_KEY,
+    MODEL_CLASSIFY_KEY,
+    MODEL_TITLE_KEY,
+    MODEL_WHATSNEW_KEY,
     PROMPT_CATALOG,
     WHATSNEW_FREQ_DAYS,
     EngineNotAvailableError,
@@ -20,6 +24,7 @@ from app.services.settings_service import (
     get_prompt,
     get_setting,
     get_suggested_questions,
+    get_task_model,
     get_whatsnew_freq,
     get_whatsnew_hour,
     get_workspace_suggested_questions,
@@ -29,6 +34,7 @@ from app.services.settings_service import (
     set_prompt,
     set_setting,
     set_suggested_questions,
+    set_task_model,
     set_whatsnew_freq,
     set_whatsnew_hour,
     set_workspace_suggested_questions,
@@ -395,6 +401,72 @@ async def update_ws_suggested_questions(
     await record_event(session, action="admin_update_ws_suggested_questions", user_id=admin.id,
                        meta={"workspace_id": workspace_id, "count": len(questions)})
     return SuggestedQuestionsOut(questions=questions)
+
+
+# ── 任务级模型配置 ─────────────────────────────────────────────
+
+_TASK_MODEL_LABELS: dict[str, str] = {
+    MODEL_CLASSIFY_KEY: "文档归类模型",
+    MODEL_CHAT_KEY: "对话问答模型",
+    MODEL_WHATSNEW_KEY: "新动态摘要模型",
+    MODEL_TITLE_KEY: "会话标题模型",
+}
+
+
+class TaskModelOut(BaseModel):
+    key: str
+    label: str
+    model: str | None
+
+
+class TaskModelsOut(BaseModel):
+    default_model: str
+    tasks: list[TaskModelOut]
+
+
+class TaskModelIn(BaseModel):
+    model: str | None = None
+
+
+@router.get("/models", response_model=TaskModelsOut)
+async def get_task_models(
+    _admin: User = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+) -> TaskModelsOut:
+    from app.core.config import get_settings
+    default = get_settings().claude_model
+    tasks = []
+    for key, label in _TASK_MODEL_LABELS.items():
+        tasks.append(TaskModelOut(
+            key=key,
+            label=label,
+            model=await get_task_model(session, key),
+        ))
+    return TaskModelsOut(default_model=default, tasks=tasks)
+
+
+@router.put("/models/{key}", response_model=TaskModelOut)
+async def update_task_model(
+    key: str,
+    body: TaskModelIn,
+    admin: User = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+) -> TaskModelOut:
+    if key not in _TASK_MODEL_LABELS:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "未知任务模型 key")
+    try:
+        await set_task_model(session, key, body.model or "")
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+    logger.info("audit admin update_task_model admin=%s key=%s model=%s",
+                admin.id, key, body.model)
+    await record_event(session, action="admin_update_task_model", user_id=admin.id,
+                       meta={"key": key, "model": body.model})
+    return TaskModelOut(
+        key=key,
+        label=_TASK_MODEL_LABELS[key],
+        model=await get_task_model(session, key),
+    )
 
 
 @router.put("/branding", response_model=BrandingOut)

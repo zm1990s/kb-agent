@@ -14,6 +14,12 @@ from app.models.prompt_history import PromptHistory
 from app.models.settings import AppSetting
 
 ENGINE_KEY = "engine_backend"
+
+# ── 任务级模型配置（存储键，值为模型名字符串，空表示使用全局默认）──────────
+MODEL_CLASSIFY_KEY = "model::classify"
+MODEL_CHAT_KEY = "model::chat"
+MODEL_WHATSNEW_KEY = "model::whatsnew"
+MODEL_TITLE_KEY = "model::title"
 WHATSNEW_HOUR_KEY = "whatsnew_schedule_hour"
 WHATSNEW_HOUR_DEFAULT = 2  # 凌晨 2 点
 
@@ -203,6 +209,30 @@ async def set_engine_backend(session: AsyncSession, backend: str) -> None:
     if backend not in _AVAILABLE_IDS:
         raise EngineNotAvailableError(backend)
     await set_setting(session, ENGINE_KEY, backend)
+
+
+# ── 任务级模型配置 ──────────────────────────────────────────────────────────
+
+_TASK_MODEL_KEYS = {MODEL_CLASSIFY_KEY, MODEL_CHAT_KEY, MODEL_WHATSNEW_KEY, MODEL_TITLE_KEY}
+
+
+async def get_task_model(session: AsyncSession, key: str) -> str | None:
+    """取任务模型；未设置时返回 None（调用方应回退到全局默认）。"""
+    return await get_setting(session, key)
+
+
+async def set_task_model(session: AsyncSession, key: str, model: str) -> None:
+    """设置任务模型；传空字符串表示清除（恢复全局默认）。"""
+    if key not in _TASK_MODEL_KEYS:
+        raise ValueError(f"未知任务模型 key: {key!r}")
+    if model:
+        await set_setting(session, key, model)
+    else:
+        # 清除：直接删除记录（设为空字符串语义上等同，但显式删除更干净）
+        row = await session.get(AppSetting, key)
+        if row is not None:
+            await session.delete(row)
+            await session.commit()
 
 
 # ── 提示词管理 ──────────────────────────────────────────────────────────────

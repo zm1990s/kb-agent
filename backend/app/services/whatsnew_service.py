@@ -12,7 +12,13 @@ from app.engine.base import get_engine
 from app.models.auth import Workspace
 from app.models.document import Category, Document
 from app.models.whatsnew import WhatsNewReport
-from app.services.settings_service import WHATSNEW_PROMPT_KEY, get_engine_backend, get_prompt
+from app.services.settings_service import (
+    MODEL_WHATSNEW_KEY,
+    WHATSNEW_PROMPT_KEY,
+    get_engine_backend,
+    get_prompt,
+    get_task_model,
+)
 from app.services.workspace_service import list_my_workspaces
 from app.storage.base import get_storage
 
@@ -77,7 +83,7 @@ async def generate_for_workspace(
     )
 
     backend = await get_engine_backend(session)
-    engine = get_engine(backend)
+    engine = get_engine(backend, model=await get_task_model(session, MODEL_WHATSNEW_KEY))
     result = await engine.complete(prompt)
     summary_md = result.text.strip()
 

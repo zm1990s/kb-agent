@@ -163,12 +163,15 @@ async def answer_question_streamed(
     from app.services.settings_service import (
         ANSWER_FETCH_PROMPT_KEY,
         ANSWER_PROMPT_KEY,
+        MODEL_CHAT_KEY,
         get_engine_backend,
         get_prompt,
+        get_task_model,
     )
 
     yield Stage("thinking", "Agent 正在阅读索引并判断是否需要原文…")
-    engine = get_engine(await get_engine_backend(session))
+    chat_model = await get_task_model(session, MODEL_CHAT_KEY)
+    engine = get_engine(await get_engine_backend(session), model=chat_model)
     hist_text = _format_history(history)
     timestamp = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
 

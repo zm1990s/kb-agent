@@ -164,12 +164,13 @@ async def generate_conversation_title(
     first_message: str,
 ) -> None:
     """用 LLM 为会话生成简短标题（后台任务，失败静默）。"""
-    from app.services.settings_service import get_engine_backend
     from app.engine.base import get_engine
+    from app.services.settings_service import MODEL_TITLE_KEY, get_engine_backend, get_task_model
 
     try:
         engine_backend = await get_engine_backend(session)
-        engine = get_engine(engine_backend)
+        title_model = await get_task_model(session, MODEL_TITLE_KEY)
+        engine = get_engine(engine_backend, model=title_model)
         from app.services.settings_service import TITLE_PROMPT_KEY, get_prompt
         prompt_tpl = await get_prompt(session, TITLE_PROMPT_KEY)
         prompt = prompt_tpl.format(message=first_message[:500])
