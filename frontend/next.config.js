@@ -4,10 +4,9 @@
 const BACKEND_URL = process.env.BACKEND_URL || "http://backend:8000";
 
 const nextConfig = {
-  // 上传文件经 /api/* 反代到后端，默认 10MB 限制会截断大文件（ECONNRESET）
-  middlewareClientMaxBodySize: "200mb",
-
   experimental: {
+    // 上传文件经 /api/* 反代到后端，默认 10MB 限制会截断大文件（ECONNRESET）
+    proxyClientMaxBodySize: "200mb",
     proxyTimeout: 120000,
   },
 
