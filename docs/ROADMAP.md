@@ -11,6 +11,11 @@
 | F1–F11 | 增强批次 | 拖拽、批量/目录上传、全字段展示、用户管理、用户组、RBAC（含 stats 模块）、空间按组授权、分类迁移、体验优化、功能扩展、Agent 增强（两阶段全文拉取、Markdown 正文、时间戳注入、提示词版本管理） | ✅ 已交付 |
 | F12 | 收尾优化 | NavBar 深色主题、管理入口合并（admin+settings）、聊天引导问题（全局 + 每空间独立）、用户角色合并（internal/partner→user，migration 012） | ✅ 已交付 |
 | F13 | 生产部署 | docker-compose.prod.yml（代码烤入镜像，next build 构建阶段完成）、Makefile prod/prod-down、entrypoint.sh 非 root 运行 | ✅ 已交付 |
+| F14 | 前端升级 | Next.js 15→16.2.10 + React 18→19 升级；全部页面/组件兼容 | ✅ 已交付 |
+| F15 | 文档重命名 | `PATCH /documents/{id}/rename` 端点 + 前端文档列表内联重命名 | ✅ 已交付 |
+| F15b | 上传限制 | `proxyClientMaxBodySize: "200mb"`，前端单次上传最大 200 MB | ✅ 已交付 |
+| F16 | 按任务模型配置 | 系统设置新增模型配置面板；`model::classify / chat / whatsnew / title` 四个 `app_settings` key；engine 调用时按 key 读取模型 | ✅ 已交付 |
+| F17 | 国际化（i18n） | next-intl 客户端 i18n；5 语言（zh/zh-TW/en/ja/ko）；NavBar 切换器；localStorage 持久化；DialogProvider 替换 window.confirm/prompt | ✅ 已交付 |
 | M4 | Skill 插拔框架 | SkillBase 抽象、registry、invoke、审批契约 | 预留（未实现） |
 | M5 | SCM 示范 skill | PANW 配置生成，pending_approval→approve→下发 | 预留（未实现） |
 
@@ -148,6 +153,7 @@
 - **Phase 5**：运维/接入收尾（Bedrock 接入、大 PDF 抽取、测试库隔离）✅
 - **Phase 6**：增强批次 F1–F11（拖拽/批量上传/全字段/用户管理/组/RBAC/空间组授权/分类迁移/体验优化/功能扩展/Agent 增强）✅
 - **Phase 6b**：收尾与生产部署 F12–F13（NavBar/管理入口/引导问题/角色合并/生产 Docker）✅
+- **Phase 6c**：功能完善 F14–F17（Next.js 16 升级、文档重命名、上传 200MB 限制、按任务模型配置、5 语言 i18n）✅
 - **Phase 7（未来）**：M4 Skill 框架 → M5 SCM skill
 
 每完成一个 Unit，建议 `git tag M<N>-U<N>-done`，方便回退。

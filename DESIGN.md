@@ -57,6 +57,9 @@ class EngineProtocol(Protocol):
 - **角色显隐**：上传/建空间/建分类/reprocess 等管理功能仅对 admin 显示（仅体验层；后端仍是强制防线）。
 - **页面**：①登录/注册 ②对话查询（答案 + 每条来源的原文下载链接）③文档管理（上传、归类状态、列表、下载）④管理后台（空间授权及配置/用户管理）⑤系统设置（通用/提示词/空间管理/用户管理）⑥数据统计 ⑦新动态 ⑧账户设置。
 - **引擎选择**：管理员在系统设置切换 Agent 引擎，选择持久化于 `app_settings`（键 `engine_backend`），归类/问答运行时按此解析。Claude CLI 可用；Codex / OpenClaw 前端灰显、后端拒绝（`available=false`），为未来预留。
+- **按任务模型配置**：系统设置独立配置归类/对话/新动态/会话标题所用模型，持久化于 `app_settings`（键 `model::classify` / `model::chat` / `model::whatsnew` / `model::title`），engine 调用时按 key 读取；未设则使用引擎默认模型。
+- **国际化**：`next-intl` 客户端 i18n；5 语言（`zh` / `zh-TW` / `en` / `ja` / `ko`）；locale 存 `localStorage`，首次访问按 `navigator.language` 匹配；NavBar 右上角语言切换器；`IntlProvider`（动态加载 `messages/*.json`）+ `LocaleContext`；所有 `window.confirm`/`window.prompt` 替换为 `DialogProvider` 提供的 Promise-based 自定义 Modal。
+- **技术版本**：Next.js 16.2.10 + React 19。
 - **XSS**：LLM 产物（summary/answer）渲染必须净化（SECURITY #6）。
 
 ## 存储抽象层（MVP 本地，未来云）
@@ -115,6 +118,7 @@ class StorageProtocol(Protocol):
 | PATCH | /folders/{id}/move | 改父级（防环） |
 | DELETE | /folders/{id} | 删目录（子级级联，文档移出不删） |
 | PATCH | /documents/{id}/move | 移动文档到目录 |
+| PATCH | /documents/{id}/rename | 重命名文档标题（管理员） |
 | DELETE | /documents/{id} | 删除文档（存储+DB+任务+索引） |
 | POST | /documents/{id}/replace | 替换原文并重新归类 |
 
@@ -145,6 +149,7 @@ class StorageProtocol(Protocol):
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | GET/PUT | /settings/engine | 查/设引擎后端（Claude 可用；Codex/OpenClaw 灰显） |
+| GET/PUT | /settings/models | 查/设各任务模型（`classify` / `chat` / `whatsnew` / `title`，每个 task 独立，持久化 `model::*` key） |
 | GET/POST | /auth/allowed-domains | 注册域名白名单（DB 维护） |
 | DELETE | /auth/allowed-domains/{id} | 删白名单域名 |
 | GET/PUT | /settings/brand | 品牌配置（Logo/名称） |

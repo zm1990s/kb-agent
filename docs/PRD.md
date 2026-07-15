@@ -1,6 +1,6 @@
 # PRD · KB-Agent（内部 + Partner 共享 Agent 知识平台）
 
-> **文档状态**：本 PRD 覆盖 MVP（M1–M3 + 前端 MF）与已交付的增强批次（F1–F11）。
+> **文档状态**：本 PRD 覆盖 MVP（M1–M3 + 前端 MF）与已交付的增强批次（F1–F14）。
 > 权限模型已从「全局角色 + 空间成员」升级为「全局 admin 绕过一切 + 用户组 RBAC + 空间按组授权」。
 
 ## 1. 目标用户与核心场景
@@ -58,6 +58,11 @@
 | F9 | 体验 | 多项体验优化 | 文件名规范化、标签过滤、用户改密、NavBar 品牌化、用量报表+轮询日志、UI 美化 | 各子功能验收均通过 | ✅ |
 | F10 | 功能 | 功能扩展批次 | 忘记密码提示+邮箱添加成员、文件预览、空间删除+打包下载、两段式索引摘要、会话命名+Pin | 各子功能验收均通过 | ✅ |
 | F11 | Agent | Agent 增强 | 两阶段动态拉取全文（Phase 1 摘要判断，Phase 2 按需加载 content_text）；content_text 改为 Markdown 格式；对话/索引提示词注入时间戳；提示词版本管理 | Phase 2 仅在需要时触发；LLM 返回 Markdown 正文；提示词历史可查可回滚 | ✅ |
+| F12 | 前端 | Next.js 16 + React 19 升级 | 前端升级至 Next.js 16.2.10 + React 19；保持全部页面/组件兼容 | `npm run build` 通过，零类型错误 | ✅ |
+| F13 | 文档 | 文档重命名 | `PATCH /documents/{id}/rename`，在文档列表直接修改文档标题 | 成功返回更新后的文档；非成员返 403 | ✅ |
+| F13b | 系统 | 上传大小限制 200 MB | `proxyClientMaxBodySize: "200mb"`（`next.config.js`），前端单次上传上限 200 MB | 超限返 413；200 MB 内正常上传 | ✅ |
+| F14 | 设置 | 按任务模型配置 | 系统设置新增模型配置面板；归类/对话/新动态/会话标题各自独立选模型；持久化于 `app_settings`（键 `model::classify` / `model::chat` / `model::whatsnew` / `model::title`） | 管理员在 UI 选模型后立即生效；各任务调用 engine 时读取对应 key | ✅ |
+| F15 | 前端 | 国际化（i18n） | 5 语言支持（简体中文/繁体中文/English/日本語/한국어）；客户端切换无需刷新；localStorage 持久化；首次访问按浏览器语言自动匹配；NavBar 语言切换器 | 切换语言后全部 UI 文字即时更新；刷新保持语言选择；所有 window.confirm/prompt 替换为自定义 Modal | ✅ |
 
 ## 3. 明确的 Out of Scope（本次不做）
 - 向量检索 / pgvector（先不上；对话已改为「全空间结构化索引喂 Claude」智能问答，非向量召回）
@@ -66,7 +71,7 @@
 - OpenClaw / Codex 引擎接入（预留 Protocol + 前端灰显，未来实现）
 - 云对象存储（当前用本地文件系统，经 StorageProtocol 抽象，未来换 S3/OSS）
 - 文档在线协同编辑、版本历史
-- 前端高级特性（SSR 数据预取优化、i18n、主题定制）
+- 前端高级特性（SSR 数据预取优化、URL 路由级 i18n、主题定制）
 
 ## 4. 已决策（原待确认问题）
 | # | 问题 | 决策 |
@@ -80,7 +85,7 @@
 ## 4b. 已决策（原待确认，实现时敲定）
 | # | 问题 | 决策 |
 |---|------|------|
-| Q2 | Claude 模型/超时/大文件 | 模型由管理员在**系统设置**选（引擎配置持久化 DB）；超时改为**闲置超时** `ENGINE_IDLE_TIMEOUT_SEC`（默认 60s，仅在无输出时计时，重置于每个输出块）；**放开 Claude 全部工具**（含 Bash），大 PDF 由 CLI 调 `pdftotext` 抽取 |
+| Q2 | Claude 模型/超时/大文件 | 模型由管理员在**系统设置**按任务独立选择（归类/对话/新动态/会话标题各一个 `model::*` key，持久化 DB）；超时改为**闲置超时** `ENGINE_IDLE_TIMEOUT_SEC`（默认 60s，仅在无输出时计时，重置于每个输出块）；**放开 Claude 全部工具**（含 Bash），大 PDF 由 CLI 调 `pdftotext` 抽取 |
 | Q6 | 后台任务承载 | **进程内 asyncio**（不引入 redis），靠 `processing_tasks` 表可查进度 + 失败重试弥补重启丢失 |
 | Q7 | 下载端点鉴权 | **复用 JWT + workspace 成员校验**，下载响应 `Content-Disposition: attachment` + `nosniff` |
 | Q8 | 用户组权限时机 | 权限绑用户组；用户取所属组权限并集最高；admin 绕过 |
