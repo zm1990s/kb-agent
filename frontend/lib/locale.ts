@@ -1,4 +1,4 @@
-export const LOCALES = ['zh', 'zh-TW', 'en', 'ja'] as const;
+export const LOCALES = ['zh', 'zh-TW', 'en', 'ja', 'ko'] as const;
 export type Locale = (typeof LOCALES)[number];
 
 const LS_KEY = 'locale';
@@ -9,6 +9,7 @@ function browserLocale(): Locale {
   if (lang.startsWith('zh-TW') || lang.startsWith('zh-HK') || lang.startsWith('zh-MO')) return 'zh-TW';
   if (lang.startsWith('zh')) return 'zh';
   if (lang.startsWith('ja')) return 'ja';
+  if (lang.startsWith('ko')) return 'ko';
   if (lang.startsWith('en')) return 'en';
   return 'zh';
 }
@@ -32,6 +33,7 @@ export function toDateLocale(locale: Locale): string {
     'zh-TW': 'zh-TW',
     'en': 'en-US',
     'ja': 'ja-JP',
+    'ko': 'ko-KR',
   };
   return map[locale];
 }
