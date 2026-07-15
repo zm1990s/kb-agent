@@ -174,6 +174,18 @@ export default function DocumentsPage() {
     }
   }
 
+  async function renameDoc(d: Doc) {
+    const title = window.prompt("重命名文件", d.title);
+    if (!title || title === d.title) return;
+    setError(null);
+    try {
+      await api.patch(`/documents/${d.id}/rename`, { title });
+      await loadDocs();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "重命名失败");
+    }
+  }
+
   async function deleteFolder(id: string) {
     if (
       !workspaceId ||
@@ -696,6 +708,12 @@ export default function DocumentsPage() {
                       )}
                       {admin && (
                         <>
+                          <button
+                            onClick={() => renameDoc(d)}
+                            className="mr-1 rounded bg-gray-100 px-2 py-1 text-xs text-gray-700 hover:bg-gray-200"
+                          >
+                            重命名
+                          </button>
                           <button
                             onClick={() => triggerReplace(d.id)}
                             className="mr-1 rounded bg-gray-100 px-2 py-1 text-xs text-gray-700 hover:bg-gray-200"

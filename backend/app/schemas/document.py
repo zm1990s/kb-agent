@@ -70,6 +70,10 @@ class FolderPublic(BaseModel):
     parent_id: uuid.UUID | None
 
 
+class DocumentRename(BaseModel):
+    title: str = Field(min_length=1, max_length=500)
+
+
 class DocumentMove(BaseModel):
     folder_id: uuid.UUID | None = None
 

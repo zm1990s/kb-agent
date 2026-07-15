@@ -108,6 +108,13 @@ async def move_document(
     return doc
 
 
+async def rename_document(session: AsyncSession, *, doc: Document, title: str) -> Document:
+    doc.title = title
+    await session.commit()
+    await session.refresh(doc)
+    return doc
+
+
 async def delete_document(session: AsyncSession, *, doc: Document) -> None:
     """删除文档：先提交 DB 删除，再删存储文件，避免文件删后 DB 回滚造成僵尸记录。"""
     storage_key = doc.storage_key

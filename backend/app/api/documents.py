@@ -26,6 +26,7 @@ from app.models.document import Document
 from app.schemas.document import (
     DocumentMove,
     DocumentPublic,
+    DocumentRename,
     DocumentUploadAccepted,
     ProcessingTaskPublic,
     ReprocessAccepted,
@@ -36,6 +37,7 @@ from app.services.document_service import (
     list_document_tasks,
     list_documents,
     move_document,
+    rename_document,
     replace_document_content,
     upload_document,
 )
@@ -201,6 +203,20 @@ async def move_doc(
         if folder is None:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "目标目录不存在")
     doc = await move_document(session, doc=doc, folder_id=body.folder_id)
+    return DocumentPublic.model_validate(doc)
+
+
+@router.patch("/documents/{document_id}/rename", response_model=DocumentPublic)
+async def rename_doc(
+    document_id: uuid.UUID,
+    body: DocumentRename,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> DocumentPublic:
+    doc = await _get_doc_for_member(session, document_id, current_user)
+    if current_user.role != "admin":
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "需要管理员权限")
+    doc = await rename_document(session, doc=doc, title=body.title)
     return DocumentPublic.model_validate(doc)
 
 
