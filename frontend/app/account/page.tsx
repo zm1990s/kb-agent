@@ -2,12 +2,14 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import NavBar from "@/components/NavBar";
 import { api, ApiError } from "@/lib/api";
 import { clearAuth, getEmail, isAdmin } from "@/lib/auth";
 import { useAuthGuard } from "@/lib/useAuthGuard";
 
 export default function AccountPage() {
+  const t = useTranslations("account");
   const ready = useAuthGuard();
   const router = useRouter();
   const email = getEmail();
@@ -31,15 +33,15 @@ export default function AccountPage() {
   async function submitPassword(e: React.FormEvent) {
     e.preventDefault();
     setPwdError(null);
-    if (next !== confirmPwd) { setPwdError("两次输入的新密码不一致"); return; }
-    if (next.length < 8) { setPwdError("新密码至少 8 位"); return; }
+    if (next !== confirmPwd) { setPwdError(t("err_mismatch")); return; }
+    if (next.length < 8) { setPwdError(t("err_too_short")); return; }
     setPwdLoading(true);
     try {
       await api.post("/auth/change-password", { current_password: current, new_password: next });
       setPwdSuccess(true);
       setCurrent(""); setNext(""); setConfirmPwd("");
     } catch (err) {
-      setPwdError(err instanceof ApiError ? err.message : "修改失败");
+      setPwdError(err instanceof ApiError ? err.message : t("change_failed"));
     } finally {
       setPwdLoading(false);
     }
@@ -53,7 +55,7 @@ export default function AccountPage() {
       clearAuth();
       router.replace("/login");
     } catch (err) {
-      setDeleteError(err instanceof ApiError ? err.message : "注销失败");
+      setDeleteError(err instanceof ApiError ? err.message : t("deactivate_failed"));
       setDeleteLoading(false);
     }
   }
@@ -62,39 +64,39 @@ export default function AccountPage() {
     <div className="flex min-h-screen flex-col bg-gray-50">
       <NavBar />
       <main className="mx-auto w-full max-w-lg flex-1 px-4 py-8">
-        <h1 className="mb-6 text-lg font-semibold text-gray-900">账户管理</h1>
+        <h1 className="mb-6 text-lg font-semibold text-gray-900">{t("title")}</h1>
 
         {/* 基本信息 */}
         <section className="mb-6 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-          <h2 className="mb-3 text-sm font-medium text-gray-700">基本信息</h2>
+          <h2 className="mb-3 text-sm font-medium text-gray-700">{t("basic_info")}</h2>
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-600 text-sm font-semibold text-white">
               {(email ?? "U")[0].toUpperCase()}
             </div>
             <div>
               <p className="text-sm font-medium text-gray-900">{email ?? "—"}</p>
-              <p className="text-xs text-gray-400">{admin ? "管理员" : "普通用户"}</p>
+              <p className="text-xs text-gray-400">{admin ? t("admin_role") : t("user_role")}</p>
             </div>
           </div>
         </section>
 
         {/* 修改密码 */}
         <section className="mb-6 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-          <h2 className="mb-4 text-sm font-medium text-gray-700">修改密码</h2>
+          <h2 className="mb-4 text-sm font-medium text-gray-700">{t("change_password")}</h2>
           {pwdSuccess ? (
             <div className="flex items-center gap-2 rounded-lg bg-green-50 px-4 py-3 text-sm text-green-700">
               <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
               </svg>
-              密码已修改成功。
+              {t("password_success")}
               <button onClick={() => setPwdSuccess(false)} className="ml-auto text-xs text-green-600 underline">
-                再次修改
+                {t("modify_again")}
               </button>
             </div>
           ) : (
             <form onSubmit={submitPassword} className="space-y-4">
               <div>
-                <label className="mb-1.5 block text-xs font-medium text-gray-600">当前密码</label>
+                <label className="mb-1.5 block text-xs font-medium text-gray-600">{t("current_password")}</label>
                 <input
                   type="password"
                   required
@@ -104,7 +106,7 @@ export default function AccountPage() {
                 />
               </div>
               <div>
-                <label className="mb-1.5 block text-xs font-medium text-gray-600">新密码（至少 8 位）</label>
+                <label className="mb-1.5 block text-xs font-medium text-gray-600">{t("new_password")}</label>
                 <input
                   type="password"
                   required
@@ -115,7 +117,7 @@ export default function AccountPage() {
                 />
               </div>
               <div>
-                <label className="mb-1.5 block text-xs font-medium text-gray-600">确认新密码</label>
+                <label className="mb-1.5 block text-xs font-medium text-gray-600">{t("confirm_password")}</label>
                 <input
                   type="password"
                   required
@@ -134,7 +136,7 @@ export default function AccountPage() {
                 disabled={pwdLoading}
                 className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 transition-colors"
               >
-                {pwdLoading ? "保存中…" : "保存新密码"}
+                {pwdLoading ? t("saving") : t("save_password")}
               </button>
             </form>
           )}
@@ -143,20 +145,20 @@ export default function AccountPage() {
         {/* 注销账号 */}
         {!admin && (
           <section className="rounded-xl border border-red-100 bg-white p-6 shadow-sm">
-            <h2 className="mb-1 text-sm font-medium text-gray-700">注销账号</h2>
+            <h2 className="mb-1 text-sm font-medium text-gray-700">{t("deactivate")}</h2>
             <p className="mb-4 text-xs text-gray-500">
-              永久删除您的账号及所有相关数据，此操作无法恢复。
+              {t("deactivate_desc")}
             </p>
             {!showDelete ? (
               <button
                 onClick={() => setShowDelete(true)}
                 className="rounded-lg border border-red-300 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
               >
-                注销账号…
+                {t("deactivate_btn")}
               </button>
             ) : (
               <div className="rounded-lg border border-red-200 bg-red-50 p-4">
-                <p className="mb-3 text-sm text-red-700">确认要永久删除账号「{email}」吗？</p>
+                <p className="mb-3 text-sm text-red-700">{t("deactivate_confirm", { email: email ?? "" })}</p>
                 {deleteError && (
                   <p className="mb-2 text-xs text-red-700">{deleteError}</p>
                 )}
@@ -166,27 +168,27 @@ export default function AccountPage() {
                     disabled={deleteLoading}
                     className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-gray-600 hover:bg-gray-50"
                   >
-                    取消
+                    {t("cancel")}
                   </button>
                   <button
                     onClick={confirmDelete}
                     disabled={deleteLoading}
                     className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50 transition-colors"
                   >
-                    {deleteLoading ? "处理中…" : "确认注销"}
+                    {deleteLoading ? t("processing") : t("confirm_deactivate")}
                   </button>
                 </div>
               </div>
             )}
             {admin && (
-              <p className="text-xs text-gray-400">管理员账号不可自助注销，请联系其他管理员操作。</p>
+              <p className="text-xs text-gray-400">{t("admin_cannot_deactivate")}</p>
             )}
           </section>
         )}
         {admin && (
           <section className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-            <h2 className="mb-1 text-sm font-medium text-gray-700">注销账号</h2>
-            <p className="text-xs text-gray-400">管理员账号不可自助注销，请联系其他管理员操作。</p>
+            <h2 className="mb-1 text-sm font-medium text-gray-700">{t("deactivate")}</h2>
+            <p className="text-xs text-gray-400">{t("admin_cannot_deactivate")}</p>
           </section>
         )}
       </main>

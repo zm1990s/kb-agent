@@ -2,12 +2,14 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { api, ApiError } from "@/lib/api";
 import { setAuth } from "@/lib/auth";
 import type { TokenResponse, UserPublic } from "@/lib/types";
 
 export default function LoginPage() {
   const router = useRouter();
+  const t = useTranslations("login");
   const [mode, setMode] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -27,12 +29,12 @@ export default function LoginPage() {
       router.replace("/chat");
     } catch (err) {
       if (err instanceof ApiError) {
-        if (err.status === 403) setError("邮箱域名不在允许列表内");
-        else if (err.status === 409) setError("该邮箱已注册");
-        else if (err.status === 401) setError("邮箱或密码错误");
+        if (err.status === 403) setError(t("err_domain"));
+        else if (err.status === 409) setError(t("err_duplicate"));
+        else if (err.status === 401) setError(t("err_credentials"));
         else setError(err.message);
       } else {
-        setError("网络错误，请重试");
+        setError(t("err_credentials"));
       }
     } finally {
       setBusy(false);
@@ -49,9 +51,9 @@ export default function LoginPage() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
             </svg>
           </div>
-          <h1 className="text-xl font-semibold text-gray-900">KB-Agent</h1>
+          <h1 className="text-xl font-semibold text-gray-900">{t("title")}</h1>
           <p className="mt-1 text-sm text-gray-500">
-            {mode === "login" ? "登录到知识平台" : "注册新账号"}
+            {mode === "login" ? t("subtitle_login") : t("subtitle_register")}
           </p>
         </div>
 
@@ -59,7 +61,7 @@ export default function LoginPage() {
         <div className="rounded-xl border border-gray-200 bg-white p-8 shadow-sm">
           <form onSubmit={onSubmit} className="space-y-4">
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-700">邮箱</label>
+              <label className="mb-1.5 block text-sm font-medium text-gray-700">{t("email")}</label>
               <input
                 type="email"
                 required
@@ -70,7 +72,7 @@ export default function LoginPage() {
               />
             </div>
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-700">密码</label>
+              <label className="mb-1.5 block text-sm font-medium text-gray-700">{t("password")}</label>
               <input
                 type="password"
                 required
@@ -78,7 +80,7 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
-                placeholder="至少 8 位"
+                placeholder={t("password_placeholder")}
               />
             </div>
 
@@ -93,14 +95,12 @@ export default function LoginPage() {
               disabled={busy}
               className="w-full rounded-lg bg-blue-600 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 transition-colors"
             >
-              {busy ? "处理中…" : mode === "login" ? "登录" : "注册并登录"}
+              {busy ? t("processing") : mode === "login" ? t("submit_login") : t("submit_register")}
             </button>
 
             {mode === "login" && (
               <p className="text-center text-xs text-gray-400">
-                忘记密码？请与{" "}
-                <span className="text-gray-600">Palo Alto Networks 渠道团队</span>
-                {" "}联系重置密码
+                {t("forgot_password", { team: t("team_name") })}
               </p>
             )}
           </form>
@@ -113,7 +113,7 @@ export default function LoginPage() {
               }}
               className="w-full text-center text-sm text-blue-600 hover:text-blue-700 hover:underline transition-colors"
             >
-              {mode === "login" ? "没有账号？去注册" : "已有账号？去登录"}
+              {mode === "login" ? t("switch_to_register") : t("switch_to_login")}
             </button>
           </div>
         </div>

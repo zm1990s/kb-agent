@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import Image from "next/image";
 import PromptsTab from "@/components/admin/PromptsTab";
 import UserAdmin from "@/components/admin/UserAdmin";
@@ -39,6 +40,7 @@ interface Props {
 }
 
 export default function SystemSettings({ perms }: Props) {
+  const t = useTranslations("settings");
   const isAdmin = perms === undefined || perms === null;
   const canSee = (module: string) => isAdmin || (perms?.[module] ?? "none") !== "none";
 
@@ -142,7 +144,7 @@ export default function SystemSettings({ perms }: Props) {
       setDomainName("");
       await loadDomains();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "添加失败");
+      setError(err instanceof ApiError ? err.message : t("add_failed"));
     }
   }
 
@@ -152,7 +154,7 @@ export default function SystemSettings({ perms }: Props) {
       await api.del(`/auth/allowed-domains/${id}`);
       await loadDomains();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "删除失败");
+      setError(err instanceof ApiError ? err.message : t("delete_failed"));
     }
   }
 
@@ -166,17 +168,17 @@ export default function SystemSettings({ perms }: Props) {
         logo_url: brandingLogo,
       });
       setBranding(updated);
-      setBrandingMsg("品牌配置已保存，刷新页面生效");
+      setBrandingMsg(t("branding_saved"));
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "保存失败");
+      setError(err instanceof ApiError ? err.message : t("save_failed"));
     }
   }
 
   const FREQ_LABELS: Record<string, string> = {
-    daily: "每天",
-    weekly: "每周",
-    biweekly: "每两周",
-    monthly: "每月",
+    daily: t("freq_daily"),
+    weekly: t("freq_weekly"),
+    biweekly: t("freq_biweekly"),
+    monthly: t("freq_monthly"),
   };
 
   async function saveWnSchedule(e: React.FormEvent) {
@@ -190,9 +192,9 @@ export default function SystemSettings({ perms }: Props) {
       );
       setWnHour(d.hour);
       setWnFreq(d.frequency);
-      setWnMsg(`新动态将${FREQ_LABELS[d.frequency] ?? d.frequency}在 ${d.hour}:00 UTC 生成`);
+      setWnMsg(t("whatsnew_saved", { freq: FREQ_LABELS[d.frequency] ?? d.frequency, hour: d.hour }));
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "保存失败");
+      setError(err instanceof ApiError ? err.message : t("save_failed"));
     }
   }
 
@@ -202,9 +204,9 @@ export default function SystemSettings({ perms }: Props) {
     setError(null);
     try {
       await api.post("/whatsnew/trigger", {});
-      setWnMsg("摘要生成任务已提交，请稍后在新动态页面查看结果。");
+      setWnMsg(t("whatsnew_trigger_success"));
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "触发失败");
+      setError(err instanceof ApiError ? err.message : t("trigger_failed"));
     } finally {
       setWnTriggering(false);
     }
@@ -217,9 +219,9 @@ export default function SystemSettings({ perms }: Props) {
       const model = taskModelInputs[key]?.trim() || null;
       await api.put(`/settings/models/${key}`, { model });
       await loadTaskModels();
-      setTaskModelMsg("模型配置已保存");
+      setTaskModelMsg(t("task_model_saved"));
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "保存失败");
+      setError(err instanceof ApiError ? err.message : t("save_failed"));
     }
   }
 
@@ -229,9 +231,9 @@ export default function SystemSettings({ perms }: Props) {
     try {
       const updated = await api.put<EngineConfig>("/settings/engine", { backend });
       setEngine(updated);
-      setEngineMsg("引擎已更新");
+      setEngineMsg(t("engine_updated"));
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "更新失败");
+      setError(err instanceof ApiError ? err.message : t("update_failed"));
     }
   }
 
@@ -243,9 +245,9 @@ export default function SystemSettings({ perms }: Props) {
       const questions = sqText.split("\n").map((q) => q.trim()).filter(Boolean);
       const updated = await api.put<{ questions: string[] }>("/settings/suggested-questions", { questions });
       setSqText(updated.questions.join("\n"));
-      setSqMsg(`已保存 ${updated.questions.length} 条引导问题`);
+      setSqMsg(t("suggested_saved", { count: updated.questions.length }));
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "保存失败");
+      setError(err instanceof ApiError ? err.message : t("save_failed"));
     }
   }
 
@@ -254,22 +256,22 @@ export default function SystemSettings({ perms }: Props) {
       {/* 标签切换：按权限过滤 */}
       <div className="mb-4 flex gap-1 border-b">
         {([
-          ["workspaces", "空间管理"],
-          ["users", "用户管理"],
-          ["general", "系统设置"],
-          ["prompts", "内置提示词管理"],
+          ["workspaces", t("tab_workspaces")],
+          ["users", t("tab_users")],
+          ["general", t("tab_general")],
+          ["prompts", t("tab_prompts")],
         ] as [Tab, string][])
-          .filter(([t]) => {
-            if (t === "workspaces") return canSee("workspaces");
-            if (t === "users") return canSee("users");
+          .filter(([tabKey]) => {
+            if (tabKey === "workspaces") return canSee("workspaces");
+            if (tabKey === "users") return canSee("users");
             return isAdmin; // general / prompts 仅管理员
           })
-          .map(([t, label]) => (
+          .map(([tabKey, label]) => (
             <button
-              key={t}
-              onClick={() => { setTab(t); setError(null); setBrandingMsg(null); setEngineMsg(null); }}
+              key={tabKey}
+              onClick={() => { setTab(tabKey); setError(null); setBrandingMsg(null); setEngineMsg(null); }}
               className={`px-4 py-2 text-sm ${
-                tab === t
+                tab === tabKey
                   ? "border-b-2 border-blue-600 font-medium text-blue-700"
                   : "text-gray-500 hover:text-gray-800"
               }`}
@@ -287,11 +289,11 @@ export default function SystemSettings({ perms }: Props) {
         <div className="space-y-6">
           {/* 平台品牌配置 */}
           <section className="rounded border bg-white p-4">
-            <h2 className="mb-1 text-sm font-medium">平台品牌</h2>
-            <p className="mb-3 text-xs text-gray-400">自定义左上角显示的平台名称和 Logo。</p>
+            <h2 className="mb-1 text-sm font-medium">{t("branding_title")}</h2>
+            <p className="mb-3 text-xs text-gray-400">{t("branding_desc")}</p>
             <form onSubmit={saveBranding} className="space-y-3">
               <div>
-                <label className="mb-1 block text-xs text-gray-500">平台名称</label>
+                <label className="mb-1 block text-xs text-gray-500">{t("branding_name_label")}</label>
                 <input
                   value={brandingName}
                   onChange={(e) => setBrandingName(e.target.value)}
@@ -300,7 +302,7 @@ export default function SystemSettings({ perms }: Props) {
                 />
               </div>
               <div>
-                <label className="mb-1 block text-xs text-gray-500">Logo 图片 URL（留空使用默认缩写）</label>
+                <label className="mb-1 block text-xs text-gray-500">{t("branding_logo_label")}</label>
                 <input
                   value={brandingLogo}
                   onChange={(e) => setBrandingLogo(e.target.value)}
@@ -311,7 +313,7 @@ export default function SystemSettings({ perms }: Props) {
               {branding.logo_url && (
                 <Image
                   src={branding.logo_url}
-                  alt="logo 预览"
+                  alt="logo preview"
                   width={40}
                   height={40}
                   className="h-10 w-10 rounded object-contain"
@@ -322,7 +324,7 @@ export default function SystemSettings({ perms }: Props) {
                 type="submit"
                 className="rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700"
               >
-                保存品牌配置
+                {t("branding_save")}
               </button>
             </form>
             {brandingMsg && <p className="mt-2 text-xs text-green-600">{brandingMsg}</p>}
@@ -330,9 +332,9 @@ export default function SystemSettings({ perms }: Props) {
 
           {/* 引擎配置 */}
           <section className="rounded border bg-white p-4">
-            <h2 className="mb-1 text-sm font-medium">Agent 引擎</h2>
+            <h2 className="mb-1 text-sm font-medium">{t("engine_title")}</h2>
             <p className="mb-3 text-xs text-gray-400">
-              选择处理归类与问答的后端。未实现的选项不可选。
+              {t("engine_desc")}
             </p>
             <div className="space-y-2">
               {engine?.options.map((o) => (
@@ -353,66 +355,65 @@ export default function SystemSettings({ perms }: Props) {
                   />
                   {o.label}
                   {engine.current === o.id && (
-                    <span className="ml-auto text-xs text-blue-600">当前</span>
+                    <span className="ml-auto text-xs text-blue-600">{t("engine_current")}</span>
                   )}
                 </label>
               ))}
-              {!engine && <p className="text-sm text-gray-400">加载中…</p>}
+              {!engine && <p className="text-sm text-gray-400">{t("engine_loading")}</p>}
             </div>
             {engineMsg && <p className="mt-2 text-xs text-green-600">{engineMsg}</p>}
           </section>
 
           {/* 任务级模型配置 */}
           <section className="rounded border bg-white p-4">
-            <h2 className="mb-1 text-sm font-medium">任务模型配置</h2>
+            <h2 className="mb-1 text-sm font-medium">{t("task_model_title")}</h2>
             <p className="mb-3 text-xs text-gray-400">
-              为每种任务单独指定模型。留空表示使用全局默认（
-              {taskModels ? <code className="rounded bg-gray-100 px-1">{taskModels.default_model}</code> : "加载中"}）。
+              {t("task_model_desc", { default: taskModels ? taskModels.default_model : t("task_model_loading") })}
             </p>
             {taskModels ? (
               <div className="space-y-3">
-                {taskModels.tasks.map((t) => (
-                  <div key={t.key} className="flex items-center gap-2">
-                    <label className="w-36 flex-shrink-0 text-xs text-gray-600">{t.label}</label>
+                {taskModels.tasks.map((task) => (
+                  <div key={task.key} className="flex items-center gap-2">
+                    <label className="w-36 flex-shrink-0 text-xs text-gray-600">{task.label}</label>
                     <input
-                      value={taskModelInputs[t.key] ?? ""}
+                      value={taskModelInputs[task.key] ?? ""}
                       onChange={(e) =>
-                        setTaskModelInputs((prev) => ({ ...prev, [t.key]: e.target.value }))
+                        setTaskModelInputs((prev) => ({ ...prev, [task.key]: e.target.value }))
                       }
                       placeholder={taskModels.default_model}
                       className="flex-1 rounded border px-3 py-1.5 text-sm font-mono focus:border-blue-400 focus:outline-none"
                     />
                     <button
-                      onClick={() => saveTaskModel(t.key)}
+                      onClick={() => saveTaskModel(task.key)}
                       className="rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700"
                     >
-                      保存
+                      {t("whatsnew_save")}
                     </button>
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-gray-400">加载中…</p>
+              <p className="text-sm text-gray-400">{t("task_model_loading")}</p>
             )}
             {taskModelMsg && <p className="mt-2 text-xs text-green-600">{taskModelMsg}</p>}
           </section>
 
           {/* 域名白名单 */}
           <section className="rounded border bg-white p-4">
-            <h2 className="mb-1 text-sm font-medium">注册域名白名单</h2>
+            <h2 className="mb-1 text-sm font-medium">{t("domain_title")}</h2>
             <p className="mb-3 text-xs text-gray-400">
-              空 = 全拒绝注册。仅列出的域名邮箱可注册（完整域名相等匹配）。
+              {t("domain_desc")}
             </p>
             <form onSubmit={addDomain} className="mb-3 flex gap-2">
               <input
                 value={domainName}
                 onChange={(e) => setDomainName(e.target.value)}
-                placeholder="例如 company.com"
+                placeholder={t("domain_placeholder")}
                 required
                 className="flex-1 rounded border px-3 py-2 text-sm"
               />
               <button className="rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700">
-                添加域名
+                {t("domain_add")}
               </button>
             </form>
             <ul className="space-y-1 text-sm text-gray-700">
@@ -426,25 +427,25 @@ export default function SystemSettings({ perms }: Props) {
                     onClick={() => deleteDomain(d.id)}
                     className="text-xs text-red-600 hover:underline"
                   >
-                    删除
+                    {t("domain_delete")}
                   </button>
                 </li>
               ))}
               {domains.length === 0 && (
-                <li className="text-gray-400">暂无域名（当前无人可注册）</li>
+                <li className="text-gray-400">{t("domain_none")}</li>
               )}
             </ul>
           </section>
 
           {/* 新动态定时 */}
           <section className="rounded border bg-white p-4">
-            <h2 className="mb-1 text-sm font-medium">新动态定时</h2>
+            <h2 className="mb-1 text-sm font-medium">{t("whatsnew_title")}</h2>
             <p className="mb-3 text-xs text-gray-400">
-              当前配置：{FREQ_LABELS[wnFreq] ?? wnFreq}在 {wnHour}:00 UTC 自动生成一次摘要。
+              {t("whatsnew_current", { freq: FREQ_LABELS[wnFreq] ?? wnFreq, hour: wnHour })}
             </p>
             <form onSubmit={saveWnSchedule} className="flex flex-wrap items-end gap-3">
               <div>
-                <label className="mb-1 block text-xs text-gray-500">生成频率</label>
+                <label className="mb-1 block text-xs text-gray-500">{t("whatsnew_freq_label")}</label>
                 <select
                   value={wnFreqInput}
                   onChange={(e) => setWnFreqInput(e.target.value)}
@@ -456,7 +457,7 @@ export default function SystemSettings({ perms }: Props) {
                 </select>
               </div>
               <div>
-                <label className="mb-1 block text-xs text-gray-500">触发整点（UTC 0–23）</label>
+                <label className="mb-1 block text-xs text-gray-500">{t("whatsnew_hour_label")}</label>
                 <input
                   type="number"
                   min={0}
@@ -470,17 +471,17 @@ export default function SystemSettings({ perms }: Props) {
                 type="submit"
                 className="rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700"
               >
-                保存
+                {t("whatsnew_save")}
               </button>
             </form>
             <div className="mt-4 border-t border-gray-100 pt-4">
-              <p className="mb-2 text-xs text-gray-400">手动触发一次摘要生成（用于测试）</p>
+              <p className="mb-2 text-xs text-gray-400">{t("whatsnew_trigger_label")}</p>
               <button
                 onClick={triggerWnNow}
                 disabled={wnTriggering}
                 className="rounded border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
               >
-                {wnTriggering ? "生成中…" : "立即生成"}
+                {wnTriggering ? t("whatsnew_triggering") : t("whatsnew_trigger")}
               </button>
               {wnMsg && <p className="mt-2 text-xs text-green-600">{wnMsg}</p>}
             </div>
@@ -488,9 +489,9 @@ export default function SystemSettings({ perms }: Props) {
 
           {/* 引导问题 */}
           <section className="rounded border bg-white p-4">
-            <h2 className="mb-1 text-sm font-medium">聊天引导问题</h2>
+            <h2 className="mb-1 text-sm font-medium">{t("suggested_title")}</h2>
             <p className="mb-3 text-xs text-gray-400">
-              新对话空白页展示的快捷问题，点击即发送。每行一条，最多 10 条。
+              {t("suggested_desc")}
             </p>
             <form onSubmit={saveSuggestedQuestions} className="space-y-3">
               <textarea
@@ -504,7 +505,7 @@ export default function SystemSettings({ perms }: Props) {
                 type="submit"
                 className="rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700"
               >
-                保存引导问题
+                {t("suggested_save")}
               </button>
             </form>
             {sqMsg && <p className="mt-2 text-xs text-green-600">{sqMsg}</p>}

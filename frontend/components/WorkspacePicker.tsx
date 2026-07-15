@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import { api } from "@/lib/api";
 import type { Workspace } from "@/lib/types";
 
@@ -11,6 +12,7 @@ interface Props {
 
 // 空间下拉选择器。加载当前用户可见空间；无空间时提示。
 export default function WorkspacePicker({ value, onChange }: Props) {
+  const t = useTranslations("workspacePicker");
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -24,9 +26,9 @@ export default function WorkspacePicker({ value, onChange }: Props) {
       .finally(() => setLoading(false));
   }, [onChange, value]);
 
-  if (loading) return <span className="text-sm text-gray-400">加载空间…</span>;
+  if (loading) return <span className="text-sm text-gray-400">{t("loading")}</span>;
   if (workspaces.length === 0)
-    return <span className="text-sm text-gray-500">暂无可用空间</span>;
+    return <span className="text-sm text-gray-500">{t("no_workspaces")}</span>;
 
   return (
     <select

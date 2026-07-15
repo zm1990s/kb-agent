@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import ConversationSidebar from "@/components/ConversationSidebar";
 import MessageBubble from "@/components/MessageBubble";
 import NavBar from "@/components/NavBar";
@@ -30,6 +31,7 @@ interface DonePayload {
 const SESSION_KEY = "chat_state";
 
 export default function ChatPage() {
+  const t = useTranslations("chat");
   const ready = useAuthGuard();
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
@@ -139,7 +141,7 @@ export default function ChatPage() {
         }))
       );
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "加载会话失败");
+      setError(err instanceof ApiError ? err.message : t("load_failed"));
     }
   }
 
@@ -160,7 +162,7 @@ export default function ChatPage() {
     setError(null);
     setInterrupted(false);
     setBusy(true);
-    setStage("正在准备…");
+    setStage(t("preparing"));
 
     const ac = new AbortController();
     abortRef.current = ac;
@@ -193,7 +195,7 @@ export default function ChatPage() {
       if (err instanceof DOMException && err.name === "AbortError") {
         // user stopped — keep turns as-is
       } else {
-        setError(err instanceof ApiError ? err.message : "请求失败");
+        setError(err instanceof ApiError ? err.message : t("request_failed"));
       }
     } finally {
       setBusy(false);
@@ -241,7 +243,7 @@ export default function ChatPage() {
       a.click();
       URL.revokeObjectURL(url);
     } catch {
-      setError("下载失败");
+      setError(t("download_failed"));
     }
   }
 
@@ -251,7 +253,7 @@ export default function ChatPage() {
 
       {/* Workspace toolbar */}
       <div className="flex items-center gap-3 border-b border-gray-200 bg-white px-4 py-2 shadow-sm">
-        <span className="text-sm text-gray-500">空间：</span>
+        <span className="text-sm text-gray-500">{t("workspace_label")}</span>
         <WorkspacePicker value={workspaceId} onChange={setWorkspaceId} />
       </div>
 
@@ -287,8 +289,8 @@ export default function ChatPage() {
                     <path strokeLinecap="round" strokeLinejoin="round" d="M8.625 9.75a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375m-13.5 3.01c0 1.6 1.123 2.994 2.707 3.227 1.087.16 2.185.283 3.293.369V21l4.184-4.183a1.14 1.14 0 01.778-.332 48.294 48.294 0 005.83-.498c1.585-.233 2.708-1.626 2.708-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z" />
                   </svg>
                 </div>
-                <p className="text-sm font-medium text-gray-600">向知识库提问</p>
-                <p className="mt-1 text-xs text-gray-400">AI 会基于文档智能作答并附上原文来源</p>
+                <p className="text-sm font-medium text-gray-600">{t("ask_title")}</p>
+                <p className="mt-1 text-xs text-gray-400">{t("ask_subtitle")}</p>
                 {suggestedQuestions.length > 0 && (
                   <div className="mt-6 flex flex-col gap-2 w-full max-w-md px-4">
                     {suggestedQuestions.map((q) => (
@@ -333,7 +335,7 @@ export default function ChatPage() {
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder={workspaceId ? "输入问题… (Enter 发送，Shift+Enter 换行)" : "请先选择空间"}
+                  placeholder={workspaceId ? t("ask_placeholder") : t("select_workspace_placeholder")}
                   disabled={!workspaceId || busy}
                   rows={1}
                   className="flex-1 resize-none bg-transparent text-sm text-gray-900 placeholder-gray-400 outline-none disabled:opacity-60"
@@ -344,7 +346,7 @@ export default function ChatPage() {
                     type="button"
                     onClick={stopGeneration}
                     className="shrink-0 rounded-lg border border-gray-300 bg-white p-2 text-gray-600 hover:bg-gray-100 transition-colors"
-                    title="停止生成"
+                    title={t("stop_generating")}
                   >
                     <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
                       <rect x="6" y="6" width="12" height="12" rx="2" />

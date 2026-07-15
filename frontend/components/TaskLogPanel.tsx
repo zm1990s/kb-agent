@@ -1,15 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import { api, ApiError } from "@/lib/api";
 import type { ProcessingTask } from "@/lib/types";
-
-const STATUS_LABEL: Record<string, string> = {
-  queued: "排队中",
-  running: "处理中",
-  succeeded: "成功",
-  failed: "失败",
-};
 
 // 文档处理任务的日志/错误详情面板（模态）。
 export default function TaskLogPanel({
@@ -21,6 +15,7 @@ export default function TaskLogPanel({
   title: string;
   onClose: () => void;
 }) {
+  const t = useTranslations("taskLog");
   const [tasks, setTasks] = useState<ProcessingTask[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -29,7 +24,7 @@ export default function TaskLogPanel({
       .get<ProcessingTask[]>(`/documents/${documentId}/tasks`)
       .then(setTasks)
       .catch((err) =>
-        setError(err instanceof ApiError ? err.message : "加载失败")
+        setError(err instanceof ApiError ? err.message : t("load_failed"))
       );
   }, [documentId]);
 
@@ -43,7 +38,7 @@ export default function TaskLogPanel({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="truncate text-sm font-semibold">处理详情 · {title}</h2>
+          <h2 className="truncate text-sm font-semibold">{t("title", { name: title })}</h2>
           <button
             onClick={onClose}
             className="rounded px-2 text-gray-400 hover:bg-gray-100"
@@ -53,37 +48,41 @@ export default function TaskLogPanel({
         </div>
 
         {error && <p className="text-sm text-red-600">{error}</p>}
-        {!tasks && !error && <p className="text-sm text-gray-400">加载中…</p>}
+        {!tasks && !error && <p className="text-sm text-gray-400">{t("loading")}</p>}
         {tasks && tasks.length === 0 && (
-          <p className="text-sm text-gray-400">暂无处理任务记录</p>
+          <p className="text-sm text-gray-400">{t("no_tasks")}</p>
         )}
 
         <div className="space-y-4">
-          {tasks?.map((t, i) => (
-            <div key={t.id} className="rounded border">
+          {tasks?.map((task, i) => (
+            <div key={task.id} className="rounded border">
               <div className="flex items-center justify-between border-b bg-gray-50 px-3 py-2 text-xs">
                 <span>
-                  第 {i + 1} 次 · 尝试 {t.attempts}/{t.max_attempts}
+                  {t("attempt", { n: i + 1, attempts: task.attempts, max: task.max_attempts })}
                 </span>
                 <span
                   className={
-                    t.status === "succeeded"
+                    task.status === "succeeded"
                       ? "text-green-700"
-                      : t.status === "failed"
+                      : task.status === "failed"
                         ? "text-red-600"
                         : "text-amber-600"
                   }
                 >
-                  {STATUS_LABEL[t.status] ?? t.status}
+                  {task.status === "queued" ? t("status_queued")
+                    : task.status === "running" ? t("status_running")
+                    : task.status === "succeeded" ? t("status_succeeded")
+                    : task.status === "failed" ? t("status_failed")
+                    : task.status}
                 </span>
               </div>
-              {t.error && (
+              {task.error && (
                 <p className="border-b bg-red-50 px-3 py-2 text-xs text-red-700">
-                  错误：{t.error}
+                  {t("error_prefix", { msg: task.error })}
                 </p>
               )}
               <ul className="divide-y text-xs">
-                {t.logs.map((log, j) => (
+                {task.logs.map((log, j) => (
                   <li key={j} className="flex gap-2 px-3 py-1.5">
                     <span className="shrink-0 text-gray-400">
                       {new Date(log.at).toLocaleTimeString()}
@@ -94,8 +93,8 @@ export default function TaskLogPanel({
                     <span className="text-gray-700">{log.message}</span>
                   </li>
                 ))}
-                {t.logs.length === 0 && (
-                  <li className="px-3 py-1.5 text-gray-400">无日志</li>
+                {task.logs.length === 0 && (
+                  <li className="px-3 py-1.5 text-gray-400">{t("no_logs")}</li>
                 )}
               </ul>
             </div>

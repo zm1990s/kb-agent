@@ -1,6 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
+import { useLocale } from "@/components/IntlProvider";
+import { toDateLocale } from "@/lib/locale";
 import { api, ApiError } from "@/lib/api";
 import { getToken } from "@/lib/auth";
 
@@ -34,12 +37,6 @@ interface LogFile {
   mtime: number;
 }
 
-const ACTION_LABELS: Record<string, string> = {
-  login: "登录",
-  upload: "上传",
-  chat: "对话",
-  download: "下载",
-};
 const ACTION_COLORS: Record<string, string> = {
   login: "#3b82f6",
   upload: "#10b981",
@@ -57,7 +54,8 @@ function MiniBarChart({
   data: { day: string; count: number }[];
   color: string;
 }) {
-  if (data.length === 0) return <p className="text-xs text-gray-400">暂无数据</p>;
+  const t = useTranslations("stats");
+  if (data.length === 0) return <p className="text-xs text-gray-400">{t("no_data")}</p>;
   const max = Math.max(...data.map((d) => d.count), 1);
   const W = 400;
   const H = 80;
@@ -94,7 +92,8 @@ function MiniBarChart({
 // ── 折线图 ────────────────────────────────────────────
 
 function ActiveUsersChart({ data }: { data: DailyActiveUser[] }) {
-  if (data.length === 0) return <p className="text-xs text-gray-400">暂无数据</p>;
+  const t = useTranslations("stats");
+  if (data.length === 0) return <p className="text-xs text-gray-400">{t("no_data")}</p>;
   const max = Math.max(...data.map((d) => d.users), 1);
   const W = 400;
   const H = 80;
@@ -114,7 +113,7 @@ function ActiveUsersChart({ data }: { data: DailyActiveUser[] }) {
         const y = H - 14 - (d.users / max) * (H - 20);
         return (
           <circle key={d.day} cx={x} cy={y} r={2.5} fill="#3b82f6">
-            <title>{d.day}: {d.users} 人</title>
+            <title>{d.day}: {d.users}</title>
           </circle>
         );
       })}
@@ -133,6 +132,7 @@ function ActiveUsersChart({ data }: { data: DailyActiveUser[] }) {
 // ── 日志查看面板 ──────────────────────────────────────
 
 function LogViewer() {
+  const t = useTranslations("stats");
   const [files, setFiles] = useState<LogFile[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [lines, setLines] = useState(500);
@@ -152,17 +152,16 @@ function LogViewer() {
         setSelected(preferred.name);
       }
     } catch (err) {
-      setLogError(err instanceof ApiError ? err.message : "获取日志列表失败");
+      setLogError(err instanceof ApiError ? err.message : t("log_list_failed"));
     } finally {
       setLoadingFiles(false);
     }
-  }, [selected]);
+  }, [selected, t]);
 
   const loadContent = useCallback(async (name: string, n: number) => {
     setLoadingContent(true);
     setLogError(null);
     try {
-      // read log as plain text via api.get (returns undefined for non-JSON) — use fetch directly
       const token = getToken();
       const res = await fetch(`/api/admin/logs/${encodeURIComponent(name)}?lines=${n}`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
@@ -172,16 +171,15 @@ function LogViewer() {
         throw new Error(d?.detail ?? `请求失败 (${res.status})`);
       }
       setContent(await res.text());
-      // 滚到底部
       setTimeout(() => {
         if (textRef.current) textRef.current.scrollTop = textRef.current.scrollHeight;
       }, 50);
     } catch (err) {
-      setLogError(err instanceof Error ? err.message : "加载日志失败");
+      setLogError(err instanceof Error ? err.message : t("log_load_failed"));
     } finally {
       setLoadingContent(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => { loadFiles(); }, [loadFiles]);
   useEffect(() => {
@@ -199,10 +197,10 @@ function LogViewer() {
       {/* 文件列表 + 行数选择 */}
       <div className="flex flex-wrap items-center gap-3">
         {loadingFiles ? (
-          <span className="text-xs text-gray-400">加载文件列表…</span>
+          <span className="text-xs text-gray-400">{t("log_loading")}</span>
         ) : files.length === 0 ? (
           <span className="text-xs text-gray-400">
-            暂无日志文件（后端启动后会在 logs/ 目录下自动创建）
+            {t("log_no_files")}
           </span>
         ) : (
           <div className="flex flex-wrap gap-2">
@@ -223,7 +221,7 @@ function LogViewer() {
           </div>
         )}
         <div className="ml-auto flex items-center gap-2 text-xs text-gray-500">
-          <span>显示末尾</span>
+          <span>{t("log_tail")}</span>
           {[200, 500, 1000, 2000].map((n) => (
             <button
               key={n}
@@ -232,7 +230,7 @@ function LogViewer() {
                 lines === n ? "bg-blue-600 text-white" : "border hover:bg-gray-100"
               }`}
             >
-              {n}行
+              {t("log_lines", { n })}
             </button>
           ))}
           {selected && (
@@ -240,7 +238,7 @@ function LogViewer() {
               onClick={() => selected && loadContent(selected, lines)}
               className="rounded border px-2 py-0.5 hover:bg-gray-100"
             >
-              刷新
+              {t("log_refresh")}
             </button>
           )}
         </div>
@@ -254,11 +252,11 @@ function LogViewer() {
         className="h-96 overflow-auto rounded border bg-gray-950 p-3 font-mono text-xs leading-relaxed text-gray-200"
       >
         {loadingContent ? (
-          <span className="text-gray-500">加载中…</span>
+          <span className="text-gray-500">{t("log_loading_content")}</span>
         ) : content === null ? (
-          <span className="text-gray-500">选择日志文件查看内容</span>
+          <span className="text-gray-500">{t("log_select_hint")}</span>
         ) : content.length === 0 ? (
-          <span className="text-gray-500">日志文件为空</span>
+          <span className="text-gray-500">{t("log_empty")}</span>
         ) : (
           content
         )}
@@ -290,11 +288,29 @@ function truncate(s: string, n: number) {
   return s.length > n ? s.slice(0, n) + "…" : s;
 }
 
-function fmtTime(iso: string) {
-  return new Date(iso).toLocaleString("zh-CN", { hour12: false });
-}
-
 export default function StatsTab() {
+  const t = useTranslations("stats");
+  const tc = useTranslations("common");
+  const { locale } = useLocale();
+  const dateLocale = toDateLocale(locale);
+
+  function fmtTime(iso: string) {
+    return new Date(iso).toLocaleString(dateLocale, { hour12: false });
+  }
+
+  const ACTION_LABELS: Record<string, string> = {
+    login: t("action_login"),
+    upload: t("action_upload"),
+    chat: t("action_chat"),
+    download: t("action_download"),
+  };
+  const ACTION_VOL_LABELS: Record<string, string> = {
+    login: t("action_login_vol"),
+    upload: t("action_upload_vol"),
+    chat: t("action_chat_vol"),
+    download: t("action_download_vol"),
+  };
+
   const [innerTab, setInnerTab] = useState<"stats" | "downloads" | "chats" | "logs">("stats");
   const [stats, setStats] = useState<Stats | null>(null);
   const [days, setDays] = useState(30);
@@ -335,12 +351,12 @@ export default function StatsTab() {
           "报表数据不可用。请确认已执行数据库迁移：\n./scripts/dev.sh  （或手动执行 infra/postgres/migrations/009_usage_events.sql）"
         );
       } else {
-        setError(err instanceof ApiError ? err.message : "加载失败");
+        setError(err instanceof ApiError ? err.message : t("load_failed"));
       }
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (innerTab === "stats") load(days);
@@ -364,20 +380,20 @@ export default function StatsTab() {
       {/* 子 Tab */}
       <div className="flex gap-1 border-b">
         {([
-          ["stats", "使用报表"],
-          ["downloads", "下载记录"],
-          ["chats", "对话记录"],
-          ["logs", "系统日志"],
-        ] as const).map(([t, label]) => (
+          ["stats", t("tab_stats")],
+          ["downloads", t("tab_downloads")],
+          ["chats", t("tab_chats")],
+          ["logs", t("tab_logs")],
+        ] as const).map(([tabKey, label]) => (
           <button
-            key={t}
+            key={tabKey}
             onClick={() => {
-              setInnerTab(t);
-              if (t === "downloads") setDlPage(1);
-              if (t === "chats") { setChatPage(1); setExpandedChat(null); }
+              setInnerTab(tabKey);
+              if (tabKey === "downloads") setDlPage(1);
+              if (tabKey === "chats") { setChatPage(1); setExpandedChat(null); }
             }}
             className={`px-4 py-2 text-sm ${
-              innerTab === t
+              innerTab === tabKey
                 ? "border-b-2 border-blue-600 font-medium text-blue-700"
                 : "text-gray-500 hover:text-gray-800"
             }`}
@@ -391,7 +407,7 @@ export default function StatsTab() {
       {innerTab === "stats" && (
         <div className="space-y-6">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm text-gray-600">时间范围：</span>
+            <span className="text-sm text-gray-600">{t("time_range")}</span>
             {DAY_OPTIONS.map((d) => (
               <button
                 key={d}
@@ -402,10 +418,10 @@ export default function StatsTab() {
                     : "border text-gray-600 hover:bg-gray-100"
                 }`}
               >
-                近 {d} 天
+                {tc("days_range", { days: d })}
               </button>
             ))}
-            {loading && <span className="text-xs text-gray-400">加载中…</span>}
+            {loading && <span className="text-xs text-gray-400">{t("loading")}</span>}
           </div>
 
           {error && (
@@ -430,7 +446,7 @@ export default function StatsTab() {
 
               {/* 活跃用户折线 */}
               <div className="rounded border bg-white p-4">
-                <h3 className="mb-3 text-sm font-medium">活跃用户趋势</h3>
+                <h3 className="mb-3 text-sm font-medium">{t("trend_title")}</h3>
                 <ActiveUsersChart data={stats?.active_users ?? []} />
               </div>
 
@@ -438,7 +454,7 @@ export default function StatsTab() {
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 {actions.map((a) => (
                   <div key={a} className="rounded border bg-white p-4">
-                    <h3 className="mb-3 text-sm font-medium">{ACTION_LABELS[a]}量</h3>
+                    <h3 className="mb-3 text-sm font-medium">{ACTION_VOL_LABELS[a]}</h3>
                     <MiniBarChart data={byAction(a)} color={ACTION_COLORS[a]} />
                   </div>
                 ))}
@@ -447,21 +463,21 @@ export default function StatsTab() {
               {/* 用户明细表 */}
               <div className="rounded border bg-white">
                 <div className="border-b px-4 py-3">
-                  <h3 className="text-sm font-medium">用户使用明细</h3>
+                  <h3 className="text-sm font-medium">{t("user_detail")}</h3>
                 </div>
                 {(stats?.per_user ?? []).length === 0 ? (
-                  <p className="px-4 py-6 text-center text-sm text-gray-400">暂无数据</p>
+                  <p className="px-4 py-6 text-center text-sm text-gray-400">{t("no_data")}</p>
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead className="bg-gray-50 text-xs text-gray-500">
                         <tr>
-                          <th className="px-4 py-2 text-left">用户</th>
-                          <th className="px-4 py-2 text-right">登录</th>
-                          <th className="px-4 py-2 text-right">上传</th>
-                          <th className="px-4 py-2 text-right">对话</th>
-                          <th className="px-4 py-2 text-right">下载</th>
-                          <th className="px-4 py-2 text-right font-semibold">合计</th>
+                          <th className="px-4 py-2 text-left">{t("col_user")}</th>
+                          <th className="px-4 py-2 text-right">{t("col_login")}</th>
+                          <th className="px-4 py-2 text-right">{t("col_upload")}</th>
+                          <th className="px-4 py-2 text-right">{t("col_chat")}</th>
+                          <th className="px-4 py-2 text-right">{t("col_download")}</th>
+                          <th className="px-4 py-2 text-right font-semibold">{t("col_total")}</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y">
@@ -489,7 +505,7 @@ export default function StatsTab() {
       {innerTab === "downloads" && (
         <div className="space-y-4">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm text-gray-600">时间范围：</span>
+            <span className="text-sm text-gray-600">{t("time_range")}</span>
             {DAY_OPTIONS.map((d) => (
               <button
                 key={d}
@@ -498,28 +514,28 @@ export default function StatsTab() {
                   days === d ? "bg-blue-600 text-white" : "border text-gray-600 hover:bg-gray-100"
                 }`}
               >
-                近 {d} 天
+                {tc("days_range", { days: d })}
               </button>
             ))}
-            {dlLoading && <span className="text-xs text-gray-400">加载中…</span>}
+            {dlLoading && <span className="text-xs text-gray-400">{t("loading")}</span>}
           </div>
           <div className="rounded border bg-white">
             <div className="border-b px-4 py-3 flex items-center justify-between">
-              <h3 className="text-sm font-medium">下载记录</h3>
-              {dlData && <span className="text-xs text-gray-400">共 {dlData.total} 条</span>}
+              <h3 className="text-sm font-medium">{t("download_records")}</h3>
+              {dlData && <span className="text-xs text-gray-400">{tc("total_count", { count: dlData.total })}</span>}
             </div>
             {!dlData || dlData.items.length === 0 ? (
               <p className="px-4 py-6 text-center text-sm text-gray-400">
-                {dlLoading ? "加载中…" : "暂无下载记录"}
+                {dlLoading ? t("loading") : t("no_downloads")}
               </p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="bg-gray-50 text-xs text-gray-500">
                     <tr>
-                      <th className="px-4 py-2 text-left">时间</th>
-                      <th className="px-4 py-2 text-left">用户</th>
-                      <th className="px-4 py-2 text-left">文档</th>
+                      <th className="px-4 py-2 text-left">{t("col_time")}</th>
+                      <th className="px-4 py-2 text-left">{t("col_email")}</th>
+                      <th className="px-4 py-2 text-left">{t("col_doc")}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
@@ -527,7 +543,7 @@ export default function StatsTab() {
                       <tr key={i} className="hover:bg-gray-50">
                         <td className="px-4 py-2 text-xs text-gray-500 whitespace-nowrap">{fmtTime(item.created_at)}</td>
                         <td className="px-4 py-2 font-mono text-xs">{item.email}</td>
-                        <td className={`px-4 py-2 text-xs ${!item.document_title || item.document_title === "(文档已删除)" ? "text-gray-400 italic" : ""}`}>
+                        <td className={`px-4 py-2 text-xs ${!item.document_title || item.document_title === t("deleted_doc") ? "text-gray-400 italic" : ""}`}>
                           {item.document_title}
                         </td>
                       </tr>
@@ -538,21 +554,21 @@ export default function StatsTab() {
             )}
             {dlData && dlData.total > 50 && (
               <div className="flex items-center justify-between border-t px-4 py-2 text-xs text-gray-500">
-                <span>第 {dlPage} 页 / 共 {Math.ceil(dlData.total / 50)} 页</span>
+                <span>{tc("page_of", { page: dlPage, total: Math.ceil(dlData.total / 50) })}</span>
                 <div className="flex gap-2">
                   <button
                     disabled={dlPage <= 1}
                     onClick={() => setDlPage((p) => p - 1)}
                     className="rounded border px-2 py-1 disabled:opacity-40 hover:bg-gray-100"
                   >
-                    上一页
+                    {tc("prev_page")}
                   </button>
                   <button
                     disabled={dlPage >= Math.ceil(dlData.total / 50)}
                     onClick={() => setDlPage((p) => p + 1)}
                     className="rounded border px-2 py-1 disabled:opacity-40 hover:bg-gray-100"
                   >
-                    下一页
+                    {tc("next_page")}
                   </button>
                 </div>
               </div>
@@ -565,7 +581,7 @@ export default function StatsTab() {
       {innerTab === "chats" && (
         <div className="space-y-4">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm text-gray-600">时间范围：</span>
+            <span className="text-sm text-gray-600">{t("time_range")}</span>
             {DAY_OPTIONS.map((d) => (
               <button
                 key={d}
@@ -574,19 +590,19 @@ export default function StatsTab() {
                   days === d ? "bg-blue-600 text-white" : "border text-gray-600 hover:bg-gray-100"
                 }`}
               >
-                近 {d} 天
+                {tc("days_range", { days: d })}
               </button>
             ))}
-            {chatLoading && <span className="text-xs text-gray-400">加载中…</span>}
+            {chatLoading && <span className="text-xs text-gray-400">{t("loading")}</span>}
           </div>
           <div className="rounded border bg-white">
             <div className="border-b px-4 py-3 flex items-center justify-between">
-              <h3 className="text-sm font-medium">对话记录</h3>
-              {chatData && <span className="text-xs text-gray-400">共 {chatData.total} 条</span>}
+              <h3 className="text-sm font-medium">{t("chat_records")}</h3>
+              {chatData && <span className="text-xs text-gray-400">{tc("total_count", { count: chatData.total })}</span>}
             </div>
             {!chatData || chatData.items.length === 0 ? (
               <p className="px-4 py-6 text-center text-sm text-gray-400">
-                {chatLoading ? "加载中…" : "暂无对话记录"}
+                {chatLoading ? t("loading") : t("no_chats")}
               </p>
             ) : (
               <div className="divide-y">
@@ -608,20 +624,20 @@ export default function StatsTab() {
                           {expanded ? (
                             <div className="space-y-2 text-xs">
                               <div>
-                                <span className="font-medium text-gray-700">提问：</span>
+                                <span className="font-medium text-gray-700">{t("question")}</span>
                                 <span className="text-gray-800 whitespace-pre-wrap">{item.question}</span>
                               </div>
                               <div>
-                                <span className="font-medium text-gray-700">回答：</span>
+                                <span className="font-medium text-gray-700">{t("answer")}</span>
                                 <span className="text-gray-600 whitespace-pre-wrap">{item.answer}</span>
                               </div>
                             </div>
                           ) : (
                             <div className="text-xs text-gray-700">
-                              <span className="font-medium">Q：</span>{truncate(item.question, 80)}
+                              <span className="font-medium">{t("q_abbr")}</span>{truncate(item.question, 80)}
                               {item.answer && (
                                 <span className="ml-2 text-gray-400">
-                                  <span className="font-medium">A：</span>{truncate(item.answer, 100)}
+                                  <span className="font-medium">{t("a_abbr")}</span>{truncate(item.answer, 100)}
                                 </span>
                               )}
                             </div>
@@ -636,21 +652,21 @@ export default function StatsTab() {
             )}
             {chatData && chatData.total > 50 && (
               <div className="flex items-center justify-between border-t px-4 py-2 text-xs text-gray-500">
-                <span>第 {chatPage} 页 / 共 {Math.ceil(chatData.total / 50)} 页</span>
+                <span>{tc("page_of", { page: chatPage, total: Math.ceil(chatData.total / 50) })}</span>
                 <div className="flex gap-2">
                   <button
                     disabled={chatPage <= 1}
                     onClick={() => setChatPage((p) => p - 1)}
                     className="rounded border px-2 py-1 disabled:opacity-40 hover:bg-gray-100"
                   >
-                    上一页
+                    {tc("prev_page")}
                   </button>
                   <button
                     disabled={chatPage >= Math.ceil(chatData.total / 50)}
                     onClick={() => setChatPage((p) => p + 1)}
                     className="rounded border px-2 py-1 disabled:opacity-40 hover:bg-gray-100"
                   >
-                    下一页
+                    {tc("next_page")}
                   </button>
                 </div>
               </div>

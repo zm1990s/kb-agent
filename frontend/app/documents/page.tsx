@@ -1,21 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import FolderTree, { buildTree } from "@/components/FolderTree";
 import Markdown from "@/components/Markdown";
 import NavBar from "@/components/NavBar";
 import TaskLogPanel from "@/components/TaskLogPanel";
 import WorkspacePicker from "@/components/WorkspacePicker";
+import { useDialog } from "@/components/DialogProvider";
 import { api, ApiError } from "@/lib/api";
 import { getToken, isAdmin } from "@/lib/auth";
 import { useAuthGuard } from "@/lib/useAuthGuard";
 import type { Category, DocumentPublic, Folder } from "@/lib/types";
-
-const STATUS_LABEL: Record<string, string> = {
-  processing: "归类中",
-  ready: "已就绪",
-  failed: "失败",
-};
 
 // 规范化文件/目录名：空格→_, 控制字符移除, 合并连续下划线
 function sanitizeName(name: string): string {
@@ -32,8 +28,15 @@ const ALL = "__all__";
 const ROOT = "__root__";
 
 export default function DocumentsPage() {
+  const t = useTranslations("documents");
+  const { showConfirm, showPrompt } = useDialog();
   const ready = useAuthGuard();
   const admin = isAdmin();
+  const STATUS_LABEL: Record<string, string> = {
+    processing: t("status_processing"),
+    ready: t("status_ready"),
+    failed: t("status_failed"),
+  };
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
   const [folders, setFolders] = useState<Folder[]>([]);
   const [activeFolder, setActiveFolder] = useState<string>(ALL);
@@ -93,7 +96,7 @@ export default function DocumentsPage() {
       if (activeFolder === ROOT) list = list.filter((d) => !d.folder_id);
       setDocs(list);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "加载失败");
+      setError(err instanceof ApiError ? err.message : t("load_failed"));
     }
   }, [workspaceId, activeFolder]);
 
@@ -136,17 +139,17 @@ export default function DocumentsPage() {
   });
 
   const COLS: { key: string; label: string }[] = [
-    { key: "folder", label: "目录" },
-    { key: "category", label: "分类" },
-    { key: "tags", label: "标签" },
-    { key: "type", label: "类型" },
-    { key: "status", label: "状态" },
-    { key: "summary", label: "摘要" },
-    { key: "created", label: "创建时间" },
+    { key: "folder", label: t("col_folder") },
+    { key: "category", label: t("col_category") },
+    { key: "tags", label: t("col_tags") },
+    { key: "type", label: t("col_type") },
+    { key: "status", label: t("col_status") },
+    { key: "summary", label: t("col_summary") },
+    { key: "created", label: t("col_created") },
   ];
 
   async function createFolder(parentId: string | null) {
-    const name = window.prompt(parentId ? "新建子目录名称" : "新目录名称");
+    const name = await showPrompt(parentId ? t("new_sub_folder_prompt") : t("new_folder_prompt"));
     if (!name || !workspaceId) return;
     setError(null);
     try {
@@ -156,12 +159,12 @@ export default function DocumentsPage() {
       });
       await loadFolders();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "建目录失败");
+      setError(err instanceof ApiError ? err.message : t("load_failed"));
     }
   }
 
   async function renameFolder(folder: Folder) {
-    const name = window.prompt("重命名目录", folder.name);
+    const name = await showPrompt(t("rename_folder_prompt"), folder.name);
     if (!name || !workspaceId || name === folder.name) return;
     setError(null);
     try {
@@ -170,26 +173,26 @@ export default function DocumentsPage() {
       });
       await loadFolders();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "重命名失败");
+      setError(err instanceof ApiError ? err.message : t("rename_failed"));
     }
   }
 
   async function renameDoc(d: DocumentPublic) {
-    const title = window.prompt("重命名文件", d.title);
+    const title = await showPrompt(t("rename_prompt"), d.title);
     if (!title || title === d.title) return;
     setError(null);
     try {
       await api.patch(`/documents/${d.id}/rename`, { title });
       await loadDocs();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "重命名失败");
+      setError(err instanceof ApiError ? err.message : t("rename_failed"));
     }
   }
 
   async function deleteFolder(id: string) {
     if (
       !workspaceId ||
-      !window.confirm("删除该目录？子目录一并删除，其下文档移出目录（不删除文档）。")
+      !await showConfirm(t("delete_folder_confirm"))
     )
       return;
     try {
@@ -198,7 +201,7 @@ export default function DocumentsPage() {
       await loadFolders();
       await loadDocs();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "删除目录失败");
+      setError(err instanceof ApiError ? err.message : t("delete_folder_failed"));
     }
   }
 
@@ -223,7 +226,7 @@ export default function DocumentsPage() {
         await loadFolders();
       }
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "移动失败");
+      setError(err instanceof ApiError ? err.message : t("move_failed"));
     }
   }
 
@@ -285,20 +288,20 @@ export default function DocumentsPage() {
       await loadFolders();
       await loadDocs();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "上传失败");
+      setError(err instanceof ApiError ? err.message : t("upload_failed"));
     } finally {
       setUploading(false);
     }
   }
 
   async function deleteDoc(doc: DocumentPublic) {
-    if (!window.confirm(`删除文档「${doc.title}」？此操作不可撤销。`)) return;
+    if (!await showConfirm(t("delete_confirm", { title: doc.title }))) return;
     setError(null);
     try {
       await api.del(`/documents/${doc.id}`);
       await loadDocs();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "删除失败");
+      setError(err instanceof ApiError ? err.message : t("load_failed"));
     }
   }
 
@@ -308,7 +311,7 @@ export default function DocumentsPage() {
       await api.post(`/documents/${doc.id}/reprocess`);
       await loadDocs(); // 状态回到归类中，轮询会自动刷新
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "重试失败");
+      setError(err instanceof ApiError ? err.message : t("load_failed"));
     }
   }
 
@@ -329,7 +332,7 @@ export default function DocumentsPage() {
       setReplacingId(null);
       await loadDocs();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "替换失败");
+      setError(err instanceof ApiError ? err.message : t("load_failed"));
     }
   }
 
@@ -345,7 +348,7 @@ export default function DocumentsPage() {
       setPreviewDoc(doc);
       setPreviewUrl(url);
     } catch {
-      setError("预览失败");
+      setError(t("preview_failed"));
     }
   }
 
@@ -370,7 +373,7 @@ export default function DocumentsPage() {
       a.click();
       URL.revokeObjectURL(url);
     } catch {
-      setError("下载失败");
+      setError(t("load_failed"));
     }
   }
 
@@ -378,7 +381,7 @@ export default function DocumentsPage() {
     <div className="flex h-screen flex-col">
       <NavBar />
       <div className="flex items-center gap-3 border-b bg-white px-4 py-2">
-        <span className="text-sm text-gray-500">空间：</span>
+        <span className="text-sm text-gray-500">{t("workspace_label")}</span>
         <WorkspacePicker value={workspaceId} onChange={setWorkspaceId} />
       </div>
 
@@ -390,13 +393,13 @@ export default function DocumentsPage() {
               onClick={() => createFolder(null)}
               className="m-2 rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
             >
-              + 新建顶级目录
+              {t("new_top_folder")}
             </button>
           )}
           <div className="flex-1 overflow-y-auto px-2 pb-2">
             {[
-              { id: ALL, name: "全部文档" },
-              { id: ROOT, name: "未归目录" },
+              { id: ALL, name: t("all_docs") },
+              { id: ROOT, name: t("unorganized") },
             ].map((f) => (
               <button
                 key={f.id}
@@ -431,7 +434,7 @@ export default function DocumentsPage() {
                 }}
                 className="mt-1 rounded border border-dashed border-gray-300 px-3 py-2 text-center text-xs text-gray-400"
               >
-                拖到此处移出目录 / 置为顶级
+                {t("drop_here")}
               </div>
             )}
           </div>
@@ -453,7 +456,7 @@ export default function DocumentsPage() {
                 disabled={uploading || !workspaceId}
                 className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
               >
-                {uploading ? "上传中…" : "上传文件（可多选）"}
+                {uploading ? t("uploading") : t("upload_files")}
               </button>
               {/* 整目录上传（保持结构） */}
               <input
@@ -471,11 +474,11 @@ export default function DocumentsPage() {
                 disabled={uploading || !workspaceId}
                 className="rounded border border-blue-600 px-4 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-50"
               >
-                上传目录
+                {t("upload_folder")}
               </button>
               {activeFolder !== ALL && activeFolder !== ROOT && (
                 <span className="text-xs text-gray-400">
-                  归入目录：{folderName(activeFolder)}
+                  {t("folder_label", { name: folderName(activeFolder) })}
                 </span>
               )}
             </div>
@@ -496,25 +499,25 @@ export default function DocumentsPage() {
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="搜索标题/摘要/标签/分类…"
+              placeholder={t("search_placeholder")}
               className="w-64 rounded-full border px-4 py-1.5 text-sm focus:border-blue-500 focus:outline-none"
             />
             {tagFilter && (
               <span className="flex items-center gap-1 rounded-full bg-blue-100 px-3 py-0.5 text-xs text-blue-700">
-                标签：{tagFilter}
+                {t("tag_filter", { tag: tagFilter })}
                 <button
                   onClick={() => setTagFilter(null)}
                   className="ml-0.5 font-bold hover:text-blue-900"
-                  aria-label="清除标签过滤"
+                  aria-label={t("tag_filter", { tag: tagFilter })}
                 >
                   ×
                 </button>
               </span>
             )}
-            <span className="text-xs text-gray-400">共 {shownDocs.length} 篇</span>
+            <span className="text-xs text-gray-400">{t("doc_count", { count: shownDocs.length })}</span>
             <details className="relative ml-auto text-sm">
               <summary className="cursor-pointer rounded border px-3 py-1.5 text-gray-600 hover:bg-gray-100">
-                展示列
+                {t("columns")}
               </summary>
               <div className="absolute right-0 z-10 mt-1 w-36 rounded border bg-white p-2 shadow-lg">
                 {COLS.map((c) => (
@@ -537,22 +540,22 @@ export default function DocumentsPage() {
             <table className="w-full text-sm">
               <thead className="bg-gray-50 text-left text-gray-500">
                 <tr>
-                  <th className="px-4 py-2">标题</th>
-                  {cols.folder && <th className="px-4 py-2">目录</th>}
-                  {cols.category && <th className="px-4 py-2">分类</th>}
-                  {cols.tags && <th className="px-4 py-2">标签</th>}
-                  {cols.type && <th className="px-4 py-2">类型</th>}
-                  {cols.status && <th className="px-4 py-2">状态</th>}
-                  {cols.summary && <th className="px-4 py-2">摘要</th>}
-                  {cols.created && <th className="px-4 py-2">创建时间</th>}
-                  <th className="px-4 py-2">操作</th>
+                  <th className="px-4 py-2">{t("col_title")}</th>
+                  {cols.folder && <th className="px-4 py-2">{t("col_folder")}</th>}
+                  {cols.category && <th className="px-4 py-2">{t("col_category")}</th>}
+                  {cols.tags && <th className="px-4 py-2">{t("col_tags")}</th>}
+                  {cols.type && <th className="px-4 py-2">{t("col_type")}</th>}
+                  {cols.status && <th className="px-4 py-2">{t("col_status")}</th>}
+                  {cols.summary && <th className="px-4 py-2">{t("col_summary")}</th>}
+                  {cols.created && <th className="px-4 py-2">{t("col_created")}</th>}
+                  <th className="px-4 py-2">{t("col_actions")}</th>
                 </tr>
               </thead>
               <tbody>
                 {shownDocs.length === 0 && (
                   <tr>
                     <td colSpan={9} className="px-4 py-6 text-center text-gray-400">
-                      {docs.length === 0 ? "暂无文档" : "无匹配结果"}
+                      {docs.length === 0 ? t("no_docs") : t("no_results")}
                     </td>
                   </tr>
                 )}
@@ -586,13 +589,13 @@ export default function DocumentsPage() {
                                 await loadDocs();
                               } catch (err) {
                                 setError(
-                                  err instanceof ApiError ? err.message : "移动失败"
+                                  err instanceof ApiError ? err.message : t("move_failed")
                                 );
                               }
                             }}
                             className="rounded border px-1 py-0.5 text-xs"
                           >
-                            <option value="">（无目录）</option>
+                            <option value="">{t("no_folder")}</option>
                             {folders.map((f) => (
                               <option key={f.id} value={f.id}>
                                 {f.name}
@@ -678,32 +681,32 @@ export default function DocumentsPage() {
                         onClick={() => previewDoc_(d)}
                         className="mr-1 rounded bg-gray-100 px-2 py-1 text-xs text-gray-700 hover:bg-gray-200"
                       >
-                        预览
+                        {t("action_preview")}
                       </button>
                       <button
                         onClick={() => download(d)}
                         className="mr-1 rounded bg-gray-100 px-2 py-1 text-xs text-blue-700 hover:bg-gray-200"
                       >
-                        下载
+                        {t("action_download")}
                       </button>
                       <button
                         onClick={() => setDetailDoc(d)}
                         className="mr-1 rounded bg-gray-100 px-2 py-1 text-xs text-gray-700 hover:bg-gray-200"
                       >
-                        文件详情
+                        {t("action_detail")}
                       </button>
                       <button
                         onClick={() => setLogDoc(d)}
                         className="mr-1 rounded bg-gray-100 px-2 py-1 text-xs text-gray-700 hover:bg-gray-200"
                       >
-                        处理详情
+                        {t("action_log")}
                       </button>
                       {admin && d.status === "failed" && (
                         <button
                           onClick={() => reprocessDoc(d)}
                           className="mr-1 rounded bg-amber-100 px-2 py-1 text-xs text-amber-700 hover:bg-amber-200"
                         >
-                          重试
+                          {t("action_retry")}
                         </button>
                       )}
                       {admin && (
@@ -712,19 +715,19 @@ export default function DocumentsPage() {
                             onClick={() => renameDoc(d)}
                             className="mr-1 rounded bg-gray-100 px-2 py-1 text-xs text-gray-700 hover:bg-gray-200"
                           >
-                            重命名
+                            {t("action_rename")}
                           </button>
                           <button
                             onClick={() => triggerReplace(d.id)}
                             className="mr-1 rounded bg-gray-100 px-2 py-1 text-xs text-gray-700 hover:bg-gray-200"
                           >
-                            替换
+                            {t("action_replace")}
                           </button>
                           <button
                             onClick={() => deleteDoc(d)}
                             className="rounded bg-gray-100 px-2 py-1 text-xs text-red-600 hover:bg-red-50"
                           >
-                            删除
+                            {t("action_delete")}
                           </button>
                         </>
                       )}
@@ -752,19 +755,19 @@ export default function DocumentsPage() {
               <table className="w-full text-sm">
                 <tbody className="divide-y divide-gray-100">
                   <tr className="align-top">
-                    <td className="w-24 shrink-0 py-3 pr-4 font-medium text-gray-500">分类</td>
+                    <td className="w-24 shrink-0 py-3 pr-4 font-medium text-gray-500">{t("detail_category")}</td>
                     <td className="py-3 text-gray-800">{categoryName(detailDoc.category_id)}</td>
                   </tr>
                   <tr className="align-top">
-                    <td className="py-3 pr-4 font-medium text-gray-500">简介</td>
+                    <td className="py-3 pr-4 font-medium text-gray-500">{t("detail_brief")}</td>
                     <td className="py-3 text-gray-800 leading-relaxed">{detailDoc.brief || "—"}</td>
                   </tr>
                   <tr className="align-top">
-                    <td className="py-3 pr-4 font-medium text-gray-500">摘要</td>
+                    <td className="py-3 pr-4 font-medium text-gray-500">{t("detail_summary")}</td>
                     <td className="py-3 text-gray-800 leading-relaxed whitespace-pre-wrap">{detailDoc.summary || "—"}</td>
                   </tr>
                   <tr className="align-top">
-                    <td className="py-3 pr-4 font-medium text-gray-500">标签</td>
+                    <td className="py-3 pr-4 font-medium text-gray-500">{t("detail_tags")}</td>
                     <td className="py-3">
                       {detailDoc.tags && detailDoc.tags.length > 0 ? (
                         <div className="flex flex-wrap gap-1">
@@ -776,7 +779,7 @@ export default function DocumentsPage() {
                     </td>
                   </tr>
                   <tr className="align-top">
-                    <td className="py-3 pr-4 font-medium text-gray-500">正文全文</td>
+                    <td className="py-3 pr-4 font-medium text-gray-500">{t("detail_content")}</td>
                     <td className="py-3">
                       {detailDoc.content_text ? (
                         <div className="max-h-[55vh] overflow-y-auto rounded border border-gray-200 bg-gray-50 p-3 text-xs leading-relaxed">
@@ -812,13 +815,13 @@ export default function DocumentsPage() {
                   onClick={() => download(previewDoc)}
                   className="rounded bg-gray-100 px-3 py-1.5 text-xs text-blue-700 hover:bg-gray-200"
                 >
-                  下载
+                  {t("action_download")}
                 </button>
                 <button
                   onClick={closePreview}
                   className="rounded bg-gray-100 px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-200"
                 >
-                  关闭
+                  {t("preview_close")}
                 </button>
               </div>
             </div>

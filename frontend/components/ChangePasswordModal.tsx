@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { api, ApiError } from "@/lib/api";
 
 interface Props {
@@ -8,6 +9,7 @@ interface Props {
 }
 
 export default function ChangePasswordModal({ onClose }: Props) {
+  const t = useTranslations("changePassword");
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -19,11 +21,11 @@ export default function ChangePasswordModal({ onClose }: Props) {
     e.preventDefault();
     setError(null);
     if (next !== confirm) {
-      setError("两次输入的新密码不一致");
+      setError(t("err_mismatch"));
       return;
     }
     if (next.length < 8) {
-      setError("新密码至少 8 位");
+      setError(t("err_too_short"));
       return;
     }
     setLoading(true);
@@ -34,7 +36,7 @@ export default function ChangePasswordModal({ onClose }: Props) {
       });
       setSuccess(true);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "修改失败");
+      setError(err instanceof ApiError ? err.message : t("failed"));
     } finally {
       setLoading(false);
     }
@@ -43,21 +45,21 @@ export default function ChangePasswordModal({ onClose }: Props) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
       <div className="w-full max-w-sm rounded-lg border bg-white p-6 shadow-lg">
-        <h2 className="mb-4 text-base font-semibold">修改密码</h2>
+        <h2 className="mb-4 text-base font-semibold">{t("title")}</h2>
         {success ? (
           <div className="space-y-4">
-            <p className="text-sm text-green-600">密码已修改成功。</p>
+            <p className="text-sm text-green-600">{t("success")}</p>
             <button
               onClick={onClose}
               className="w-full rounded bg-blue-600 py-2 text-sm font-medium text-white hover:bg-blue-700"
             >
-              关闭
+              {t("close")}
             </button>
           </div>
         ) : (
           <form onSubmit={submit} className="space-y-3">
             <div>
-              <label className="mb-1 block text-xs text-gray-500">当前密码</label>
+              <label className="mb-1 block text-xs text-gray-500">{t("current")}</label>
               <input
                 type="password"
                 required
@@ -67,7 +69,7 @@ export default function ChangePasswordModal({ onClose }: Props) {
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs text-gray-500">新密码（至少 8 位）</label>
+              <label className="mb-1 block text-xs text-gray-500">{t("new_password")}</label>
               <input
                 type="password"
                 required
@@ -78,7 +80,7 @@ export default function ChangePasswordModal({ onClose }: Props) {
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs text-gray-500">确认新密码</label>
+              <label className="mb-1 block text-xs text-gray-500">{t("confirm")}</label>
               <input
                 type="password"
                 required
@@ -94,14 +96,14 @@ export default function ChangePasswordModal({ onClose }: Props) {
                 disabled={loading}
                 className="flex-1 rounded bg-blue-600 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
               >
-                {loading ? "保存中…" : "保存"}
+                {loading ? t("saving") : t("save")}
               </button>
               <button
                 type="button"
                 onClick={onClose}
                 className="flex-1 rounded border py-2 text-sm text-gray-600 hover:bg-gray-50"
               >
-                取消
+                {t("cancel")}
               </button>
             </div>
           </form>

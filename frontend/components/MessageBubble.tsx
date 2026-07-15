@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import Markdown from "@/components/Markdown";
 import type { SourceRef } from "@/lib/types";
 
@@ -14,6 +15,7 @@ interface Props {
 }
 
 export default function MessageBubble({ role, content, sources, onDownload, onEdit, onResend }: Props) {
+  const t = useTranslations("messageBubble");
   const isUser = role === "user";
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(content);
@@ -62,7 +64,7 @@ export default function MessageBubble({ role, content, sources, onDownload, onEd
         }`}
         aria-hidden
       >
-        {isUser ? "我" : "AI"}
+        {isUser ? t("me") : "AI"}
       </div>
 
       <div className={`flex max-w-[75%] flex-col gap-1.5 ${isUser ? "items-end" : "items-start"}`}>
@@ -78,14 +80,14 @@ export default function MessageBubble({ role, content, sources, onDownload, onEd
             />
             <div className="mt-1 flex justify-end gap-2">
               <button onClick={cancelEdit} className="rounded px-3 py-1 text-xs text-gray-500 hover:bg-gray-100">
-                取消
+                {t("cancel")}
               </button>
               <button
                 onClick={commitEdit}
                 disabled={!draft.trim()}
                 className="rounded bg-blue-600 px-3 py-1 text-xs text-white hover:bg-blue-700 disabled:opacity-50"
               >
-                重新发送
+                {t("resend")}
               </button>
             </div>
           </div>
@@ -103,7 +105,7 @@ export default function MessageBubble({ role, content, sources, onDownload, onEd
             {isUser && onEdit && (
               <button
                 onClick={startEdit}
-                title="编辑并重新发送"
+                title={t("edit_resend")}
                 className="absolute -left-7 top-1/2 -translate-y-1/2 rounded p-1 text-gray-300 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-gray-100 hover:text-gray-500"
               >
                 <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
@@ -122,7 +124,7 @@ export default function MessageBubble({ role, content, sources, onDownload, onEd
             <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
             </svg>
-            重新发送
+            {t("resend")}
           </button>
         )}
 
@@ -133,7 +135,7 @@ export default function MessageBubble({ role, content, sources, onDownload, onEd
                 key={s.doc_id}
                 onClick={() => onDownload?.(s)}
                 className="flex items-center gap-1 rounded-full border border-gray-200 bg-white px-2.5 py-1 text-xs text-blue-600 hover:border-blue-300 hover:bg-blue-50 transition-colors"
-                title="下载原文"
+                title={t("download_original")}
               >
                 <svg className="h-3 w-3" viewBox="0 0 16 16" fill="currentColor">
                   <path d="M9 2H4a1 1 0 00-1 1v10a1 1 0 001 1h8a1 1 0 001-1V6l-4-4zm1 4V3l3 3h-3z"/>

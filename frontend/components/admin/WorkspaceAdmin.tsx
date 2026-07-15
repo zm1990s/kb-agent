@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import CategoryManager from "@/components/admin/CategoryManager";
 import { api, ApiError } from "@/lib/api";
 import { getToken } from "@/lib/auth";
@@ -18,6 +19,7 @@ interface GroupGrant {
 
 // 空间管理：建空间、选空间、加个人成员、按组授权、导出并删除。
 export default function WorkspaceAdmin() {
+  const t = useTranslations("admin");
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [groups, setGroups] = useState<Group[]>([]);
@@ -89,7 +91,7 @@ export default function WorkspaceAdmin() {
       try {
         await fn();
       } catch (err) {
-        setError(err instanceof ApiError ? err.message : "操作失败");
+        setError(err instanceof ApiError ? err.message : t("ws_op_failed"));
       }
     };
   }
@@ -135,7 +137,7 @@ export default function WorkspaceAdmin() {
       const res = await fetch(`/api/workspaces/${selected}/export`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
-      if (!res.ok) throw new Error("导出失败");
+      if (!res.ok) throw new Error(t("ws_export_failed"));
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -145,7 +147,7 @@ export default function WorkspaceAdmin() {
       URL.revokeObjectURL(url);
       setDeleteStep("download");
     } catch (err) {
-      setDeleteError(err instanceof Error ? err.message : "导出失败");
+      setDeleteError(err instanceof Error ? err.message : t("ws_export_failed"));
     } finally {
       setDeleteLoading(false);
     }
@@ -161,7 +163,7 @@ export default function WorkspaceAdmin() {
       setSelected(null);
       await loadWorkspaces();
     } catch (err) {
-      setDeleteError(err instanceof ApiError ? err.message : "删除失败");
+      setDeleteError(err instanceof ApiError ? err.message : t("ws_delete_failed"));
     } finally {
       setDeleteLoading(false);
     }
@@ -170,30 +172,30 @@ export default function WorkspaceAdmin() {
   return (
     <div className="space-y-6">
       <section className="rounded border bg-white p-4">
-        <h2 className="mb-3 text-sm font-medium">创建空间</h2>
+        <h2 className="mb-3 text-sm font-medium">{t("ws_create")}</h2>
         <form onSubmit={createWs} className="flex gap-2">
           <input
             value={wsName}
             onChange={(e) => setWsName(e.target.value)}
-            placeholder="空间名称"
+            placeholder={t("ws_name_placeholder")}
             required
             className="flex-1 rounded border px-3 py-2 text-sm"
           />
           <button className="rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700">
-            创建
+            {t("ws_create_btn")}
           </button>
         </form>
       </section>
 
       <section className="rounded border bg-white p-4">
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-sm font-medium">空间授权及配置</h2>
+          <h2 className="text-sm font-medium">{t("ws_auth_title")}</h2>
           {selected && (
             <button
               onClick={openDeleteModal}
               className="rounded border border-red-200 px-3 py-1 text-xs text-red-600 hover:bg-red-50"
             >
-              删除此空间…
+              {t("ws_delete_btn")}
             </button>
           )}
         </div>
@@ -210,13 +212,13 @@ export default function WorkspaceAdmin() {
         </select>
 
         <div className="border-t pt-4">
-          <h3 className="mb-3 text-xs font-medium text-gray-600">添加个人成员</h3>
+          <h3 className="mb-3 text-xs font-medium text-gray-600">{t("ws_add_member_title")}</h3>
           <form onSubmit={addMember} className="flex gap-2">
             <input
               type="email"
               value={memberId}
               onChange={(e) => setMemberId(e.target.value)}
-              placeholder="用户邮箱"
+              placeholder={t("ws_member_email_placeholder")}
               required
               className="flex-1 rounded border px-3 py-2 text-sm"
             />
@@ -230,15 +232,15 @@ export default function WorkspaceAdmin() {
               <option value="owner">owner</option>
             </select>
             <button className="rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700">
-              添加
+              {t("ws_add_btn")}
             </button>
           </form>
         </div>
 
         <div className="border-t pt-4 mt-4">
-          <h3 className="mb-1 text-xs font-medium text-gray-600">按用户组授权</h3>
+          <h3 className="mb-1 text-xs font-medium text-gray-600">{t("ws_group_grant_title")}</h3>
           <p className="mb-3 text-xs text-gray-400">
-            授权给组后，组内成员自动获得该空间访问权（与个人成员并存）。
+            {t("ws_group_grant_desc")}
           </p>
           <form onSubmit={addGrant} className="mb-3 flex gap-2">
             <select
@@ -247,7 +249,7 @@ export default function WorkspaceAdmin() {
               required
               className="flex-1 rounded border px-2 py-2 text-sm"
             >
-              <option value="">选择用户组…</option>
+              <option value="">{t("ws_group_select")}</option>
               {groups.map((g) => (
                 <option key={g.id} value={g.id}>
                   {g.name}
@@ -264,7 +266,7 @@ export default function WorkspaceAdmin() {
               <option value="owner">owner</option>
             </select>
             <button className="rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700">
-              授权
+              {t("ws_grant_btn")}
             </button>
           </form>
           <ul className="space-y-1 text-sm text-gray-700">
@@ -285,16 +287,16 @@ export default function WorkspaceAdmin() {
                       );
                       await loadGrants();
                     } catch (err) {
-                      setError(err instanceof ApiError ? err.message : "撤销失败");
+                      setError(err instanceof ApiError ? err.message : t("ws_op_failed"));
                     }
                   }}
                   className="text-xs text-red-500 hover:underline"
                 >
-                  撤销
+                  {t("ws_revoke")}
                 </button>
               </li>
             ))}
-            {grants.length === 0 && <li className="text-gray-400">暂无组授权</li>}
+            {grants.length === 0 && <li className="text-gray-400">{t("ws_no_grants")}</li>}
           </ul>
         </div>
 
@@ -303,9 +305,9 @@ export default function WorkspaceAdmin() {
         </div>
 
         <div className="border-t pt-4 mt-4">
-          <h3 className="mb-1 text-xs font-medium text-gray-600">聊天引导问题</h3>
+          <h3 className="mb-1 text-xs font-medium text-gray-600">{t("ws_sq_title")}</h3>
           <p className="mb-3 text-xs text-gray-400">
-            空置时使用全局引导问题；每行一条，最多 10 条。
+            {t("ws_sq_desc")}
           </p>
           <form
             onSubmit={async (e) => {
@@ -319,9 +321,9 @@ export default function WorkspaceAdmin() {
                   { questions }
                 );
                 setSqText(updated.questions.join("\n"));
-                setSqMsg(`已保存 ${updated.questions.length} 条引导问题`);
+                setSqMsg(t("ws_sq_saved", { count: updated.questions.length }));
               } catch (err) {
-                setError(err instanceof ApiError ? err.message : "保存失败");
+                setError(err instanceof ApiError ? err.message : t("ws_op_failed"));
               }
             }}
             className="space-y-2"
@@ -338,7 +340,7 @@ export default function WorkspaceAdmin() {
               disabled={!selected}
               className="rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700 disabled:opacity-50"
             >
-              保存引导问题
+              {t("ws_sq_save")}
             </button>
           </form>
           {sqMsg && <p className="mt-2 text-xs text-green-600">{sqMsg}</p>}
@@ -351,15 +353,15 @@ export default function WorkspaceAdmin() {
       {showDeleteModal && selectedWs && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
-            <h2 className="mb-1 text-base font-semibold text-red-600">删除空间</h2>
+            <h2 className="mb-1 text-base font-semibold text-red-600">{t("ws_delete_modal_title")}</h2>
             <p className="mb-4 text-sm text-gray-600">
-              此操作将永久删除空间「<strong>{selectedWs.name}</strong>」及其全部文档、对话记录，无法恢复。
+              {t("ws_delete_modal_desc", { name: selectedWs.name })}
             </p>
 
             {deleteStep === "confirm" && (
               <>
                 <p className="mb-2 text-sm text-gray-700">
-                  请输入空间名称确认：
+                  {t("ws_delete_input_hint")}
                 </p>
                 <input
                   value={deleteConfirmName}
@@ -373,14 +375,14 @@ export default function WorkspaceAdmin() {
                     onClick={() => setShowDeleteModal(false)}
                     className="rounded border px-4 py-2 text-sm text-gray-600 hover:bg-gray-100"
                   >
-                    取消
+                    {t("ws_cancel_delete")}
                   </button>
                   <button
                     onClick={handleExportAndProceed}
                     disabled={deleteConfirmName !== selectedWs.name || deleteLoading}
                     className="rounded bg-red-600 px-4 py-2 text-sm text-white hover:bg-red-700 disabled:opacity-50"
                   >
-                    {deleteLoading ? "打包中…" : "导出所有文件并继续"}
+                    {deleteLoading ? t("ws_delete_exporting") : t("ws_delete_export")}
                   </button>
                 </div>
               </>
@@ -389,10 +391,10 @@ export default function WorkspaceAdmin() {
             {deleteStep === "download" && (
               <>
                 <div className="mb-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
-                  文件已开始下载。请确认下载完成后再执行删除。
+                  {t("ws_delete_download_msg")}
                 </div>
                 <p className="mb-4 text-sm text-gray-600">
-                  {'下载完成了吗？点击"确认删除"将永久删除该空间。'}
+                  {t("ws_delete_download_confirm")}
                 </p>
                 {deleteError && <p className="mb-3 text-sm text-red-600">{deleteError}</p>}
                 <div className="flex justify-end gap-2">
@@ -400,21 +402,21 @@ export default function WorkspaceAdmin() {
                     onClick={() => setShowDeleteModal(false)}
                     className="rounded border px-4 py-2 text-sm text-gray-600 hover:bg-gray-100"
                   >
-                    取消，不删除
+                    {t("ws_cancel_delete")}
                   </button>
                   <button
                     onClick={handleExportAndProceed}
                     disabled={deleteLoading}
                     className="rounded border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                   >
-                    重新下载
+                    {t("ws_redownload")}
                   </button>
                   <button
                     onClick={handleConfirmDelete}
                     disabled={deleteLoading}
                     className="rounded bg-red-600 px-4 py-2 text-sm text-white hover:bg-red-700 disabled:opacity-50"
                   >
-                    {deleteLoading ? "删除中…" : "确认删除"}
+                    {deleteLoading ? t("ws_deleting") : t("ws_confirm_delete")}
                   </button>
                 </div>
               </>

@@ -1,6 +1,9 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 export default function ThinkingBubble({ stage }: { stage: string | null }) {
+  const t = useTranslations("chat");
   return (
     <div className="flex flex-row gap-3">
       <div
@@ -11,7 +14,7 @@ export default function ThinkingBubble({ stage }: { stage: string | null }) {
       </div>
       <div className="flex flex-col items-start gap-1.5">
         <div className="rounded-2xl rounded-tl-sm border border-gray-200 bg-white px-4 py-3 shadow-sm">
-          <span className="flex gap-1.5 items-center" aria-label="正在处理">
+          <span className="flex gap-1.5 items-center" aria-label={t("preparing")}>
             <span className="h-2 w-2 animate-bounce rounded-full bg-gray-400 [animation-delay:-0.3s]" />
             <span className="h-2 w-2 animate-bounce rounded-full bg-gray-400 [animation-delay:-0.15s]" />
             <span className="h-2 w-2 animate-bounce rounded-full bg-gray-400" />

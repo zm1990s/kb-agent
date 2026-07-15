@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import { api } from "@/lib/api";
+import { useDialog } from "@/components/DialogProvider";
 import type { ConversationSummary } from "@/lib/types";
 
 interface Props {
@@ -21,6 +23,8 @@ export default function ConversationSidebar({
   onUpdated,
   onDeleted,
 }: Props) {
+  const t = useTranslations("sidebar");
+  const { showConfirm } = useDialog();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
   const editRef = useRef<HTMLInputElement>(null);
@@ -65,7 +69,8 @@ export default function ConversationSidebar({
 
   async function deleteConv(conv: ConversationSummary, e: React.MouseEvent) {
     e.stopPropagation();
-    if (!confirm(`删除会话「${conv.title ?? "新会话"}」？`)) return;
+    const ok = await showConfirm(t("delete_confirm", { title: conv.title ?? t("untitled") }));
+    if (!ok) return;
     try {
       await api.del(`/conversations/${conv.id}`);
       onDeleted?.(conv.id);
@@ -81,12 +86,12 @@ export default function ConversationSidebar({
           onClick={onNew}
           className="w-full rounded-lg bg-blue-600 py-2 px-3 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
         >
-          + 新建会话
+          {t("new_conversation")}
         </button>
       </div>
       <div className="flex-1 overflow-y-auto px-2 pb-2">
         {conversations.length === 0 && (
-          <p className="px-3 py-4 text-center text-xs text-gray-400">暂无会话</p>
+          <p className="px-3 py-4 text-center text-xs text-gray-400">{t("no_conversations")}</p>
         )}
         {conversations.map((c) => (
           <div
@@ -100,7 +105,7 @@ export default function ConversationSidebar({
           >
             {/* Pin indicator */}
             {c.pinned && (
-              <span className="mr-1.5 mt-0.5 shrink-0 text-blue-400" title="已置顶">
+              <span className="mr-1.5 mt-0.5 shrink-0 text-blue-400" title={t("pinned_title")}>
                 <svg className="h-3 w-3" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"/>
                 </svg>
@@ -129,7 +134,7 @@ export default function ConversationSidebar({
                   title={c.title ?? undefined}
                   onDoubleClick={(e) => startEdit(c, e)}
                 >
-                  {c.title ?? "新会话"}
+                  {c.title ?? t("untitled")}
                 </span>
               )}
               <span className="mt-0.5 block text-xs text-gray-400">
@@ -142,7 +147,7 @@ export default function ConversationSidebar({
               <div className="ml-1 flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
                 <button
                   onClick={(e) => togglePin(c, e)}
-                  title={c.pinned ? "取消置顶" : "置顶"}
+                  title={c.pinned ? t("unpin") : t("pin")}
                   className={`rounded p-0.5 hover:bg-gray-200 ${c.pinned ? "text-blue-500" : "text-gray-400"}`}
                 >
                   <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="currentColor">
@@ -151,7 +156,7 @@ export default function ConversationSidebar({
                 </button>
                 <button
                   onClick={(e) => startEdit(c, e)}
-                  title="重命名"
+                  title={t("rename")}
                   className="rounded p-0.5 text-gray-400 hover:bg-gray-200 hover:text-gray-600"
                 >
                   <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
@@ -160,7 +165,7 @@ export default function ConversationSidebar({
                 </button>
                 <button
                   onClick={(e) => deleteConv(c, e)}
-                  title="删除会话"
+                  title={t("delete")}
                   className="rounded p-0.5 text-gray-400 hover:bg-red-100 hover:text-red-500"
                 >
                   <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>

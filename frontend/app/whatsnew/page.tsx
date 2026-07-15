@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import NavBar from "@/components/NavBar";
 import Markdown from "@/components/Markdown";
 import { api } from "@/lib/api";
@@ -32,20 +33,23 @@ interface Subscription {
   created_at: string;
 }
 
-const FREQ_OPTIONS = [
-  { value: "weekly", label: "每周" },
-  { value: "biweekly", label: "每两周" },
-  { value: "monthly", label: "每月" },
-];
+// FREQ_OPTIONS labels are now resolved via t() inside the component
 
 function formatDate(iso: string) {
   return iso.slice(0, 10);
 }
 
 export default function WhatsNewPage() {
+  const t = useTranslations("whatsnew");
   const ready = useAuthGuard();
   const admin = isAdmin();
   const myEmail = getEmail() ?? "";
+
+  const FREQ_OPTIONS = [
+    { value: "weekly", label: t("freq_weekly") },
+    { value: "biweekly", label: t("freq_biweekly") },
+    { value: "monthly", label: t("freq_monthly") },
+  ];
 
   const [reports, setReports] = useState<WorkspaceReport[]>([]);
   const [loading, setLoading] = useState(true);
@@ -115,9 +119,9 @@ export default function WhatsNewPage() {
     setTriggerMsg("");
     try {
       await api.post("/whatsnew/trigger", {});
-      setTriggerMsg("摘要生成任务已提交，请稍后刷新页面查看最新结果。");
+      setTriggerMsg(t("trigger_success"));
     } catch {
-      setTriggerMsg("提交失败，请重试。");
+      setTriggerMsg(t("trigger_failed"));
     } finally {
       setTriggering(false);
     }
@@ -129,9 +133,9 @@ export default function WhatsNewPage() {
     try {
       const data = await api.put<Subscription>("/whatsnew/subscription", { frequency: subFreq });
       setSub(data);
-      setSubMsg("订阅已保存。");
+      setSubMsg(t("sub_saved"));
     } catch {
-      setSubMsg("保存失败，请重试。");
+      setSubMsg(t("sub_save_failed"));
     } finally {
       setSubSaving(false);
     }
@@ -144,9 +148,9 @@ export default function WhatsNewPage() {
       await api.del("/whatsnew/subscription");
       setSub(null);
       setSubFreq("weekly");
-      setSubMsg("已取消订阅。");
+      setSubMsg(t("sub_deleted"));
     } catch {
-      setSubMsg("取消失败，请重试。");
+      setSubMsg(t("sub_delete_failed"));
     } finally {
       setSubSaving(false);
     }
@@ -160,7 +164,7 @@ export default function WhatsNewPage() {
       <main className="mx-auto w-full max-w-4xl flex-1 p-6">
         {/* 页头 */}
         <div className="mb-5 flex items-center justify-between">
-          <h1 className="text-lg font-semibold text-gray-800">新动态</h1>
+          <h1 className="text-lg font-semibold text-gray-800">{t("title")}</h1>
           <div className="flex items-center gap-3">
             {admin && (
               <button
@@ -168,14 +172,14 @@ export default function WhatsNewPage() {
                 disabled={triggering}
                 className="rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700 disabled:opacity-50"
               >
-                {triggering ? "生成中…" : "立即刷新"}
+                {triggering ? t("triggering") : t("trigger")}
               </button>
             )}
             <button
               onClick={load}
               className="rounded border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100"
             >
-              刷新
+              {t("refresh")}
             </button>
           </div>
         </div>
@@ -188,10 +192,10 @@ export default function WhatsNewPage() {
 
         {/* 摘要列表 */}
         {loading ? (
-          <div className="py-16 text-center text-sm text-gray-400">加载中…</div>
+          <div className="py-16 text-center text-sm text-gray-400">{t("loading")}</div>
         ) : reports.length === 0 ? (
           <div className="py-16 text-center text-sm text-gray-400">
-            暂无新动态，摘要将在每天自动生成。
+            {t("no_reports")}
           </div>
         ) : (
           <div className="space-y-6">
@@ -203,8 +207,8 @@ export default function WhatsNewPage() {
                 <div className="flex items-center justify-between border-b border-gray-100 bg-gray-50 px-5 py-3">
                   <div className="font-medium text-gray-800">{r.workspace_name}</div>
                   <div className="text-xs text-gray-400">
-                    {formatDate(r.period_start)} ~ {formatDate(r.period_end)}
-                    &nbsp;·&nbsp;生成于 {formatDate(r.created_at)}
+                    {t("period", { start: formatDate(r.period_start), end: formatDate(r.period_end) })}
+                    &nbsp;·&nbsp;{t("generated_at", { date: formatDate(r.created_at) })}
                   </div>
                 </div>
 
@@ -218,7 +222,7 @@ export default function WhatsNewPage() {
                   {r.documents.length > 0 && (
                     <div>
                       <p className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-400">
-                        本期新增文档（{r.documents.length} 篇）
+                        {t("new_docs", { count: r.documents.length })}
                       </p>
                       <ul className="space-y-2">
                         {r.documents.map((doc) => (
@@ -276,17 +280,17 @@ export default function WhatsNewPage() {
         {/* 邮件订阅区块 */}
         <div className="mt-10 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
           <div className="border-b border-gray-100 bg-gray-50 px-5 py-3">
-            <h2 className="font-medium text-gray-800">邮件订阅</h2>
+            <h2 className="font-medium text-gray-800">{t("subscription")}</h2>
           </div>
           <div className="p-5">
             {subLoading ? (
-              <p className="text-sm text-gray-400">加载中…</p>
+              <p className="text-sm text-gray-400">{t("loading")}</p>
             ) : (
               <div className="space-y-4">
                 {/* 收件邮箱（只读） */}
                 <div>
                   <label className="mb-1 block text-xs font-medium text-gray-500">
-                    收件邮箱
+                    {t("sub_email")}
                   </label>
                   <input
                     type="text"
@@ -294,13 +298,13 @@ export default function WhatsNewPage() {
                     readOnly
                     className="w-full rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-500 cursor-not-allowed"
                   />
-                  <p className="mt-0.5 text-xs text-gray-400">邮件将发送至你的登录邮箱</p>
+                  <p className="mt-0.5 text-xs text-gray-400">{t("sub_email_hint")}</p>
                 </div>
 
                 {/* 频率选择 */}
                 <div>
                   <label className="mb-1 block text-xs font-medium text-gray-500">
-                    通知频率
+                    {t("sub_frequency")}
                   </label>
                   <select
                     value={subFreq}
@@ -318,10 +322,10 @@ export default function WhatsNewPage() {
                 {/* 当前订阅状态 */}
                 {sub && (
                   <p className="text-xs text-gray-400">
-                    当前已订阅（{FREQ_OPTIONS.find((o) => o.value === sub.frequency)?.label ?? sub.frequency}）
+                    {t("sub_current", { freq: FREQ_OPTIONS.find((o) => o.value === sub.frequency)?.label ?? sub.frequency })}
                     {sub.last_sent_at
-                      ? `，上次发送于 ${formatDate(sub.last_sent_at)}`
-                      : "，尚未发送过"}
+                      ? t("sub_last_sent", { date: formatDate(sub.last_sent_at) })
+                      : t("sub_never_sent")}
                   </p>
                 )}
 
@@ -332,7 +336,7 @@ export default function WhatsNewPage() {
                     disabled={subSaving}
                     className="rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700 disabled:opacity-50"
                   >
-                    {subSaving ? "保存中…" : sub ? "更新订阅" : "订阅"}
+                    {subSaving ? t("sub_save") : sub ? t("sub_update") : t("sub_subscribe")}
                   </button>
                   {sub && (
                     <button
@@ -340,7 +344,7 @@ export default function WhatsNewPage() {
                       disabled={subSaving}
                       className="rounded border border-red-200 px-4 py-2 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50"
                     >
-                      取消订阅
+                      {t("sub_unsubscribe")}
                     </button>
                   )}
                 </div>

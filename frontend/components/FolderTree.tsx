@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import type { Folder } from "@/lib/types";
 
 export interface FolderNode extends Folder {
@@ -88,6 +89,7 @@ function FolderRow({
   onDelete,
   onDropItem,
 }: { node: FolderNode; depth: number } & Omit<Props, "nodes" | "depth">) {
+  const t = useTranslations("folderTree");
   const [open, setOpen] = useState(true);
   const [dragOver, setDragOver] = useState(false);
   const hasChildren = node.children.length > 0;
@@ -130,7 +132,7 @@ function FolderRow({
         <button
           onClick={() => setOpen((o) => !o)}
           className="flex w-4 shrink-0 items-center justify-center text-gray-400 hover:text-gray-600"
-          aria-label={open ? "折叠" : "展开"}
+          aria-label={open ? t("collapse") : t("expand")}
         >
           {hasChildren && (
             <svg
@@ -172,21 +174,21 @@ function FolderRow({
             <button
               onClick={() => onAddChild(node.id)}
               className="text-gray-400 hover:text-blue-600"
-              title="新建子目录"
+              title={t("add_child")}
             >
               ＋
             </button>
             <button
               onClick={() => onRename(node)}
               className="text-gray-400 hover:text-blue-600"
-              title="重命名"
+              title={t("rename")}
             >
               ✎
             </button>
             <button
               onClick={() => onDelete(node.id)}
               className="text-gray-400 hover:text-red-600"
-              title="删除目录"
+              title={t("delete_folder")}
             >
               ✕
             </button>

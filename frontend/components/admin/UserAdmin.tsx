@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
+import { useDialog } from "@/components/DialogProvider";
 import { api, ApiError } from "@/lib/api";
 
 interface UserRow {
@@ -26,17 +28,18 @@ interface GroupPerm {
   level: string;
 }
 
-const MODULES = [
-  { key: "whatsnew", label: "新动态" },
-  { key: "chat", label: "对话查询" },
-  { key: "documents", label: "文档管理" },
-  { key: "workspaces", label: "空间管理" },
-  { key: "users", label: "用户管理" },
-  { key: "settings", label: "系统设置" },
-  { key: "stats", label: "数据统计" },
-];
+const MODULE_KEYS = [
+  "whatsnew",
+  "chat",
+  "documents",
+  "workspaces",
+  "users",
+  "settings",
+  "stats",
+] as const;
 
 export default function UserAdmin() {
+  const t = useTranslations("admin");
   const [tab, setTab] = useState<"users" | "groups">("users");
   const [users, setUsers] = useState<UserRow[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
@@ -47,9 +50,9 @@ export default function UserAdmin() {
       setUsers(await api.get<UserRow[]>("/admin/users"));
       setGroups(await api.get<Group[]>("/admin/groups"));
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "加载失败");
+      setError(err instanceof ApiError ? err.message : t("user_load_failed"));
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     load();
@@ -58,17 +61,17 @@ export default function UserAdmin() {
   return (
     <div>
       <div className="mb-4 flex gap-1 border-b">
-        {(["users", "groups"] as const).map((t) => (
+        {(["users", "groups"] as const).map((tabKey) => (
           <button
-            key={t}
-            onClick={() => setTab(t)}
+            key={tabKey}
+            onClick={() => setTab(tabKey)}
             className={`px-4 py-2 text-sm ${
-              tab === t
+              tab === tabKey
                 ? "border-b-2 border-blue-600 font-medium text-blue-700"
                 : "text-gray-500 hover:text-gray-800"
             }`}
           >
-            {t === "users" ? "用户" : "用户组与权限"}
+            {tabKey === "users" ? t("user_tab_users") : t("user_tab_groups")}
           </button>
         ))}
       </div>
@@ -92,13 +95,16 @@ function UsersTab({
   reload: () => Promise<void>;
   setError: (s: string | null) => void;
 }) {
+  const t = useTranslations("admin");
+  const { showConfirm, showPrompt } = useDialog();
+
   async function act(fn: () => Promise<unknown>) {
     setError(null);
     try {
       await fn();
       await reload();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "操作失败");
+      setError(err instanceof ApiError ? err.message : t("user_op_failed"));
     }
   }
 
@@ -107,10 +113,10 @@ function UsersTab({
       <table className="w-full text-sm">
         <thead className="bg-gray-50 text-left text-gray-500">
           <tr>
-            <th className="px-4 py-2">邮箱</th>
-            <th className="px-4 py-2">角色</th>
-            <th className="px-4 py-2">状态</th>
-            <th className="px-4 py-2">操作</th>
+            <th className="px-4 py-2">{t("user_col_email")}</th>
+            <th className="px-4 py-2">{t("user_col_role")}</th>
+            <th className="px-4 py-2">{t("user_col_status")}</th>
+            <th className="px-4 py-2">{t("user_col_actions")}</th>
           </tr>
         </thead>
         <tbody>
@@ -127,13 +133,13 @@ function UsersTab({
                   }
                   className="rounded border px-1 py-0.5 text-xs"
                 >
-                  <option value="admin">管理员</option>
-                  <option value="user">普通用户</option>
+                  <option value="admin">{t("user_role_admin")}</option>
+                  <option value="user">{t("user_role_user")}</option>
                 </select>
               </td>
               <td className="px-4 py-2">
                 <span className={u.is_active ? "text-green-700" : "text-gray-400"}>
-                  {u.is_active ? "启用" : "禁用"}
+                  {u.is_active ? t("user_active") : t("user_inactive")}
                 </span>
               </td>
               <td className="whitespace-nowrap px-4 py-2">
@@ -145,11 +151,11 @@ function UsersTab({
                   }
                   className="mr-1 rounded bg-gray-100 px-2 py-1 text-xs text-gray-700 hover:bg-gray-200"
                 >
-                  {u.is_active ? "禁用" : "启用"}
+                  {u.is_active ? t("user_disable") : t("user_enable")}
                 </button>
                 <button
-                  onClick={() => {
-                    const pw = window.prompt("为该用户设置新密码（≥8 位）");
+                  onClick={async () => {
+                    const pw = await showPrompt(t("user_reset_password_prompt"));
                     if (pw)
                       act(() =>
                         api.post(`/admin/users/${u.id}/reset-password`, { new_password: pw })
@@ -157,16 +163,16 @@ function UsersTab({
                   }}
                   className="rounded bg-gray-100 px-2 py-1 text-xs text-blue-700 hover:bg-gray-200"
                 >
-                  重置密码
+                  {t("user_reset_password")}
                 </button>
                 <button
-                  onClick={() => {
-                    if (window.confirm(`确认永久删除用户「${u.email}」？此操作不可恢复。`))
+                  onClick={async () => {
+                    if (await showConfirm(t("user_delete_confirm", { email: u.email })))
                       act(() => api.del(`/admin/users/${u.id}`));
                   }}
                   className="ml-1 rounded bg-gray-100 px-2 py-1 text-xs text-red-600 hover:bg-red-50"
                 >
-                  删除
+                  {t("user_delete")}
                 </button>
               </td>
             </tr>
@@ -186,6 +192,8 @@ function GroupsTab({
   reload: () => Promise<void>;
   setError: (s: string | null) => void;
 }) {
+  const t = useTranslations("admin");
+  const { showConfirm, showPrompt } = useDialog();
   const [selected, setSelected] = useState<string | null>(null);
   const [rules, setRules] = useState<GroupRule[]>([]);
   const [perms, setPerms] = useState<GroupPerm[]>([]);
@@ -195,9 +203,9 @@ function GroupsTab({
       setRules(await api.get<GroupRule[]>(`/admin/groups/${gid}/rules`));
       setPerms(await api.get<GroupPerm[]>(`/admin/groups/${gid}/permissions`));
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "加载组详情失败");
+      setError(err instanceof ApiError ? err.message : t("user_load_failed"));
     }
-  }, [setError]);
+  }, [setError, t]);
 
   useEffect(() => {
     if (selected) loadDetail(selected);
@@ -210,7 +218,7 @@ function GroupsTab({
       await reload();
       if (selected && reloadDetail) await loadDetail(selected);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "操作失败");
+      setError(err instanceof ApiError ? err.message : t("user_op_failed"));
     }
   }
 
@@ -221,13 +229,13 @@ function GroupsTab({
     <div className="flex gap-4">
       <div className="w-56 shrink-0 rounded border bg-white">
         <button
-          onClick={() => {
-            const name = window.prompt("新用户组名称");
+          onClick={async () => {
+            const name = await showPrompt(t("group_new_prompt"));
             if (name) act(() => api.post("/admin/groups", { name }), false);
           }}
           className="m-2 rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700"
         >
-          + 新建组
+          {t("group_new")}
         </button>
         {groups.map((g) => (
           <div
@@ -245,8 +253,8 @@ function GroupsTab({
               {g.name}
             </button>
             <button
-              onClick={() => {
-                if (window.confirm(`删除组「${g.name}」？`)) {
+              onClick={async () => {
+                if (await showConfirm(t("group_delete_confirm", { name: g.name }))) {
                   act(() => api.del(`/admin/groups/${g.id}`), false);
                   if (selected === g.id) setSelected(null);
                 }
@@ -261,14 +269,14 @@ function GroupsTab({
 
       <div className="flex-1 space-y-4">
         {!selected && (
-          <p className="text-sm text-gray-400">选择一个组以配置入组规则与模块权限。</p>
+          <p className="text-sm text-gray-400">{t("group_select_hint")}</p>
         )}
         {selected && (
           <>
             <section className="rounded border bg-white p-4">
-              <h3 className="mb-2 text-sm font-medium">自动入组规则</h3>
+              <h3 className="mb-2 text-sm font-medium">{t("group_rules_title")}</h3>
               <p className="mb-2 text-xs text-gray-400">
-                {'任一规则命中即入组。改规则后可点击"重算全部用户入组"刷新。'}
+                {t("group_rules_desc")}
               </p>
               <ul className="mb-3 space-y-1 text-sm">
                 {rules.map((r) => (
@@ -283,11 +291,11 @@ function GroupsTab({
                       onClick={() => act(() => api.del(`/admin/rules/${r.id}`))}
                       className="text-xs text-red-500 hover:underline"
                     >
-                      删除
+                      {t("group_delete_rule")}
                     </button>
                   </li>
                 ))}
-                {rules.length === 0 && <li className="text-gray-400">暂无规则</li>}
+                {rules.length === 0 && <li className="text-gray-400">{t("group_no_rules")}</li>}
               </ul>
               <RuleForm
                 onAdd={(field, op, value) =>
@@ -299,27 +307,27 @@ function GroupsTab({
             </section>
 
             <section className="rounded border bg-white p-4">
-              <h3 className="mb-2 text-sm font-medium">模块权限（RBAC）</h3>
+              <h3 className="mb-2 text-sm font-medium">{t("group_perms_title")}</h3>
               <div className="space-y-2">
-                {MODULES.map((m) => (
-                  <div key={m.key} className="flex items-center gap-3 text-sm">
-                    <span className="w-24 text-gray-600">{m.label}</span>
+                {MODULE_KEYS.map((key) => (
+                  <div key={key} className="flex items-center gap-3 text-sm">
+                    <span className="w-24 text-gray-600">{t(`module_${key}`)}</span>
                     {(["none", "read", "write"] as const).map((lv) => (
                       <label key={lv} className="flex items-center gap-1 text-xs">
                         <input
                           type="radio"
-                          name={`perm-${m.key}`}
-                          checked={permLevel(m.key) === lv}
+                          name={`perm-${key}`}
+                          checked={permLevel(key) === lv}
                           onChange={() =>
                             act(() =>
                               api.put(`/admin/groups/${selected}/permissions`, {
-                                module: m.key,
+                                module: key,
                                 level: lv,
                               })
                             )
                           }
                         />
-                        {lv === "none" ? "无" : lv === "read" ? "只读" : "读写"}
+                        {lv === "none" ? t("group_perm_none") : lv === "read" ? t("group_perm_read") : t("group_perm_write")}
                       </label>
                     ))}
                   </div>
@@ -329,7 +337,7 @@ function GroupsTab({
                 onClick={() => act(() => api.post("/admin/recompute-memberships"), false)}
                 className="mt-4 rounded border px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-100"
               >
-                重算全部用户入组
+                {t("group_recompute")}
               </button>
             </section>
           </>
@@ -340,6 +348,7 @@ function GroupsTab({
 }
 
 function RuleForm({ onAdd }: { onAdd: (field: string, op: string, value: string) => void }) {
+  const t = useTranslations("admin");
   const [field, setField] = useState("email_domain");
   const [op, setOp] = useState("equals");
   const [value, setValue] = useState("");
@@ -377,28 +386,28 @@ function RuleForm({ onAdd }: { onAdd: (field: string, op: string, value: string)
           onChange={(e) => setField(e.target.value)}
           className="rounded border px-2 py-1 text-xs"
         >
-          <option value="email_domain">邮箱域名</option>
-          <option value="email">邮箱</option>
-          <option value="role">角色</option>
+          <option value="email_domain">{t("group_rule_field_domain")}</option>
+          <option value="email">{t("group_rule_field_email")}</option>
+          <option value="role">{t("group_rule_field_role")}</option>
         </select>
         <select
           value={op}
           onChange={(e) => setOp(e.target.value)}
           className="rounded border px-2 py-1 text-xs"
         >
-          <option value="equals">等于</option>
-          <option value="endswith">以…结尾</option>
-          <option value="contains">包含</option>
+          <option value="equals">{t("group_rule_op_equals")}</option>
+          <option value="endswith">{t("group_rule_op_endswith")}</option>
+          <option value="contains">{t("group_rule_op_contains")}</option>
         </select>
         <input
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="支持空格/逗号/回车分隔多个值"
+          placeholder={t("group_rule_value_placeholder")}
           className="flex-1 rounded border px-2 py-1 text-xs"
         />
         <button className="rounded bg-blue-600 px-3 py-1 text-xs text-white hover:bg-blue-700">
-          添加规则
+          {t("group_rule_add")}
         </button>
       </div>
       {preview.length > 1 && (
@@ -408,7 +417,7 @@ function RuleForm({ onAdd }: { onAdd: (field: string, op: string, value: string)
               {v}
             </span>
           ))}
-          <span className="text-xs text-gray-400">将添加 {preview.length} 条规则</span>
+          <span className="text-xs text-gray-400">{t("group_rule_will_add", { count: preview.length })}</span>
         </div>
       )}
     </form>
