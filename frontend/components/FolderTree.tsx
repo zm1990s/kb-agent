@@ -129,10 +129,18 @@ function FolderRow({
       >
         <button
           onClick={() => setOpen((o) => !o)}
-          className="w-4 shrink-0 text-xs text-gray-400"
+          className="flex w-4 shrink-0 items-center justify-center text-gray-400 hover:text-gray-600"
           aria-label={open ? "折叠" : "展开"}
         >
-          {hasChildren ? (open ? "▾" : "▸") : ""}
+          {hasChildren && (
+            <svg
+              viewBox="0 0 16 16"
+              fill="currentColor"
+              className={`h-3 w-3 transition-transform duration-150 ${open ? "rotate-90" : ""}`}
+            >
+              <path d="M6 3.5l5 4.5-5 4.5V3.5z" />
+            </svg>
+          )}
         </button>
         <button
           onClick={() => onSelect(node.id)}
@@ -143,11 +151,21 @@ function FolderRow({
               JSON.stringify({ type: "folder", id: node.id })
             )
           }
-          className={`flex-1 cursor-grab truncate py-2 pr-1 text-left text-sm active:cursor-grabbing ${
-            activeId === node.id ? "text-blue-700" : "text-gray-600"
+          className={`flex flex-1 cursor-grab items-center gap-1.5 truncate py-2 pr-1 text-left text-sm active:cursor-grabbing ${
+            activeId === node.id ? "text-blue-600" : "text-gray-600"
           }`}
         >
-          📁 {node.name}
+          {open && hasChildren ? (
+            <svg viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4 shrink-0 text-blue-400">
+              <path d="M2 6a2 2 0 012-2h4l2 2h6a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
+            </svg>
+          ) : (
+            <svg viewBox="0 0 20 20" fill="currentColor" className={`h-4 w-4 shrink-0 ${activeId === node.id ? "text-blue-500" : "text-blue-400"}`}>
+              <path d="M2 6a2 2 0 012-2h4l2 2h6a2 2 0 012 2v1H2V6z" />
+              <path d="M2 9h16v5a2 2 0 01-2 2H4a2 2 0 01-2-2V9z" />
+            </svg>
+          )}
+          {node.name}
         </button>
         {admin && (
           <span className="hidden shrink-0 gap-1 pr-1 text-xs group-hover:flex">
