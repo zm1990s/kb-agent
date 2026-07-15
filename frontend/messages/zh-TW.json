@@ -456,6 +456,16 @@
     "prompts_undo": "復原更改",
     "prompts_save_failed": "儲存失敗",
     "prompts_reset_failed": "重設失敗",
-    "prompts_rollback_failed": "回退失敗"
+    "prompts_rollback_failed": "回退失敗",
+    "prompts_label_answer_fetch_prompt": "對話問答提示詞（第一階段：判斷是否需要原文）",
+    "prompts_desc_answer_fetch_prompt": "Agent 先用摘要索引判斷能否回答。摘要夠用則直接輸出答案；否則聲明需要哪些文件原文（返回 fetch 模式）。必須包含 {question}、{catalog}、{history}。",
+    "prompts_label_answer_prompt": "對話問答提示詞（第二階段：結合原文回答）",
+    "prompts_desc_answer_prompt": "當第一階段判斷摘要不夠用時，Agent 獲取文件原文後使用此提示詞作答。必須包含 {question}（使用者問題）、{catalog}（文件索引）、{history}（對話歷史）、{fulltext}（請求的文件原文）、{timestamp}（目前時間）。",
+    "prompts_label_classify_prompt": "文件索引提示詞",
+    "prompts_desc_classify_prompt": "Agent 讀取文件原文後執行分類、生成摘要和標籤時使用的提示詞。必須包含 {categories}（分類名稱清單）佔位符。",
+    "prompts_label_title_prompt": "對話標題提示詞",
+    "prompts_desc_title_prompt": "使用者發出第一條訊息後，Agent 自動生成對話標題時使用的提示詞。必須包含 {message} 佔位符（執行時替換為使用者的第一條訊息）。",
+    "prompts_label_whatsnew_prompt": "最新動態摘要提示詞",
+    "prompts_desc_whatsnew_prompt": "定時任務為每個空間生成「最新動態」摘要時使用的提示詞。必須包含 {workspace_name}、{period}、{doc_count}、{documents}、{timestamp} 五個佔位符。"
   }
 }

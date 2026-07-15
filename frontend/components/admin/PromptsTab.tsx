@@ -62,6 +62,20 @@ function diffLines(a: string, b: string): { type: "equal" | "remove" | "add"; te
 // 单个提示词卡片
 function PromptCard({ prompt, onSaved }: { prompt: PromptItem; onSaved: (p: PromptItem) => void }) {
   const t = useTranslations("admin");
+  const LABEL_MAP: Record<string, string> = {
+    answer_fetch_prompt: t("prompts_label_answer_fetch_prompt"),
+    answer_prompt: t("prompts_label_answer_prompt"),
+    classify_prompt: t("prompts_label_classify_prompt"),
+    title_prompt: t("prompts_label_title_prompt"),
+    whatsnew_prompt: t("prompts_label_whatsnew_prompt"),
+  };
+  const DESC_MAP: Record<string, string> = {
+    answer_fetch_prompt: t("prompts_desc_answer_fetch_prompt"),
+    answer_prompt: t("prompts_desc_answer_prompt"),
+    classify_prompt: t("prompts_desc_classify_prompt"),
+    title_prompt: t("prompts_desc_title_prompt"),
+    whatsnew_prompt: t("prompts_desc_whatsnew_prompt"),
+  };
   const { showConfirm } = useDialog();
   const { locale } = useLocale();
   const dateLocale = toDateLocale(locale);
@@ -153,7 +167,9 @@ function PromptCard({ prompt, onSaved }: { prompt: PromptItem; onSaved: (p: Prom
     <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
       {/* 标题行 */}
       <div className="mb-1 flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-gray-800">{prompt.label}</h2>
+        <h2 className="text-sm font-semibold text-gray-800">
+          {LABEL_MAP[prompt.key] ?? prompt.label}
+        </h2>
         <button
           onClick={() => { setShowHistory((v) => !v); setShowDiff(false); }}
           className="flex items-center gap-1 rounded px-2 py-1 text-xs text-gray-500 hover:bg-gray-100 transition-colors"
@@ -164,7 +180,7 @@ function PromptCard({ prompt, onSaved }: { prompt: PromptItem; onSaved: (p: Prom
           {t("prompts_history")}
         </button>
       </div>
-      <p className="mb-2 text-xs text-gray-400">{prompt.description}</p>
+      <p className="mb-2 text-xs text-gray-400">{DESC_MAP[prompt.key] ?? prompt.description}</p>
       {prompt.required_placeholders.length > 0 && (
         <p className="mb-3 text-xs text-blue-600">
           {t("prompts_must_contain")}{prompt.required_placeholders.map((ph) => (
