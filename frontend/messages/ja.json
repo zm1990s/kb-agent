@@ -63,7 +63,18 @@
     "err_email_not_verified": "メールアドレスが未確認です。登録時に送信された確認メールをご確認ください。",
     "err_account_locked": "アカウントが一時的にロックされました。{minutes}分後に再試行してください。",
     "pending_verification_title": "登録完了 — メールアドレスを確認してください",
-    "pending_verification_desc": "確認メールを {email} に送信しました。メール内のリンクをクリックして認証を完了してください（24時間以内有効）。"
+    "pending_verification_desc": "確認メールを {email} に送信しました。メール内のリンクをクリックして認証を完了してください（24時間以内有効）。",
+    "forgot_password_link": "パスワードをお忘れですか？",
+    "forgot_title": "パスワードの再設定",
+    "forgot_desc": "登録済みのメールアドレスを入力してください。6桁の確認コードをお送りします",
+    "forgot_submit": "コードを送信",
+    "forgot_sent": "コードを送信しました（登録済みの場合）。メールをご確認ください。",
+    "reset_title": "パスワードリセット",
+    "reset_code_label": "メール確認コード（6桁）",
+    "reset_new_password": "新しいパスワード",
+    "reset_submit": "リセットを確認",
+    "reset_success": "パスワードをリセットしました。新しいパスワードでログインしてください。",
+    "err_reset_invalid": "コードが無効または期限切れです。再送信してください。"
   },
   "chat": {
     "workspace_label": "ワークスペース：",
@@ -331,7 +342,7 @@
     "branding_logo_label": "ロゴ画像 URL（空欄の場合は略称を使用）",
     "branding_save": "ブランディングを保存",
     "branding_saved": "ブランディングを保存しました。ページを更新して反映させてください。",
-    "engine_title": "Agent エンジン",
+    "engine_title": "デフォルト Agent エンジン",
     "engine_desc": "分類と Q&A のバックエンドを選択します。利用不可のオプションは選択できません。",
     "engine_current": "現在",
     "engine_loading": "読み込み中…",

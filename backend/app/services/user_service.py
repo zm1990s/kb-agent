@@ -262,3 +262,82 @@ async def verify_email_token(session: AsyncSession, *, token: str) -> bool:
     await session.commit()
     logger.info("verify_email: 邮箱验证成功 user_id=%s", user.id)
     return True
+
+
+_RESET_CODE_EXPIRE_MINUTES = 10
+_RESET_RATE_LIMIT_SECONDS = 60
+_MAX_RESET_ATTEMPTS = 5
+
+
+async def request_password_reset(session: AsyncSession, *, email: str) -> None:
+    """触发密码重置：生成 6 位验证码并发送邮件。
+
+    防护策略：
+    - 无论邮箱是否存在，函数始终静默返回（不泄露用户存在性）
+    - rate limit：同邮箱 1 次/分钟，超频则跳过发送
+    - 验证码用 bcrypt 存储（与密码同等待遇）
+    - 每次请求覆盖旧 token，旧码立即失效
+    """
+    # 延迟导入避免循环依赖
+    from app.services.email_service import send_reset_code_email  # noqa: PLC0415
+
+    email = email.strip().lower()
+    result = await session.execute(select(User).where(User.email == email))
+    user = result.scalar_one_or_none()
+    if user is None:
+        return
+
+    now = datetime.now(UTC)
+    if user.reset_rate_exp is not None and user.reset_rate_exp > now:
+        return  # rate limit 未过，静默忽略
+
+    code = f"{secrets.randbelow(1_000_000):06d}"
+    user.reset_code_hash = hash_password(code)
+    user.reset_code_exp = now + timedelta(minutes=_RESET_CODE_EXPIRE_MINUTES)
+    user.reset_attempts = 0
+    user.reset_rate_exp = now + timedelta(seconds=_RESET_RATE_LIMIT_SECONDS)
+    await session.commit()
+
+    await send_reset_code_email(email, code)
+    logger.info("request_password_reset: 验证码已发送 user_id=%s", user.id)
+
+
+async def reset_password_with_code(
+    session: AsyncSession, *, email: str, code: str, new_password: str
+) -> bool:
+    """用验证码重置密码。失败（无效/过期/超次数）返回 False，成功返回 True。
+
+    失败时不区分具体原因（防信息泄露）。
+    """
+    email = email.strip().lower()
+    result = await session.execute(select(User).where(User.email == email))
+    user = result.scalar_one_or_none()
+    if user is None:
+        return False
+
+    now = datetime.now(UTC)
+    if (
+        user.reset_code_hash is None
+        or user.reset_code_exp is None
+        or user.reset_code_exp < now
+    ):
+        return False
+
+    if user.reset_attempts >= _MAX_RESET_ATTEMPTS:
+        return False
+
+    if not verify_password(code, user.reset_code_hash):
+        user.reset_attempts += 1
+        await session.commit()
+        return False
+
+    user.password_hash = hash_password(new_password)
+    user.reset_code_hash = None
+    user.reset_code_exp = None
+    user.reset_attempts = 0
+    user.reset_rate_exp = None
+    user.failed_login_attempts = 0
+    user.locked_until = None
+    await session.commit()
+    logger.info("reset_password_with_code: 密码重置成功 user_id=%s", user.id)
+    return True

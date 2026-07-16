@@ -63,7 +63,18 @@
     "err_email_not_verified": "電子郵件尚未驗證，請查收註冊時發送的驗證郵件",
     "err_account_locked": "帳號已被暫時鎖定，請 {minutes} 分鐘後再試",
     "pending_verification_title": "註冊成功，請驗證電子郵件",
-    "pending_verification_desc": "驗證郵件已發送至 {email}，請點擊郵件中的連結完成驗證後再登入（24小時內有效）"
+    "pending_verification_desc": "驗證郵件已發送至 {email}，請點擊郵件中的連結完成驗證後再登入（24小時內有效）",
+    "forgot_password_link": "忘記密碼？",
+    "forgot_title": "找回密碼",
+    "forgot_desc": "輸入註冊信箱，我們會發送 6 位驗證碼",
+    "forgot_submit": "發送驗證碼",
+    "forgot_sent": "驗證碼已發送（若該信箱已註冊），請查收郵件",
+    "reset_title": "重設密碼",
+    "reset_code_label": "信箱驗證碼（6位）",
+    "reset_new_password": "新密碼",
+    "reset_submit": "確認重設",
+    "reset_success": "密碼已重設，請使用新密碼登入",
+    "err_reset_invalid": "驗證碼無效或已過期，請重新發送"
   },
   "chat": {
     "workspace_label": "空間：",
@@ -331,7 +342,7 @@
     "branding_logo_label": "Logo 圖片 URL（留空使用預設縮寫）",
     "branding_save": "儲存品牌設定",
     "branding_saved": "品牌設定已儲存，重新整理頁面生效",
-    "engine_title": "Agent 引擎",
+    "engine_title": "預設 Agent 引擎",
     "engine_desc": "選擇處理分類與問答的後端。未實作的選項不可選。",
     "engine_current": "目前",
     "engine_loading": "載入中…",

@@ -419,7 +419,7 @@ export default function SystemSettings({ perms }: Props) {
             {brandingMsg && <p className="mt-2 text-xs text-green-600">{brandingMsg}</p>}
           </section>
 
-          {/* 引擎配置 */}
+          {/* 默认 Agent 引擎配置（含任务模型子菜单） */}
           <section className="rounded border bg-white p-4">
             <h2 className="mb-1 text-sm font-medium">{t("engine_title")}</h2>
             <p className="mb-3 text-xs text-gray-400">
@@ -451,40 +451,40 @@ export default function SystemSettings({ perms }: Props) {
               {!engine && <p className="text-sm text-gray-400">{t("engine_loading")}</p>}
             </div>
             {engineMsg && <p className="mt-2 text-xs text-green-600">{engineMsg}</p>}
-          </section>
 
-          {/* 任务级模型配置 */}
-          <section className="rounded border bg-white p-4">
-            <h2 className="mb-1 text-sm font-medium">{t("task_model_title")}</h2>
-            <p className="mb-3 text-xs text-gray-400">
-              {t("task_model_desc", { default: taskModels ? taskModels.default_model : t("task_model_loading") })}
-            </p>
-            {taskModels ? (
-              <div className="space-y-3">
-                {taskModels.tasks.map((task) => (
-                  <div key={task.key} className="flex items-center gap-2">
-                    <label className="w-36 flex-shrink-0 text-xs text-gray-600">{task.label}</label>
-                    <input
-                      value={taskModelInputs[task.key] ?? ""}
-                      onChange={(e) =>
-                        setTaskModelInputs((prev) => ({ ...prev, [task.key]: e.target.value }))
-                      }
-                      placeholder={taskModels.default_model}
-                      className="flex-1 rounded border px-3 py-1.5 text-sm font-mono focus:border-blue-400 focus:outline-none"
-                    />
-                    <button
-                      onClick={() => saveTaskModel(task.key)}
-                      className="rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700"
-                    >
-                      {t("whatsnew_save")}
-                    </button>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-gray-400">{t("task_model_loading")}</p>
-            )}
-            {taskModelMsg && <p className="mt-2 text-xs text-green-600">{taskModelMsg}</p>}
+            {/* 任务级模型配置（子菜单） */}
+            <div className="mt-4 rounded border border-gray-100 bg-gray-50 p-3">
+              <h3 className="mb-1 text-xs font-medium text-gray-700">{t("task_model_title")}</h3>
+              <p className="mb-3 text-xs text-gray-400">
+                {t("task_model_desc", { default: taskModels ? taskModels.default_model : t("task_model_loading") })}
+              </p>
+              {taskModels ? (
+                <div className="space-y-3">
+                  {taskModels.tasks.map((task) => (
+                    <div key={task.key} className="flex items-center gap-2">
+                      <label className="w-36 flex-shrink-0 text-xs text-gray-600">{task.label}</label>
+                      <input
+                        value={taskModelInputs[task.key] ?? ""}
+                        onChange={(e) =>
+                          setTaskModelInputs((prev) => ({ ...prev, [task.key]: e.target.value }))
+                        }
+                        placeholder={taskModels.default_model}
+                        className="flex-1 rounded border bg-white px-3 py-1.5 text-sm font-mono focus:border-blue-400 focus:outline-none"
+                      />
+                      <button
+                        onClick={() => saveTaskModel(task.key)}
+                        className="rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700"
+                      >
+                        {t("whatsnew_save")}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-400">{t("task_model_loading")}</p>
+              )}
+              {taskModelMsg && <p className="mt-2 text-xs text-green-600">{taskModelMsg}</p>}
+            </div>
           </section>
 
           {/* 对话引擎配置 */}
@@ -663,34 +663,7 @@ export default function SystemSettings({ perms }: Props) {
             {sqMsg && <p className="mt-2 text-xs text-green-600">{sqMsg}</p>}
           </section>
 
-          {/* 站点基础 URL */}
-          <section className="rounded border bg-white p-4">
-            <h2 className="mb-1 text-sm font-medium">{t("site_base_url_title")}</h2>
-            <p className="mb-3 text-xs text-gray-400">{t("site_base_url_desc")}</p>
-            <form onSubmit={saveSiteBaseUrl} className="flex gap-2">
-              <input
-                type="url"
-                value={siteBaseUrlInput}
-                onChange={(e) => setSiteBaseUrlInput(e.target.value)}
-                placeholder="https://kb.example.com"
-                className="flex-1 rounded border px-3 py-2 text-sm focus:border-blue-400 focus:outline-none"
-              />
-              <button
-                type="submit"
-                className="rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700"
-              >
-                {t("site_base_url_save")}
-              </button>
-            </form>
-            {siteBaseUrl && (
-              <p className="mt-2 text-xs text-gray-400">
-                {t("site_base_url_current")}: <code className="text-gray-600">{siteBaseUrl}</code>
-              </p>
-            )}
-            {siteBaseUrlMsg && <p className="mt-2 text-xs text-green-600">{siteBaseUrlMsg}</p>}
-          </section>
-
-          {/* 邮箱验证开关 */}
+          {/* 邮箱验证开关（含站点基础 URL 子菜单） */}
           <section className="rounded border bg-white p-4">
             <h2 className="mb-1 text-sm font-medium">{t("email_verification_title")}</h2>
             <p className="mb-3 text-xs text-gray-400">{t("email_verification_desc")}</p>
@@ -706,6 +679,33 @@ export default function SystemSettings({ perms }: Props) {
               </span>
             </label>
             {emailVerificationMsg && <p className="mt-2 text-xs text-green-600">{emailVerificationMsg}</p>}
+
+            {/* 站点基础 URL */}
+            <div className="mt-4 rounded border border-gray-100 bg-gray-50 p-3">
+              <h3 className="mb-1 text-xs font-medium text-gray-700">{t("site_base_url_title")}</h3>
+              <p className="mb-3 text-xs text-gray-400">{t("site_base_url_desc")}</p>
+              <form onSubmit={saveSiteBaseUrl} className="flex gap-2">
+                <input
+                  type="url"
+                  value={siteBaseUrlInput}
+                  onChange={(e) => setSiteBaseUrlInput(e.target.value)}
+                  placeholder="https://kb.example.com"
+                  className="flex-1 rounded border bg-white px-3 py-2 text-sm focus:border-blue-400 focus:outline-none"
+                />
+                <button
+                  type="submit"
+                  className="rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700"
+                >
+                  {t("site_base_url_save")}
+                </button>
+              </form>
+              {siteBaseUrl && (
+                <p className="mt-2 text-xs text-gray-400">
+                  {t("site_base_url_current")}: <code className="text-gray-600">{siteBaseUrl}</code>
+                </p>
+              )}
+              {siteBaseUrlMsg && <p className="mt-2 text-xs text-green-600">{siteBaseUrlMsg}</p>}
+            </div>
           </section>
 
           {error && <p className="text-sm text-red-600">{error}</p>}

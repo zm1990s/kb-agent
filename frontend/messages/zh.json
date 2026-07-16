@@ -63,7 +63,18 @@
     "err_email_not_verified": "邮箱尚未验证，请查收注册时发送的验证邮件",
     "err_account_locked": "账号已被暂时锁定，请 {minutes} 分钟后再试",
     "pending_verification_title": "注册成功，请验证邮箱",
-    "pending_verification_desc": "验证邮件已发送至 {email}，请点击邮件中的链接完成验证后再登录（24小时内有效）"
+    "pending_verification_desc": "验证邮件已发送至 {email}，请点击邮件中的链接完成验证后再登录（24小时内有效）",
+    "forgot_password_link": "忘记密码？",
+    "forgot_title": "找回密码",
+    "forgot_desc": "输入注册邮箱，我们会发送 6 位验证码",
+    "forgot_submit": "发送验证码",
+    "forgot_sent": "验证码已发送（若该邮箱已注册），请查收邮件",
+    "reset_title": "重置密码",
+    "reset_code_label": "邮箱验证码（6位）",
+    "reset_new_password": "新密码",
+    "reset_submit": "确认重置",
+    "reset_success": "密码已重置，请使用新密码登录",
+    "err_reset_invalid": "验证码无效或已过期，请重新发送"
   },
   "chat": {
     "workspace_label": "空间：",
@@ -331,7 +342,7 @@
     "branding_logo_label": "Logo 图片 URL（留空使用默认缩写）",
     "branding_save": "保存品牌配置",
     "branding_saved": "品牌配置已保存，刷新页面生效",
-    "engine_title": "Agent 引擎",
+    "engine_title": "默认 Agent 引擎",
     "engine_desc": "选择处理归类与问答的后端。未实现的选项不可选。",
     "engine_current": "当前",
     "engine_loading": "加载中…",

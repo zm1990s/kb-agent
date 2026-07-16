@@ -14,9 +14,11 @@ from app.schemas.auth import (
     AllowedDomainCreate,
     AllowedDomainPublic,
     ChangePasswordRequest,
+    ForgotPasswordRequest,
     LoginRequest,
     RegisterRequest,
     RegisterResponse,
+    ResetPasswordRequest,
     TokenResponse,
     UserPublic,
 )
@@ -34,6 +36,8 @@ from app.services.user_service import (
     list_allowed_domains,
     register_user,
     remove_allowed_domain,
+    request_password_reset,
+    reset_password_with_code,
     verify_email_token,
 )
 
@@ -211,3 +215,25 @@ async def delete_allowed_domain(
     logger.info("audit admin remove_allowed_domain admin=%s domain_id=%s", admin.id, domain_id)
     await record_event(session, action="admin_remove_allowed_domain", user_id=admin.id,
                        meta={"domain_id": str(domain_id)})
+
+
+@router.post("/forgot-password", status_code=status.HTTP_200_OK)
+async def forgot_password(
+    body: ForgotPasswordRequest,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    await request_password_reset(session, email=body.email)
+    return {"message": "if_exists_sent"}
+
+
+@router.post("/reset-password", status_code=status.HTTP_200_OK)
+async def reset_password(
+    body: ResetPasswordRequest,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    ok = await reset_password_with_code(
+        session, email=body.email, code=body.code, new_password=body.new_password
+    )
+    if not ok:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "invalid_or_expired")
+    return {"message": "password_reset_ok"}

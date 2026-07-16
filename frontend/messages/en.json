@@ -63,7 +63,18 @@
     "err_email_not_verified": "Email not verified. Please check your inbox for the verification email.",
     "err_account_locked": "Account temporarily locked. Try again in {minutes} minute(s).",
     "pending_verification_title": "Registration successful — verify your email",
-    "pending_verification_desc": "A verification email has been sent to {email}. Click the link in the email to activate your account (valid for 24 hours)."
+    "pending_verification_desc": "A verification email has been sent to {email}. Click the link in the email to activate your account (valid for 24 hours).",
+    "forgot_password_link": "Forgot password?",
+    "forgot_title": "Recover Password",
+    "forgot_desc": "Enter your registered email and we'll send a 6-digit code",
+    "forgot_submit": "Send Code",
+    "forgot_sent": "A code has been sent (if this email is registered). Please check your inbox.",
+    "reset_title": "Reset Password",
+    "reset_code_label": "Email verification code (6 digits)",
+    "reset_new_password": "New Password",
+    "reset_submit": "Confirm Reset",
+    "reset_success": "Password reset successfully. Please log in with your new password.",
+    "err_reset_invalid": "Code is invalid or expired. Please request a new one."
   },
   "chat": {
     "workspace_label": "Workspace:",
@@ -331,7 +342,7 @@
     "branding_logo_label": "Logo image URL (leave empty to use initials)",
     "branding_save": "Save branding",
     "branding_saved": "Branding saved. Refresh the page to apply.",
-    "engine_title": "Agent Engine",
+    "engine_title": "Default Agent Engine",
     "engine_desc": "Select the backend for classification and Q&A. Unavailable options are disabled.",
     "engine_current": "Current",
     "engine_loading": "Loading…",

@@ -18,16 +18,20 @@ interface RegisterResponse {
 export default function LoginPage() {
   const router = useRouter();
   const t = useTranslations("login");
-  const [mode, setMode] = useState<"login" | "register">("login");
+  const [mode, setMode] = useState<"login" | "register" | "forgot" | "reset">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [resetCode, setResetCode] = useState("");
+  const [resetNewPassword, setResetNewPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [pendingVerification, setPendingVerification] = useState(false);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setInfo(null);
     setBusy(true);
     try {
       if (mode === "register") {
@@ -61,6 +65,58 @@ export default function LoginPage() {
     }
   }
 
+  async function onForgot(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setInfo(null);
+    setBusy(true);
+    try {
+      await api.post("/auth/forgot-password", { email });
+      setInfo(t("forgot_sent"));
+      setMode("reset");
+    } catch {
+      setInfo(t("forgot_sent"));
+      setMode("reset");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onReset(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setInfo(null);
+    setBusy(true);
+    try {
+      await api.post("/auth/reset-password", {
+        email,
+        code: resetCode,
+        new_password: resetNewPassword,
+      });
+      setInfo(t("reset_success"));
+      setResetCode("");
+      setResetNewPassword("");
+      setTimeout(() => {
+        setMode("login");
+        setInfo(null);
+      }, 2000);
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 400) {
+        setError(t("err_reset_invalid"));
+      } else {
+        setError(t("err_reset_invalid"));
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function switchMode(next: "login" | "register" | "forgot" | "reset") {
+    setMode(next);
+    setError(null);
+    setInfo(null);
+  }
+
   if (pendingVerification) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-gray-50 p-6">
@@ -73,7 +129,7 @@ export default function LoginPage() {
           <h2 className="mb-2 text-lg font-semibold text-gray-900">{t("pending_verification_title")}</h2>
           <p className="mb-6 text-sm text-gray-500">{t("pending_verification_desc", { email })}</p>
           <button
-            onClick={() => { setPendingVerification(false); setMode("login"); }}
+            onClick={() => { setPendingVerification(false); switchMode("login"); }}
             className="w-full rounded-lg border border-gray-300 py-2 text-sm text-gray-700 hover:bg-gray-50"
           >
             {t("switch_to_login")}
@@ -95,68 +151,189 @@ export default function LoginPage() {
           </div>
           <h1 className="text-xl font-semibold text-gray-900">{t("title")}</h1>
           <p className="mt-1 text-sm text-gray-500">
-            {mode === "login" ? t("subtitle_login") : t("subtitle_register")}
+            {mode === "login"
+              ? t("subtitle_login")
+              : mode === "register"
+              ? t("subtitle_register")
+              : mode === "forgot"
+              ? t("forgot_title")
+              : t("reset_title")}
           </p>
         </div>
 
         {/* Card */}
         <div className="rounded-xl border border-gray-200 bg-white p-8 shadow-sm">
-          <form onSubmit={onSubmit} className="space-y-4">
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-700">{t("email")}</label>
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
-                placeholder="you@company.com"
-              />
-            </div>
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-700">{t("password")}</label>
-              <input
-                type="password"
-                required
-                minLength={8}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
-                placeholder={t("password_placeholder")}
-              />
-            </div>
 
-            {error && (
-              <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                {error}
+          {/* ── 登录 / 注册表单 ── */}
+          {(mode === "login" || mode === "register") && (
+            <form onSubmit={onSubmit} className="space-y-4">
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-gray-700">{t("email")}</label>
+                <input
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
+                  placeholder="you@company.com"
+                />
               </div>
-            )}
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-gray-700">{t("password")}</label>
+                <input
+                  type="password"
+                  required
+                  minLength={8}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
+                  placeholder={t("password_placeholder")}
+                />
+              </div>
 
-            <button
-              type="submit"
-              disabled={busy}
-              className="w-full rounded-lg bg-blue-600 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 transition-colors"
-            >
-              {busy ? t("processing") : mode === "login" ? t("submit_login") : t("submit_register")}
-            </button>
+              {error && (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                  {error}
+                </div>
+              )}
 
-            {mode === "login" && (
-              <p className="text-center text-xs text-gray-400">
-                {t("forgot_password", { team: t("team_name") })}
+              <button
+                type="submit"
+                disabled={busy}
+                className="w-full rounded-lg bg-blue-600 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              >
+                {busy ? t("processing") : mode === "login" ? t("submit_login") : t("submit_register")}
+              </button>
+
+              {mode === "login" && (
+                <p className="text-center text-xs">
+                  <button
+                    type="button"
+                    onClick={() => switchMode("forgot")}
+                    className="text-blue-500 hover:underline"
+                  >
+                    {t("forgot_password_link")}
+                  </button>
+                </p>
+              )}
+            </form>
+          )}
+
+          {/* ── 忘记密码：输入邮箱 ── */}
+          {mode === "forgot" && (
+            <form onSubmit={onForgot} className="space-y-4">
+              <p className="text-sm text-gray-500">{t("forgot_desc")}</p>
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-gray-700">{t("email")}</label>
+                <input
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
+                  placeholder="you@company.com"
+                />
+              </div>
+
+              {error && (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                  {error}
+                </div>
+              )}
+              {info && (
+                <div className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">
+                  {info}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={busy}
+                className="w-full rounded-lg bg-blue-600 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              >
+                {busy ? t("processing") : t("forgot_submit")}
+              </button>
+            </form>
+          )}
+
+          {/* ── 重置密码：输入验证码 + 新密码 ── */}
+          {mode === "reset" && (
+            <form onSubmit={onReset} className="space-y-4">
+              {info && (
+                <div className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">
+                  {info}
+                </div>
+              )}
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-gray-700">{t("reset_code_label")}</label>
+                <input
+                  type="text"
+                  required
+                  maxLength={6}
+                  minLength={6}
+                  value={resetCode}
+                  onChange={(e) => setResetCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all tracking-widest"
+                  placeholder="000000"
+                />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-gray-700">{t("reset_new_password")}</label>
+                <input
+                  type="password"
+                  required
+                  minLength={8}
+                  value={resetNewPassword}
+                  onChange={(e) => setResetNewPassword(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
+                  placeholder={t("password_placeholder")}
+                />
+              </div>
+
+              {error && (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                  {error}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={busy}
+                className="w-full rounded-lg bg-blue-600 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              >
+                {busy ? t("processing") : t("reset_submit")}
+              </button>
+
+              <p className="text-center text-xs">
+                <button
+                  type="button"
+                  onClick={() => switchMode("forgot")}
+                  className="text-blue-500 hover:underline"
+                >
+                  {t("forgot_submit")}
+                </button>
               </p>
-            )}
-          </form>
+            </form>
+          )}
 
+          {/* ── 底部切换链接 ── */}
           <div className="mt-4 border-t border-gray-100 pt-4">
-            <button
-              onClick={() => {
-                setMode(mode === "login" ? "register" : "login");
-                setError(null);
-              }}
-              className="w-full text-center text-sm text-blue-600 hover:text-blue-700 hover:underline transition-colors"
-            >
-              {mode === "login" ? t("switch_to_register") : t("switch_to_login")}
-            </button>
+            {(mode === "login" || mode === "register") && (
+              <button
+                onClick={() => switchMode(mode === "login" ? "register" : "login")}
+                className="w-full text-center text-sm text-blue-600 hover:text-blue-700 hover:underline transition-colors"
+              >
+                {mode === "login" ? t("switch_to_register") : t("switch_to_login")}
+              </button>
+            )}
+            {(mode === "forgot" || mode === "reset") && (
+              <button
+                onClick={() => switchMode("login")}
+                className="w-full text-center text-sm text-blue-600 hover:text-blue-700 hover:underline transition-colors"
+              >
+                {t("switch_to_login")}
+              </button>
+            )}
           </div>
         </div>
       </div>

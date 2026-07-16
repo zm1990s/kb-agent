@@ -51,6 +51,10 @@ class User(Base):
     )
     failed_login_attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    reset_code_hash: Mapped[str | None] = mapped_column(Text, nullable=True)
+    reset_code_exp: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    reset_attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    reset_rate_exp: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (
         CheckConstraint(
