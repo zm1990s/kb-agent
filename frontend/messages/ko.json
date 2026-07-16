@@ -369,7 +369,17 @@
     "email_verification_on": "활성화됨 (신규 사용자는 이메일 인증 필요)",
     "email_verification_off": "비활성화됨 (가입 후 바로 로그인 가능)",
     "email_verification_enabled": "이메일 인증이 활성화되었습니다",
-    "email_verification_disabled": "이메일 인증이 비활성화되었습니다"
+    "email_verification_disabled": "이메일 인증이 비활성화되었습니다",
+    "chat_engine_title": "채팅 엔진",
+    "chat_engine_desc": "채팅 Q&A 및 대화 제목의 엔진 백엔드를 선택합니다（문서 분류는 항상 Claude CLI를 사용）",
+    "chat_engine_backend_label": "엔진 백엔드",
+    "chat_engine_claude_cli": "Claude CLI",
+    "chat_engine_openai_compat": "OpenAI 호환（Ollama / vLLM / OpenAI / Azure）",
+    "openai_base_url_label": "Base URL",
+    "openai_api_key_label": "API 키",
+    "openai_api_key_set": "설정됨（비워두면 변경 없음）",
+    "openai_model_label": "모델 이름",
+    "chat_engine_saved": "채팅 엔진 설정이 저장되었습니다"
   },
   "admin": {
     "user_tab_users": "사용자",

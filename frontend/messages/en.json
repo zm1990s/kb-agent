@@ -369,7 +369,17 @@
     "email_verification_on": "Enabled (new users must verify email)",
     "email_verification_off": "Disabled (users can log in immediately after registration)",
     "email_verification_enabled": "Email verification enabled",
-    "email_verification_disabled": "Email verification disabled"
+    "email_verification_disabled": "Email verification disabled",
+    "chat_engine_title": "Chat Engine",
+    "chat_engine_desc": "Select the engine backend for chat Q&A and conversation titles (document classification always uses Claude CLI)",
+    "chat_engine_backend_label": "Engine backend",
+    "chat_engine_claude_cli": "Claude CLI",
+    "chat_engine_openai_compat": "OpenAI-compatible (Ollama / vLLM / OpenAI / Azure)",
+    "openai_base_url_label": "Base URL",
+    "openai_api_key_label": "API Key",
+    "openai_api_key_set": "Already set (leave blank to keep unchanged)",
+    "openai_model_label": "Model name",
+    "chat_engine_saved": "Chat engine settings saved"
   },
   "admin": {
     "user_tab_users": "Users",

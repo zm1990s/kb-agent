@@ -369,7 +369,17 @@
     "email_verification_on": "有効（新規ユーザーはメール確認が必要）",
     "email_verification_off": "無効（登録後すぐにログイン可能）",
     "email_verification_enabled": "メールアドレス確認を有効にしました",
-    "email_verification_disabled": "メールアドレス確認を無効にしました"
+    "email_verification_disabled": "メールアドレス確認を無効にしました",
+    "chat_engine_title": "チャットエンジン",
+    "chat_engine_desc": "チャット回答と会話タイトルのエンジンバックエンドを選択します（文書分類は常に Claude CLI を使用）",
+    "chat_engine_backend_label": "エンジンバックエンド",
+    "chat_engine_claude_cli": "Claude CLI",
+    "chat_engine_openai_compat": "OpenAI 互換（Ollama / vLLM / OpenAI / Azure）",
+    "openai_base_url_label": "ベース URL",
+    "openai_api_key_label": "API キー",
+    "openai_api_key_set": "設定済み（空白のまま変更しない）",
+    "openai_model_label": "モデル名",
+    "chat_engine_saved": "チャットエンジン設定を保存しました"
   },
   "admin": {
     "user_tab_users": "ユーザー",

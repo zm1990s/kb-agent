@@ -369,7 +369,17 @@
     "email_verification_on": "已开启（新用户需验证邮箱）",
     "email_verification_off": "已关闭（注册即可登录）",
     "email_verification_enabled": "已开启邮箱验证",
-    "email_verification_disabled": "已关闭邮箱验证"
+    "email_verification_disabled": "已关闭邮箱验证",
+    "chat_engine_title": "对话引擎",
+    "chat_engine_desc": "选择处理对话问答和会话标题的引擎后端（文档归类始终使用 Claude CLI）",
+    "chat_engine_backend_label": "引擎后端",
+    "chat_engine_claude_cli": "Claude CLI",
+    "chat_engine_openai_compat": "OpenAI 兼容（Ollama / vLLM / OpenAI / Azure）",
+    "openai_base_url_label": "Base URL",
+    "openai_api_key_label": "API Key",
+    "openai_api_key_set": "已配置（留空保持不变）",
+    "openai_model_label": "模型名称",
+    "chat_engine_saved": "对话引擎配置已保存"
   },
   "admin": {
     "user_tab_users": "用户",

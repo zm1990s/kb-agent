@@ -20,7 +20,11 @@ from app.services.settings_service import (
     WHATSNEW_FREQ_DAYS,
     EngineNotAvailableError,
     InvalidPromptError,
+    get_chat_engine_backend,
     get_engine_backend,
+    get_openai_api_key,
+    get_openai_base_url,
+    get_openai_model,
     get_prompt,
     get_require_email_verification,
     get_setting,
@@ -32,7 +36,11 @@ from app.services.settings_service import (
     get_workspace_suggested_questions,
     list_prompt_history,
     rollback_prompt,
+    set_chat_engine_backend,
     set_engine_backend,
+    set_openai_api_key,
+    set_openai_base_url,
+    set_openai_model,
     set_prompt,
     set_require_email_verification,
     set_setting,
@@ -531,4 +539,69 @@ async def update_email_verification_config(
     return EmailVerificationOut(
         require_email_verification=await get_require_email_verification(session),
         site_base_url=await get_site_base_url(session),
+    )
+
+
+# ── 对话引擎配置 ──────────────────────────────────────────────────────────────
+
+
+class ChatEngineConfigOut(BaseModel):
+    chat_engine_backend: str
+    openai_base_url: str
+    openai_api_key: str  # 非空时脱敏返回 "***"
+    openai_model: str
+
+
+class ChatEngineConfigIn(BaseModel):
+    chat_engine_backend: str
+    openai_base_url: str = ""
+    openai_api_key: str = ""  # 空字符串表示不更新已有 key
+    openai_model: str = ""
+
+
+@router.get("/chat-engine", response_model=ChatEngineConfigOut)
+async def get_chat_engine_config(
+    _admin: User = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+) -> ChatEngineConfigOut:
+    raw_key = await get_openai_api_key(session)
+    return ChatEngineConfigOut(
+        chat_engine_backend=await get_chat_engine_backend(session),
+        openai_base_url=await get_openai_base_url(session),
+        openai_api_key="***" if raw_key else "",
+        openai_model=await get_openai_model(session),
+    )
+
+
+@router.put("/chat-engine", response_model=ChatEngineConfigOut)
+async def update_chat_engine_config(
+    body: ChatEngineConfigIn,
+    admin: User = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+) -> ChatEngineConfigOut:
+    try:
+        await set_chat_engine_backend(session, body.chat_engine_backend)
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+    if body.openai_base_url:
+        await set_openai_base_url(session, body.openai_base_url)
+    # 空字符串不覆盖已有 key（允许只改 model 而不动 key）
+    if body.openai_api_key:
+        await set_openai_api_key(session, body.openai_api_key)
+    if body.openai_model:
+        await set_openai_model(session, body.openai_model)
+    logger.info(
+        "audit admin update_chat_engine admin=%s backend=%s",
+        admin.id, body.chat_engine_backend,
+    )
+    await record_event(
+        session, action="admin_update_chat_engine", user_id=admin.id,
+        meta={"backend": body.chat_engine_backend},
+    )
+    raw_key = await get_openai_api_key(session)
+    return ChatEngineConfigOut(
+        chat_engine_backend=await get_chat_engine_backend(session),
+        openai_base_url=await get_openai_base_url(session),
+        openai_api_key="***" if raw_key else "",
+        openai_model=await get_openai_model(session),
     )

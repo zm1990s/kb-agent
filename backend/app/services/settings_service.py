@@ -419,3 +419,49 @@ async def get_site_base_url(session: AsyncSession) -> str:
 
 async def set_site_base_url(session: AsyncSession, url: str) -> None:
     await set_setting(session, SITE_BASE_URL_KEY, url.rstrip("/"))
+
+
+# ── 对话引擎配置（独立于文档归类引擎）──────────────────────────
+
+CHAT_ENGINE_BACKEND_KEY = "chat_engine_backend"
+OPENAI_BASE_URL_KEY = "openai_base_url"
+OPENAI_API_KEY_KEY = "openai_api_key"
+OPENAI_MODEL_KEY = "openai_model"
+
+_CHAT_ENGINE_IDS = {"claude_cli", "openai_compat"}
+
+
+async def get_chat_engine_backend(session: AsyncSession) -> str:
+    """对话引擎后端；DB 无值时默认 claude_cli。"""
+    stored = await get_setting(session, CHAT_ENGINE_BACKEND_KEY)
+    return stored if stored in _CHAT_ENGINE_IDS else "claude_cli"
+
+
+async def set_chat_engine_backend(session: AsyncSession, backend: str) -> None:
+    if backend not in _CHAT_ENGINE_IDS:
+        raise ValueError(f"未知对话引擎: {backend!r}")
+    await set_setting(session, CHAT_ENGINE_BACKEND_KEY, backend)
+
+
+async def get_openai_base_url(session: AsyncSession) -> str:
+    return await get_setting(session, OPENAI_BASE_URL_KEY) or ""
+
+
+async def set_openai_base_url(session: AsyncSession, url: str) -> None:
+    await set_setting(session, OPENAI_BASE_URL_KEY, url.rstrip("/"))
+
+
+async def get_openai_api_key(session: AsyncSession) -> str:
+    return await get_setting(session, OPENAI_API_KEY_KEY) or ""
+
+
+async def set_openai_api_key(session: AsyncSession, key_val: str) -> None:
+    await set_setting(session, OPENAI_API_KEY_KEY, key_val)
+
+
+async def get_openai_model(session: AsyncSession) -> str:
+    return await get_setting(session, OPENAI_MODEL_KEY) or ""
+
+
+async def set_openai_model(session: AsyncSession, model: str) -> None:
+    await set_setting(session, OPENAI_MODEL_KEY, model)

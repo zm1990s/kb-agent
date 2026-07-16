@@ -18,7 +18,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
-from app.engine.base import get_engine
+from app.engine.base import get_chat_engine
 from app.engine.claude_cli import EngineError
 from app.models.document import Category, Document
 from app.storage.base import get_storage
@@ -165,15 +165,11 @@ async def answer_question_streamed(
     from app.services.settings_service import (
         ANSWER_FETCH_PROMPT_KEY,
         ANSWER_PROMPT_KEY,
-        MODEL_CHAT_KEY,
-        get_engine_backend,
         get_prompt,
-        get_task_model,
     )
 
     yield Stage("thinking", "Agent 正在阅读索引并判断是否需要原文…")
-    chat_model = await get_task_model(session, MODEL_CHAT_KEY)
-    engine = get_engine(await get_engine_backend(session), model=chat_model)
+    engine = await get_chat_engine(session)
     hist_text = _format_history(history)
     timestamp = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
 

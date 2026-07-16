@@ -31,6 +31,12 @@ interface TaskModelsConfig {
   default_model: string;
   tasks: TaskModel[];
 }
+interface ChatEngineConfig {
+  chat_engine_backend: string;
+  openai_base_url: string;
+  openai_api_key: string;
+  openai_model: string;
+}
 
 type Tab = "workspaces" | "users" | "general" | "prompts";
 
@@ -76,6 +82,19 @@ export default function SystemSettings({ perms }: Props) {
   const [siteBaseUrlMsg, setSiteBaseUrlMsg] = useState<string | null>(null);
   const [requireEmailVerification, setRequireEmailVerification] = useState(false);
   const [emailVerificationMsg, setEmailVerificationMsg] = useState<string | null>(null);
+  const [chatEngine, setChatEngine] = useState<ChatEngineConfig>({
+    chat_engine_backend: "claude_cli",
+    openai_base_url: "",
+    openai_api_key: "",
+    openai_model: "",
+  });
+  const [chatEngineInput, setChatEngineInput] = useState<ChatEngineConfig>({
+    chat_engine_backend: "claude_cli",
+    openai_base_url: "",
+    openai_api_key: "",
+    openai_model: "",
+  });
+  const [chatEngineMsg, setChatEngineMsg] = useState<string | null>(null);
 
   const loadDomains = useCallback(async () => {
     try {
@@ -143,6 +162,14 @@ export default function SystemSettings({ perms }: Props) {
     } catch { /* 非 admin 正常 */ }
   }, []);
 
+  const loadChatEngine = useCallback(async () => {
+    try {
+      const d = await api.get<ChatEngineConfig>("/settings/chat-engine");
+      setChatEngine(d);
+      setChatEngineInput({ ...d, openai_api_key: "" });
+    } catch { /* 非 admin 正常 */ }
+  }, []);
+
   useEffect(() => {
     loadDomains();
     loadEngine();
@@ -151,7 +178,8 @@ export default function SystemSettings({ perms }: Props) {
     loadSuggestedQuestions();
     loadTaskModels();
     loadEmailVerification();
-  }, [loadDomains, loadEngine, loadBranding, loadWnSchedule, loadSuggestedQuestions, loadTaskModels, loadEmailVerification]);
+    loadChatEngine();
+  }, [loadDomains, loadEngine, loadBranding, loadWnSchedule, loadSuggestedQuestions, loadTaskModels, loadEmailVerification, loadChatEngine]);
 
   async function addDomain(e: React.FormEvent) {
     e.preventDefault();
@@ -277,6 +305,20 @@ export default function SystemSettings({ perms }: Props) {
       await api.put("/settings/email-verification", { require_email_verification: enabled });
       setRequireEmailVerification(enabled);
       setEmailVerificationMsg(enabled ? t("email_verification_enabled") : t("email_verification_disabled"));
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : t("save_failed"));
+    }
+  }
+
+  async function saveChatEngine(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setChatEngineMsg(null);
+    try {
+      const updated = await api.put<ChatEngineConfig>("/settings/chat-engine", chatEngineInput);
+      setChatEngine(updated);
+      setChatEngineInput({ ...updated, openai_api_key: "" });
+      setChatEngineMsg(t("chat_engine_saved"));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : t("save_failed"));
     }
@@ -441,6 +483,69 @@ export default function SystemSettings({ perms }: Props) {
               <p className="text-sm text-gray-400">{t("task_model_loading")}</p>
             )}
             {taskModelMsg && <p className="mt-2 text-xs text-green-600">{taskModelMsg}</p>}
+          </section>
+
+          {/* 对话引擎配置 */}
+          <section className="rounded border bg-white p-4">
+            <h2 className="mb-1 text-sm font-medium">{t("chat_engine_title")}</h2>
+            <p className="mb-3 text-xs text-gray-400">{t("chat_engine_desc")}</p>
+            <form onSubmit={saveChatEngine} className="space-y-3">
+              <div>
+                <label className="mb-1 block text-xs text-gray-500">{t("chat_engine_backend_label")}</label>
+                <select
+                  value={chatEngineInput.chat_engine_backend}
+                  onChange={(e) => setChatEngineInput((prev) => ({ ...prev, chat_engine_backend: e.target.value }))}
+                  className="rounded border px-3 py-2 text-sm focus:border-blue-400 focus:outline-none"
+                >
+                  <option value="claude_cli">{t("chat_engine_claude_cli")}</option>
+                  <option value="openai_compat">{t("chat_engine_openai_compat")}</option>
+                </select>
+              </div>
+              {chatEngineInput.chat_engine_backend === "openai_compat" && (
+                <div className="space-y-2 rounded border border-gray-100 bg-gray-50 p-3">
+                  <div>
+                    <label className="mb-1 block text-xs text-gray-500">{t("openai_base_url_label")}</label>
+                    <input
+                      value={chatEngineInput.openai_base_url}
+                      onChange={(e) => setChatEngineInput((prev) => ({ ...prev, openai_base_url: e.target.value }))}
+                      placeholder="http://localhost:11434/v1"
+                      className="w-full rounded border px-3 py-1.5 text-sm font-mono focus:border-blue-400 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs text-gray-500">
+                      {t("openai_api_key_label")}
+                      {chatEngine.openai_api_key === "***" && (
+                        <span className="ml-2 text-gray-400">{t("openai_api_key_set")}</span>
+                      )}
+                    </label>
+                    <input
+                      type="password"
+                      value={chatEngineInput.openai_api_key}
+                      onChange={(e) => setChatEngineInput((prev) => ({ ...prev, openai_api_key: e.target.value }))}
+                      placeholder={chatEngine.openai_api_key === "***" ? "（留空保持不变）" : "none"}
+                      className="w-full rounded border px-3 py-1.5 text-sm font-mono focus:border-blue-400 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs text-gray-500">{t("openai_model_label")}</label>
+                    <input
+                      value={chatEngineInput.openai_model}
+                      onChange={(e) => setChatEngineInput((prev) => ({ ...prev, openai_model: e.target.value }))}
+                      placeholder="qwen2.5:72b"
+                      className="w-full rounded border px-3 py-1.5 text-sm font-mono focus:border-blue-400 focus:outline-none"
+                    />
+                  </div>
+                </div>
+              )}
+              <button
+                type="submit"
+                className="rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700"
+              >
+                {t("whatsnew_save")}
+              </button>
+            </form>
+            {chatEngineMsg && <p className="mt-2 text-xs text-green-600">{chatEngineMsg}</p>}
           </section>
 
           {/* 域名白名单 */}

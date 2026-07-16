@@ -153,10 +153,10 @@ async def run_classification(session: AsyncSession, task_id: uuid.UUID) -> None:
             categories=", ".join(cat_names) if cat_names else "（无预定义分类）",
         )
 
-        # 经 engine 让 CLI 读原文（唯一 LLM 出口）；引擎后端取管理员在应用内的选择
-        from app.services.settings_service import MODEL_CLASSIFY_KEY, get_engine_backend, get_task_model
+        # 文档归类始终使用 Claude CLI（需要 --add-dir 读取本地文件）
+        from app.services.settings_service import MODEL_CLASSIFY_KEY, get_task_model
 
-        engine = get_engine(await get_engine_backend(session), model=await get_task_model(session, MODEL_CLASSIFY_KEY))
+        engine = get_engine("claude_cli", model=await get_task_model(session, MODEL_CLASSIFY_KEY))
         from app.storage.base import get_storage
 
         path = await get_storage().open_path(doc.storage_key)
