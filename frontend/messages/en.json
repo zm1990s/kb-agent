@@ -186,7 +186,9 @@
     "unpin": "Unpin",
     "rename": "Rename",
     "delete": "Delete conversation",
-    "delete_confirm": "Delete conversation \"{title}\"?"
+    "delete_confirm": "Delete conversation \"{title}\"?",
+    "collapse": "Collapse sidebar",
+    "expand": "Expand sidebar"
   },
   "account": {
     "title": "Account",

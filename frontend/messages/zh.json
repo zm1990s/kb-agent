@@ -186,7 +186,9 @@
     "unpin": "取消置顶",
     "rename": "重命名",
     "delete": "删除会话",
-    "delete_confirm": "删除会话「{title}」？"
+    "delete_confirm": "删除会话「{title}」？",
+    "collapse": "收起侧边栏",
+    "expand": "展开侧边栏"
   },
   "account": {
     "title": "账户管理",

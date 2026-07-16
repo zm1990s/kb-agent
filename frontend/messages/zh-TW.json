@@ -186,7 +186,9 @@
     "unpin": "取消置頂",
     "rename": "重新命名",
     "delete": "刪除對話",
-    "delete_confirm": "刪除對話「{title}」？"
+    "delete_confirm": "刪除對話「{title}」？",
+    "collapse": "收起側邊欄",
+    "expand": "展開側邊欄"
   },
   "account": {
     "title": "帳戶管理",

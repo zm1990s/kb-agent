@@ -186,7 +186,9 @@
     "unpin": "ピン留めを外す",
     "rename": "名前変更",
     "delete": "会話を削除",
-    "delete_confirm": "会話「{title}」を削除しますか？"
+    "delete_confirm": "会話「{title}」を削除しますか？",
+    "collapse": "サイドバーを閉じる",
+    "expand": "サイドバーを開く"
   },
   "account": {
     "title": "アカウント",
