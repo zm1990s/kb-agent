@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.engine.base import get_engine
+from app.engine.claude_cli import EngineError
 from app.models.auth import Workspace
 from app.models.document import Category, Document
 from app.models.whatsnew import WhatsNewReport
@@ -84,7 +85,11 @@ async def generate_for_workspace(
 
     backend = await get_engine_backend(session)
     engine = get_engine(backend, model=await get_task_model(session, MODEL_WHATSNEW_KEY))
-    result = await engine.complete(prompt)
+    try:
+        result = await engine.complete(prompt)
+    except EngineError as exc:
+        logger.error("whatsnew engine 调用失败 workspace=%s: %s", workspace.id, exc)
+        raise
     summary_md = result.text.strip()
 
     report = WhatsNewReport(

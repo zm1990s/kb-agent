@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.engine.base import get_engine
+from app.engine.claude_cli import EngineError
 from app.models.document import Category, Document
 from app.storage.base import get_storage
 
@@ -177,11 +178,17 @@ async def answer_question_streamed(
 
     # ── Phase 1：只给摘要，让 Agent 判断够不够用 ────────────────
     fetch_prompt_tpl = await get_prompt(session, ANSWER_FETCH_PROMPT_KEY)
-    phase1_result = await engine.complete(
-        fetch_prompt_tpl.format(
-            question=question, catalog=catalog, history=hist_text, timestamp=timestamp
+    try:
+        phase1_result = await engine.complete(
+            fetch_prompt_tpl.format(
+                question=question, catalog=catalog, history=hist_text, timestamp=timestamp
+            )
         )
-    )
+    except EngineError as exc:
+        logger.error("phase1 engine 调用失败 workspace=%s: %s", workspace_id, exc)
+        yield Stage("done", "完成")
+        yield AnswerResult(answer="抱歉，AI 引擎暂时不可用，请稍后重试。", sources=[])
+        return
 
     yield Stage("parsing", "正在解析 Agent 判断结果…")
     try:
@@ -217,15 +224,21 @@ async def answer_question_streamed(
 
         yield Stage("thinking", "Agent 正在结合原文组织回答…")
         answer_prompt_tpl = await get_prompt(session, ANSWER_PROMPT_KEY)
-        result = await engine.complete(
-            answer_prompt_tpl.format(
-                question=question,
-                catalog=catalog,
-                history=hist_text,
-                fulltext=fulltext_block,
-                timestamp=timestamp,
+        try:
+            result = await engine.complete(
+                answer_prompt_tpl.format(
+                    question=question,
+                    catalog=catalog,
+                    history=hist_text,
+                    fulltext=fulltext_block,
+                    timestamp=timestamp,
+                )
             )
-        )
+        except EngineError as exc:
+            logger.error("phase2 engine 调用失败 workspace=%s: %s", workspace_id, exc)
+            yield Stage("done", "完成")
+            yield AnswerResult(answer="抱歉，AI 引擎暂时不可用，请稍后重试。", sources=[])
+            return
         yield Stage("parsing", "正在整理答案与相关文档…")
         try:
             parsed = _parse_engine_json(result.text)

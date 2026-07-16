@@ -106,7 +106,14 @@ class ClaudeCliEngine:
         await proc.wait()
 
         if proc.returncode != 0:
-            detail = stderr_bytes.decode("utf-8", errors="replace").strip()
+            stdout_tail = b"".join(chunks).decode("utf-8", errors="replace").strip()
+            stderr_str = stderr_bytes.decode("utf-8", errors="replace").strip()
+            # CLI 常把错误信息写到 stdout（如模型不可访问），stderr 可能为空
+            detail = stderr_str or stdout_tail or "(无输出)"
+            logger.error(
+                "Claude CLI 退出码 %d | stderr=%r | stdout_tail=%r",
+                proc.returncode, stderr_str[:500], stdout_tail[:500],
+            )
             raise EngineError(f"Claude CLI 返回非零退出码 {proc.returncode}: {detail}")
 
         return EngineResult(text=b"".join(chunks).decode("utf-8", errors="replace").strip())
