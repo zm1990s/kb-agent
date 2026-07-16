@@ -1,24 +1,9 @@
 "use client";
 
-import { useEffect, useRef } from "react";
 import { useTranslations } from "next-intl";
 
-export default function ThinkingBubble({
-  stage,
-  log = [],
-}: {
-  stage: string | null;
-  log?: string[];
-}) {
+export default function ThinkingBubble({ stage }: { stage: string | null }) {
   const t = useTranslations("chat");
-  const logRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (logRef.current) {
-      logRef.current.scrollTop = logRef.current.scrollHeight;
-    }
-  }, [log]);
-
   return (
     <div className="flex flex-row gap-3">
       <div
@@ -37,16 +22,6 @@ export default function ThinkingBubble({
         </div>
         {stage && (
           <p className="pl-1 text-xs text-gray-400">{stage}</p>
-        )}
-        {log.length > 0 && (
-          <div
-            ref={logRef}
-            className="mt-1 max-h-36 w-full max-w-lg overflow-y-auto rounded border border-gray-100 bg-gray-50 p-2 font-mono text-[11px] leading-relaxed text-gray-500"
-          >
-            {log.map((chunk, i) => (
-              <span key={i}>{chunk}</span>
-            ))}
-          </div>
         )}
       </div>
     </div>

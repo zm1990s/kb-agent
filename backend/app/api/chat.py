@@ -23,7 +23,6 @@ from app.schemas.chat import (
 )
 from app.services.answer_service import (
     AnswerResult,
-    OutputChunk,
     Stage,
     answer_question,
     answer_question_streamed,
@@ -157,8 +156,6 @@ async def chat_stream(
         ):
             if isinstance(item, Stage):
                 yield sse("stage", {"stage": item.stage, "message": item.message})
-            elif isinstance(item, OutputChunk):
-                yield sse("output", {"chunk": item.text})
             elif isinstance(item, AnswerResult):
                 final = item
         if final is None:

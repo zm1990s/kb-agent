@@ -4,7 +4,6 @@
 通过 ENGINE_BACKEND 配置切换实现。
 """
 
-from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Protocol, runtime_checkable
@@ -30,7 +29,6 @@ class EngineProtocol(Protocol):
         *,
         files: list[Path] | None = None,
         system: str | None = None,
-        on_chunk: Callable[[str], None] | None = None,
     ) -> EngineResult:
         """给定 prompt（可附带文件），返回模型输出。"""
         ...

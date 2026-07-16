@@ -8,7 +8,6 @@
 
 import asyncio
 import logging
-from collections.abc import Callable
 from pathlib import Path
 
 from app.core.config import get_settings
@@ -65,7 +64,6 @@ class ClaudeCliEngine:
         *,
         files: list[Path] | None = None,
         system: str | None = None,
-        on_chunk: Callable[[str], None] | None = None,
     ) -> EngineResult:
         argv = self._build_argv(prompt, files)
         if system:
@@ -101,8 +99,6 @@ class ClaudeCliEngine:
                 if not chunk:
                     break  # EOF
                 chunks.append(chunk)
-                if on_chunk:
-                    on_chunk(chunk.decode("utf-8", errors="replace"))
         except TimeoutError:
             timed_out = True
         finally:

@@ -8,7 +8,6 @@
 - 索引数量设上限保护；超限截断并记录，不静默（SECURITY 原则）。
 """
 
-import asyncio
 import json
 import logging
 import uuid
@@ -19,7 +18,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
-from app.engine.base import EngineResult, get_engine
+from app.engine.base import get_engine
 from app.engine.claude_cli import EngineError
 from app.models.document import Category, Document
 from app.storage.base import get_storage
@@ -138,29 +137,6 @@ class Stage:
     message: str
 
 
-@dataclass
-class OutputChunk:
-    """LLM 原始输出块（供前端实时展示 Agent 工作状态）。"""
-
-    text: str
-
-
-async def _run_engine_streamed(
-    engine,
-    prompt: str,
-    queue: "asyncio.Queue[str | None]",
-    **kwargs,
-) -> EngineResult:
-    """运行引擎并将 stdout chunk 推入 queue；结束时推入 None 哨兵。"""
-    result = await engine.complete(
-        prompt,
-        on_chunk=lambda c: queue.put_nowait(c),
-        **kwargs,
-    )
-    await queue.put(None)
-    return result
-
-
 async def answer_question_streamed(
     session: AsyncSession,
     *,
@@ -204,22 +180,11 @@ async def answer_question_streamed(
     # ── Phase 1：只给摘要，让 Agent 判断够不够用 ────────────────
     fetch_prompt_tpl = await get_prompt(session, ANSWER_FETCH_PROMPT_KEY)
     try:
-        queue1: asyncio.Queue[str | None] = asyncio.Queue()
-        task1 = asyncio.create_task(
-            _run_engine_streamed(
-                engine,
-                fetch_prompt_tpl.format(
-                    question=question, catalog=catalog, history=hist_text, timestamp=timestamp
-                ),
-                queue1,
+        phase1_result = await engine.complete(
+            fetch_prompt_tpl.format(
+                question=question, catalog=catalog, history=hist_text, timestamp=timestamp
             )
         )
-        while True:
-            item = await queue1.get()
-            if item is None:
-                break
-            yield OutputChunk(text=item)
-        phase1_result = await task1
     except EngineError as exc:
         logger.error("phase1 engine 调用失败 workspace=%s: %s", workspace_id, exc)
         yield Stage("done", "完成")
@@ -265,26 +230,15 @@ async def answer_question_streamed(
         yield Stage("thinking", "Agent 正在结合原文组织回答…")
         answer_prompt_tpl = await get_prompt(session, ANSWER_PROMPT_KEY)
         try:
-            queue2: asyncio.Queue[str | None] = asyncio.Queue()
-            task2 = asyncio.create_task(
-                _run_engine_streamed(
-                    engine,
-                    answer_prompt_tpl.format(
-                        question=question,
-                        catalog=catalog,
-                        history=hist_text,
-                        fulltext=fulltext_block,
-                        timestamp=timestamp,
-                    ),
-                    queue2,
+            result = await engine.complete(
+                answer_prompt_tpl.format(
+                    question=question,
+                    catalog=catalog,
+                    history=hist_text,
+                    fulltext=fulltext_block,
+                    timestamp=timestamp,
                 )
             )
-            while True:
-                item = await queue2.get()
-                if item is None:
-                    break
-                yield OutputChunk(text=item)
-            result = await task2
         except EngineError as exc:
             logger.error("phase2 engine 调用失败 workspace=%s: %s", workspace_id, exc)
             yield Stage("done", "完成")
