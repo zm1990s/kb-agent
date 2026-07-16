@@ -207,8 +207,10 @@ async def answer_question_streamed(
         )
         return
 
+    # ── Phase 2：始终执行，流式生成答案 ──────────────────────────
+    # Phase 1 只决定是否需要原文（fetch_numbers），答案始终由 Phase 2 生成。
+    doc_numbers: list[int] = []
     if phase1.get("mode") == "fetch":
-        # ── Phase 2：拉取原文，再调一次 LLM ───────────────────────
         fetch_numbers: list[int] = [
             n for n in (phase1.get("fetch_numbers") or [])
             if isinstance(n, int) and 1 <= n <= len(index)
@@ -228,64 +230,47 @@ async def answer_question_streamed(
             )
         else:
             fulltext_block = ""
-
-        yield Stage("thinking", "Agent 正在结合原文组织回答…")
-        answer_prompt_tpl = await get_prompt(session, ANSWER_PROMPT_KEY)
-        phase2_prompt = answer_prompt_tpl.format(
-            question=question,
-            catalog=catalog,
-            history=hist_text,
-            fulltext=fulltext_block,
-            timestamp=timestamp,
-        )
-        try:
-            if hasattr(engine, "complete_streaming"):
-                token_chunks: list[str] = []
-                async for token in engine.complete_streaming(phase2_prompt):
-                    token_chunks.append(token)
-                    yield TokenChunk(text=token)
-                result_text = "".join(token_chunks)
-            else:
-                r = await engine.complete(phase2_prompt)
-                result_text = r.text
-        except EngineError as exc:
-            logger.error("phase2 engine 调用失败 workspace=%s: %s", workspace_id, exc)
-            yield Stage("done", "完成")
-            yield AnswerResult(
-                answer="engine_unavailable", sources=[], error_key="engine_unavailable"
-            )
-            return
-        yield Stage("parsing", "正在整理答案与相关文档…")
-        try:
-            parsed = _parse_engine_json(result_text)
-            answer = str(parsed.get("answer") or "").strip()
-            doc_numbers = parsed.get("doc_numbers") or []
-        except (ValueError, json.JSONDecodeError):
-            fallback = _extract_answer_fallback(result_text)
-            logger.warning("phase2 JSON 解析失败，fallback answer=%s", bool(fallback))
-            yield Stage("done", "完成")
-            yield AnswerResult(
-                answer=fallback or "format_error",
-                sources=[],
-                error_key=None if fallback else "format_error",
-            )
-            return
+        doc_numbers = fetch_numbers
     else:
-        # mode == "answer"：摘要已够，直接用 Phase 1 的结果
-        answer = str(phase1.get("answer") or "").strip()
-        doc_numbers = phase1.get("doc_numbers") or []
+        # mode == "answer"：摘要已够，无需原文；来源由 Phase 1 的 doc_numbers 给出
+        fulltext_block = ""
+        doc_numbers = [
+            n for n in (phase1.get("doc_numbers") or [])
+            if isinstance(n, int) and 1 <= n <= len(index)
+        ]
 
-    sources = []
-    for num in doc_numbers:
-        if isinstance(num, int) and 1 <= num <= len(index):
-            sources.append(await _build_source(index[num - 1][0]))
+    yield Stage("thinking", "Agent 正在组织回答…")
+    answer_prompt_tpl = await get_prompt(session, ANSWER_PROMPT_KEY)
+    phase2_prompt = answer_prompt_tpl.format(
+        question=question,
+        catalog=catalog,
+        history=hist_text,
+        fulltext=fulltext_block,
+        timestamp=timestamp,
+    )
+    try:
+        if hasattr(engine, "complete_streaming"):
+            token_chunks: list[str] = []
+            async for token in engine.complete_streaming(phase2_prompt):
+                token_chunks.append(token)
+                yield TokenChunk(text=token)
+            answer = "".join(token_chunks).strip()
+        else:
+            r = await engine.complete(phase2_prompt)
+            answer = r.text.strip()
+    except EngineError as exc:
+        logger.error("phase2 engine 调用失败 workspace=%s: %s", workspace_id, exc)
+        yield Stage("done", "完成")
+        yield AnswerResult(
+            answer="engine_unavailable", sources=[], error_key="engine_unavailable"
+        )
+        return
 
-    error_key: str | None = None
+    sources = [await _build_source(index[num - 1][0]) for num in doc_numbers]
+
+    error_key: str | None = None if answer else "no_answer"
     if not answer:
-        logger.warning("answer 字段为空，尝试 fallback")
-        answer = _extract_answer_fallback(phase1_result.text) or ""
-        if not answer:
-            error_key = "no_answer"
+        logger.warning("phase2 输出为空 workspace=%s", workspace_id)
     logger.info("answer done workspace=%s sources=%d", workspace_id, len(sources))
     yield Stage("done", "完成")
     yield AnswerResult(answer=answer, sources=sources, error_key=error_key)
