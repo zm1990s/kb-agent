@@ -316,8 +316,10 @@ export default function SystemSettings({ perms }: Props) {
     setChatEngineMsg(null);
     try {
       const updated = await api.put<ChatEngineConfig>("/settings/chat-engine", chatEngineInput);
-      setChatEngine(updated);
-      setChatEngineInput({ ...updated, openai_api_key: "" });
+      if (updated) {
+        setChatEngine(updated);
+        setChatEngineInput({ ...updated, openai_api_key: "" });
+      }
       setChatEngineMsg(t("chat_engine_saved"));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : t("save_failed"));
