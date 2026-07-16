@@ -84,7 +84,17 @@
     "load_failed": "Failed to load conversation",
     "request_failed": "Request failed",
     "download_failed": "Download failed",
-    "preparing": "Preparing…"
+    "preparing": "Preparing…",
+    "stage_indexing": "Indexing",
+    "stage_thinking": "Thinking",
+    "stage_parsing": "Parsing",
+    "stage_indexing_start": "Searching knowledge base index…",
+    "stage_indexing_loaded": "Loaded {count} document(s)",
+    "stage_thinking_phase1": "Agent is reviewing the index…",
+    "stage_fetching": "Fetching {count} document(s)…",
+    "stage_thinking_phase2": "Agent is composing the answer…",
+    "stage_done": "Done",
+    "stage_no_docs": "No documents in this workspace"
   },
   "messageBubble": {
     "me": "Me",

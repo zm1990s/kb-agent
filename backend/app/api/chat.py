@@ -156,7 +156,11 @@ async def chat_stream(
             history=history,
         ):
             if isinstance(item, Stage):
-                yield sse("stage", {"stage": item.stage, "message": item.message})
+                yield sse("stage", {
+                    "stage": item.stage,
+                    "message_key": item.message_key,
+                    "message_params": item.message_params,
+                })
             elif isinstance(item, TokenChunk):
                 yield sse("token", {"text": item.text})
             elif isinstance(item, AnswerResult):

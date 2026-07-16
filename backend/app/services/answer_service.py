@@ -132,8 +132,9 @@ def _extract_answer_fallback(text: str) -> str | None:
 class Stage:
     """流式工作阶段事件（供前端展示 Agent 进展）。"""
 
-    stage: str  # 阶段标识：indexing / thinking / parsing / done
-    message: str
+    stage: str        # 阶段标识：indexing / thinking / parsing / done
+    message_key: str  # 前端 i18n key
+    message_params: dict = field(default_factory=dict)
 
 
 @dataclass
@@ -156,16 +157,16 @@ async def answer_question_streamed(
     供 SSE 端点消费；answer_question() 是它的收敛封装。
     """
     logger.info("answer start workspace=%s question_len=%d", workspace_id, len(question))
-    yield Stage("indexing", "正在检索知识库索引…")
+    yield Stage("indexing", "stage_indexing_start")
     index = await _load_index(session, workspace_id)
 
     if not index and not history:
-        yield Stage("done", "空间暂无文档")
+        yield Stage("done", "stage_no_docs")
         yield AnswerResult(answer=NO_DOCS_ANSWER, sources=[], error_key="no_docs")
         return
 
     if index:
-        yield Stage("indexing", f"已载入 {len(index)} 篇文档索引")
+        yield Stage("indexing", "stage_indexing_loaded", {"count": len(index)})
     catalog = _build_catalog(index) if index else "（本空间暂无已归类文档）"
 
     from app.services.settings_service import (
@@ -174,7 +175,7 @@ async def answer_question_streamed(
         get_prompt,
     )
 
-    yield Stage("thinking", "Agent 正在阅读索引并判断是否需要原文…")
+    yield Stage("thinking", "stage_thinking_phase1")
     engine = await get_chat_engine(session)
     hist_text = _format_history(history)
     timestamp = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
@@ -189,17 +190,17 @@ async def answer_question_streamed(
         )
     except EngineError as exc:
         logger.error("phase1 engine 调用失败 workspace=%s: %s", workspace_id, exc)
-        yield Stage("done", "完成")
+        yield Stage("done", "stage_done")
         yield AnswerResult(answer="engine_unavailable", sources=[], error_key="engine_unavailable")
         return
 
-    yield Stage("parsing", "正在解析 Agent 判断结果…")
+    yield Stage("parsing", "stage_parsing")
     try:
         phase1 = _parse_engine_json(phase1_result.text)
     except (ValueError, json.JSONDecodeError):
         fallback = _extract_answer_fallback(phase1_result.text)
         logger.warning("phase1 JSON 解析失败，fallback answer=%s", bool(fallback))
-        yield Stage("done", "完成")
+        yield Stage("done", "stage_done")
         yield AnswerResult(
             answer=fallback or "format_error",
             sources=[],
@@ -216,7 +217,7 @@ async def answer_question_streamed(
             if isinstance(n, int) and 1 <= n <= len(index)
         ]
         if fetch_numbers:
-            yield Stage("thinking", f"正在获取 {len(fetch_numbers)} 篇文档原文…")
+            yield Stage("thinking", "stage_fetching", {"count": len(fetch_numbers)})
             fulltext_lines = []
             for num in fetch_numbers:
                 doc, _ = index[num - 1]
@@ -239,7 +240,7 @@ async def answer_question_streamed(
             if isinstance(n, int) and 1 <= n <= len(index)
         ]
 
-    yield Stage("thinking", "Agent 正在组织回答…")
+    yield Stage("thinking", "stage_thinking_phase2")
     answer_prompt_tpl = await get_prompt(session, ANSWER_PROMPT_KEY)
     phase2_prompt = answer_prompt_tpl.format(
         question=question,
@@ -260,7 +261,7 @@ async def answer_question_streamed(
             answer = r.text.strip()
     except EngineError as exc:
         logger.error("phase2 engine 调用失败 workspace=%s: %s", workspace_id, exc)
-        yield Stage("done", "完成")
+        yield Stage("done", "stage_done")
         yield AnswerResult(
             answer="engine_unavailable", sources=[], error_key="engine_unavailable"
         )
@@ -272,7 +273,7 @@ async def answer_question_streamed(
     if not answer:
         logger.warning("phase2 输出为空 workspace=%s", workspace_id)
     logger.info("answer done workspace=%s sources=%d", workspace_id, len(sources))
-    yield Stage("done", "完成")
+    yield Stage("done", "stage_done")
     yield AnswerResult(answer=answer, sources=sources, error_key=error_key)
 
 

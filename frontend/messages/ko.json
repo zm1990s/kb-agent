@@ -84,7 +84,17 @@
     "load_failed": "대화를 불러오지 못했습니다",
     "request_failed": "요청에 실패했습니다",
     "download_failed": "다운로드에 실패했습니다",
-    "preparing": "준비 중…"
+    "preparing": "준비 중…",
+    "stage_indexing": "인덱스 검색",
+    "stage_thinking": "심층 사고",
+    "stage_parsing": "결과 정리",
+    "stage_indexing_start": "지식 베이스 인덱스 검색 중…",
+    "stage_indexing_loaded": "{count}개의 문서를 불러왔습니다",
+    "stage_thinking_phase1": "Agent가 인덱스를 검토 중입니다…",
+    "stage_fetching": "{count}개의 문서 원문을 가져오는 중…",
+    "stage_thinking_phase2": "Agent가 답변을 구성하고 있습니다…",
+    "stage_done": "완료",
+    "stage_no_docs": "이 스페이스에 문서가 없습니다"
   },
   "messageBubble": {
     "me": "나",

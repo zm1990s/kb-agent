@@ -84,7 +84,17 @@
     "load_failed": "会話の読み込みに失敗しました",
     "request_failed": "リクエストに失敗しました",
     "download_failed": "ダウンロードに失敗しました",
-    "preparing": "準備中…"
+    "preparing": "準備中…",
+    "stage_indexing": "インデックス検索",
+    "stage_thinking": "思考中",
+    "stage_parsing": "結果整理",
+    "stage_indexing_start": "ナレッジベースのインデックスを検索中…",
+    "stage_indexing_loaded": "{count} 件のドキュメントを読み込みました",
+    "stage_thinking_phase1": "Agent がインデックスを確認しています…",
+    "stage_fetching": "{count} 件のドキュメントを取得中…",
+    "stage_thinking_phase2": "Agent が回答を整理しています…",
+    "stage_done": "完了",
+    "stage_no_docs": "このスペースにドキュメントがありません"
   },
   "messageBubble": {
     "me": "自分",

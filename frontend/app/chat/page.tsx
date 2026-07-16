@@ -43,6 +43,7 @@ export default function ChatPage() {
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [stage, setStage] = useState<string | null>(null);
+  const [stageKey, setStageKey] = useState<string | null>(null);
   const [streamingText, setStreamingText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [interrupted, setInterrupted] = useState(false);
@@ -182,7 +183,13 @@ export default function ChatPage() {
         },
         (event, data) => {
           if (event === "stage") {
-            setStage((data as { message: string }).message);
+            const { stage: sk, message_key, message_params } = data as {
+              stage: string;
+              message_key: string;
+              message_params: Record<string, unknown>;
+            };
+            setStageKey(sk);
+            setStage(t(message_key, message_params as Record<string, string>));
           } else if (event === "token") {
             setStreamingText((prev) => prev + (data as { text: string }).text);
           } else if (event === "done") {
@@ -207,6 +214,7 @@ export default function ChatPage() {
     } finally {
       setBusy(false);
       setStage(null);
+      setStageKey(null);
       setStreamingText("");
       abortRef.current = null;
     }
@@ -336,7 +344,7 @@ export default function ChatPage() {
                 </div>
               </div>
             ) : busy ? (
-              <ThinkingBubble stage={stage} />
+              <ThinkingBubble stage={stage} stageKey={stageKey} />
             ) : null}
           </div>
 

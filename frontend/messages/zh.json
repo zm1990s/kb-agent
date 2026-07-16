@@ -84,7 +84,17 @@
     "load_failed": "加载会话失败",
     "request_failed": "请求失败",
     "download_failed": "下载失败",
-    "preparing": "正在准备…"
+    "preparing": "正在准备…",
+    "stage_indexing": "检索索引",
+    "stage_thinking": "深度思考",
+    "stage_parsing": "整理结果",
+    "stage_indexing_start": "正在检索知识库索引…",
+    "stage_indexing_loaded": "已载入 {count} 篇文档索引",
+    "stage_thinking_phase1": "Agent 正在阅读索引并判断是否需要原文…",
+    "stage_fetching": "正在获取 {count} 篇文档原文…",
+    "stage_thinking_phase2": "Agent 正在组织回答…",
+    "stage_done": "完成",
+    "stage_no_docs": "空间暂无文档"
   },
   "messageBubble": {
     "me": "我",
