@@ -136,6 +136,13 @@ class Stage:
     message: str
 
 
+@dataclass
+class TokenChunk:
+    """单个 token 增量，Phase 2 流式生成时逐个 yield。"""
+
+    text: str
+
+
 async def answer_question_streamed(
     session: AsyncSession,
     *,
@@ -224,16 +231,23 @@ async def answer_question_streamed(
 
         yield Stage("thinking", "Agent 正在结合原文组织回答…")
         answer_prompt_tpl = await get_prompt(session, ANSWER_PROMPT_KEY)
+        phase2_prompt = answer_prompt_tpl.format(
+            question=question,
+            catalog=catalog,
+            history=hist_text,
+            fulltext=fulltext_block,
+            timestamp=timestamp,
+        )
         try:
-            result = await engine.complete(
-                answer_prompt_tpl.format(
-                    question=question,
-                    catalog=catalog,
-                    history=hist_text,
-                    fulltext=fulltext_block,
-                    timestamp=timestamp,
-                )
-            )
+            if hasattr(engine, "complete_streaming"):
+                token_chunks: list[str] = []
+                async for token in engine.complete_streaming(phase2_prompt):
+                    token_chunks.append(token)
+                    yield TokenChunk(text=token)
+                result_text = "".join(token_chunks)
+            else:
+                r = await engine.complete(phase2_prompt)
+                result_text = r.text
         except EngineError as exc:
             logger.error("phase2 engine 调用失败 workspace=%s: %s", workspace_id, exc)
             yield Stage("done", "完成")
@@ -243,11 +257,11 @@ async def answer_question_streamed(
             return
         yield Stage("parsing", "正在整理答案与相关文档…")
         try:
-            parsed = _parse_engine_json(result.text)
+            parsed = _parse_engine_json(result_text)
             answer = str(parsed.get("answer") or "").strip()
             doc_numbers = parsed.get("doc_numbers") or []
         except (ValueError, json.JSONDecodeError):
-            fallback = _extract_answer_fallback(result.text)
+            fallback = _extract_answer_fallback(result_text)
             logger.warning("phase2 JSON 解析失败，fallback answer=%s", bool(fallback))
             yield Stage("done", "完成")
             yield AnswerResult(

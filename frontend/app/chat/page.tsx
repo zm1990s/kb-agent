@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import ConversationSidebar from "@/components/ConversationSidebar";
+import Markdown from "@/components/Markdown";
 import MessageBubble from "@/components/MessageBubble";
 import NavBar from "@/components/NavBar";
 import ThinkingBubble from "@/components/ThinkingBubble";
@@ -42,6 +43,7 @@ export default function ChatPage() {
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [stage, setStage] = useState<string | null>(null);
+  const [streamingText, setStreamingText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [interrupted, setInterrupted] = useState(false);
   const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>([]);
@@ -181,7 +183,10 @@ export default function ChatPage() {
         (event, data) => {
           if (event === "stage") {
             setStage((data as { message: string }).message);
+          } else if (event === "token") {
+            setStreamingText((prev) => prev + (data as { text: string }).text);
           } else if (event === "done") {
+            setStreamingText("");
             const d = data as DonePayload;
             setConversationId(d.conversation_id);
             setTurns((t) => [
@@ -202,6 +207,7 @@ export default function ChatPage() {
     } finally {
       setBusy(false);
       setStage(null);
+      setStreamingText("");
       abortRef.current = null;
     }
   }
@@ -320,7 +326,18 @@ export default function ChatPage() {
                 onResend={interrupted && !busy && t.role === "user" && i === turns.length - 1 ? () => sendMessage(t.content) : undefined}
               />
             ))}
-{busy && <ThinkingBubble stage={stage} />}
+{busy && streamingText ? (
+              <div className="flex gap-3">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-gray-200 bg-white text-xs font-semibold text-gray-700 shadow-sm">
+                  AI
+                </div>
+                <div className="max-w-[75%] rounded-2xl rounded-tl-sm border border-gray-200 bg-white px-4 py-3 text-sm leading-relaxed text-gray-900 shadow-sm">
+                  <Markdown content={streamingText} />
+                </div>
+              </div>
+            ) : busy ? (
+              <ThinkingBubble stage={stage} />
+            ) : null}
           </div>
 
           {error && (

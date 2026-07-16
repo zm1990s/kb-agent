@@ -4,7 +4,9 @@
 注意：不支持 files 参数（文档归类须用 ClaudeCliEngine）。
 """
 
+import json
 import logging
+from collections.abc import AsyncGenerator
 from pathlib import Path
 
 import httpx
@@ -43,7 +45,7 @@ class OpenAICompatEngine:
             messages.append({"role": "system", "content": system})
         messages.append({"role": "user", "content": prompt})
 
-        payload = {"model": self._model, "messages": messages}
+        payload: dict = {"model": self._model, "messages": messages, "enable_thinking": False}
         headers = {
             "Authorization": f"Bearer {self._api_key}",
             "Content-Type": "application/json",
@@ -76,3 +78,56 @@ class OpenAICompatEngine:
             raise OpenAICompatEngineError(f"网络请求失败: {exc}") from exc
         except (KeyError, IndexError) as exc:
             raise OpenAICompatEngineError(f"响应格式解析失败: {exc}") from exc
+
+    async def complete_streaming(
+        self, prompt: str, *, system: str | None = None
+    ) -> AsyncGenerator[str, None]:
+        """流式调用：逐 token yield 文字增量。"""
+        messages: list[dict] = []
+        if system:
+            messages.append({"role": "system", "content": system})
+        messages.append({"role": "user", "content": prompt})
+
+        payload = {
+            "model": self._model,
+            "messages": messages,
+            "stream": True,
+            "enable_thinking": False,
+        }
+        headers = {
+            "Authorization": f"Bearer {self._api_key}",
+            "Content-Type": "application/json",
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=300) as client:
+                async with client.stream(
+                    "POST",
+                    f"{self._base_url}/chat/completions",
+                    json=payload,
+                    headers=headers,
+                ) as resp:
+                    resp.raise_for_status()
+                    async for line in resp.aiter_lines():
+                        if not line.startswith("data: ") or line == "data: [DONE]":
+                            continue
+                        try:
+                            chunk = json.loads(line[6:])
+                            delta = chunk["choices"][0]["delta"].get("content") or ""
+                            if delta:
+                                yield delta
+                        except (json.JSONDecodeError, KeyError, IndexError):
+                            continue
+        except httpx.HTTPStatusError as exc:
+            logger.error(
+                "OpenAI 兼容引擎流式 HTTP 错误 | status=%d | body=%s",
+                exc.response.status_code,
+                exc.response.text[:500],
+            )
+            raise OpenAICompatEngineError(
+                f"API 返回 HTTP {exc.response.status_code}: {exc.response.text[:200]}"
+            ) from exc
+        except httpx.TimeoutException as exc:
+            raise OpenAICompatEngineError("流式请求超时（300s）") from exc
+        except httpx.RequestError as exc:
+            raise OpenAICompatEngineError(f"网络请求失败: {exc}") from exc
