@@ -355,7 +355,18 @@
     "add_failed": "追加に失敗しました",
     "delete_failed": "削除に失敗しました",
     "update_failed": "更新に失敗しました",
-    "trigger_failed": "トリガーに失敗しました"
+    "trigger_failed": "トリガーに失敗しました",
+    "site_base_url_title": "サイトベース URL",
+    "site_base_url_desc": "確認メールのリンクに使用するドメイン（例：https://kb.example.com）。メール確認を有効にする前に設定してください。",
+    "site_base_url_save": "保存",
+    "site_base_url_saved": "保存しました",
+    "site_base_url_current": "現在",
+    "email_verification_title": "登録メールアドレス確認",
+    "email_verification_desc": "有効にすると、新規ユーザーはログイン前に確認メールのリンクをクリックする必要があります。事前に SMTP とサイトベース URL を設定してください。",
+    "email_verification_on": "有効（新規ユーザーはメール確認が必要）",
+    "email_verification_off": "無効（登録後すぐにログイン可能）",
+    "email_verification_enabled": "メールアドレス確認を有効にしました",
+    "email_verification_disabled": "メールアドレス確認を無効にしました"
   },
   "admin": {
     "user_tab_users": "ユーザー",
@@ -473,18 +484,7 @@
     "prompts_label_title_prompt": "会話タイトルプロンプト",
     "prompts_desc_title_prompt": "ユーザーが最初のメッセージを送信した後、会話タイトルを自動生成する際に使用するプロンプト。'{message}'プレースホルダー（実行時にユーザーの最初のメッセージで置き換え）を含める必要があります。",
     "prompts_label_whatsnew_prompt": "新着情報サマリープロンプト",
-    "prompts_desc_whatsnew_prompt": "定期タスクが各ワークスペースの新着情報サマリーを生成する際に使用するプロンプト。'{workspace_name}'、'{period}'、'{doc_count}'、'{documents}'、'{timestamp}'の5つのプレースホルダーを含める必要があります。",
-    "site_base_url_title": "サイトベース URL",
-    "site_base_url_desc": "確認メールのリンクに使用するドメイン（例：https://kb.example.com）。メール確認を有効にする前に設定してください。",
-    "site_base_url_save": "保存",
-    "site_base_url_saved": "保存しました",
-    "site_base_url_current": "現在",
-    "email_verification_title": "登録メールアドレス確認",
-    "email_verification_desc": "有効にすると、新規ユーザーはログイン前に確認メールのリンクをクリックする必要があります。事前に SMTP とサイトベース URL を設定してください。",
-    "email_verification_on": "有効（新規ユーザーはメール確認が必要）",
-    "email_verification_off": "無効（登録後すぐにログイン可能）",
-    "email_verification_enabled": "メールアドレス確認を有効にしました",
-    "email_verification_disabled": "メールアドレス確認を無効にしました"
+    "prompts_desc_whatsnew_prompt": "定期タスクが各ワークスペースの新着情報サマリーを生成する際に使用するプロンプト。'{workspace_name}'、'{period}'、'{doc_count}'、'{documents}'、'{timestamp}'の5つのプレースホルダーを含める必要があります。"
   },
   "verifyEmail": {
     "verifying": "確認中、しばらくお待ちください…",

@@ -355,7 +355,18 @@
     "add_failed": "추가에 실패했습니다",
     "delete_failed": "삭제에 실패했습니다",
     "update_failed": "업데이트에 실패했습니다",
-    "trigger_failed": "트리거에 실패했습니다"
+    "trigger_failed": "트리거에 실패했습니다",
+    "site_base_url_title": "사이트 기본 URL",
+    "site_base_url_desc": "인증 이메일 링크에 사용할 도메인 (예: https://kb.example.com). 이메일 인증 활성화 전에 먼저 설정하세요.",
+    "site_base_url_save": "저장",
+    "site_base_url_saved": "저장되었습니다",
+    "site_base_url_current": "현재",
+    "email_verification_title": "회원가입 이메일 인증",
+    "email_verification_desc": "활성화하면 신규 사용자는 로그인 전에 인증 이메일의 링크를 클릭해야 합니다. SMTP와 사이트 기본 URL을 먼저 설정해 주세요.",
+    "email_verification_on": "활성화됨 (신규 사용자는 이메일 인증 필요)",
+    "email_verification_off": "비활성화됨 (가입 후 바로 로그인 가능)",
+    "email_verification_enabled": "이메일 인증이 활성화되었습니다",
+    "email_verification_disabled": "이메일 인증이 비활성화되었습니다"
   },
   "admin": {
     "user_tab_users": "사용자",
@@ -473,18 +484,7 @@
     "prompts_label_title_prompt": "대화 제목 프롬프트",
     "prompts_desc_title_prompt": "사용자가 첫 번째 메시지를 보낸 후 대화 제목을 자동 생성할 때 사용하는 프롬프트입니다. '{message}' 플레이스홀더 (런타임에 사용자의 첫 번째 메시지로 대체)를 포함해야 합니다.",
     "prompts_label_whatsnew_prompt": "새 소식 요약 프롬프트",
-    "prompts_desc_whatsnew_prompt": "정기 작업이 각 워크스페이스의 새 소식 요약을 생성할 때 사용하는 프롬프트입니다. '{workspace_name}', '{period}', '{doc_count}', '{documents}', '{timestamp}'를 포함해야 합니다.",
-    "site_base_url_title": "사이트 기본 URL",
-    "site_base_url_desc": "인증 이메일 링크에 사용할 도메인 (예: https://kb.example.com). 이메일 인증 활성화 전에 먼저 설정하세요.",
-    "site_base_url_save": "저장",
-    "site_base_url_saved": "저장되었습니다",
-    "site_base_url_current": "현재",
-    "email_verification_title": "회원가입 이메일 인증",
-    "email_verification_desc": "활성화하면 신규 사용자는 로그인 전에 인증 이메일의 링크를 클릭해야 합니다. SMTP와 사이트 기본 URL을 먼저 설정해 주세요.",
-    "email_verification_on": "활성화됨 (신규 사용자는 이메일 인증 필요)",
-    "email_verification_off": "비활성화됨 (가입 후 바로 로그인 가능)",
-    "email_verification_enabled": "이메일 인증이 활성화되었습니다",
-    "email_verification_disabled": "이메일 인증이 비활성화되었습니다"
+    "prompts_desc_whatsnew_prompt": "정기 작업이 각 워크스페이스의 새 소식 요약을 생성할 때 사용하는 프롬프트입니다. '{workspace_name}', '{period}', '{doc_count}', '{documents}', '{timestamp}'를 포함해야 합니다."
   },
   "verifyEmail": {
     "verifying": "인증 중, 잠시만 기다려 주세요…",

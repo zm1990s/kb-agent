@@ -355,7 +355,18 @@
     "add_failed": "新增失敗",
     "delete_failed": "刪除失敗",
     "update_failed": "更新失敗",
-    "trigger_failed": "觸發失敗"
+    "trigger_failed": "觸發失敗",
+    "site_base_url_title": "網站基礎 URL",
+    "site_base_url_desc": "驗證郵件中連結的域名，例如 https://kb.example.com。啟用郵箱驗證前請先填寫。",
+    "site_base_url_save": "儲存",
+    "site_base_url_saved": "已儲存",
+    "site_base_url_current": "目前",
+    "email_verification_title": "註冊電子郵件驗證",
+    "email_verification_desc": "開啟後，新註冊使用者須點擊驗證郵件中的連結才能登入。請先設定 SMTP 和網站基礎 URL。",
+    "email_verification_on": "已開啟（新使用者需驗證電子郵件）",
+    "email_verification_off": "已關閉（註冊即可登入）",
+    "email_verification_enabled": "已開啟電子郵件驗證",
+    "email_verification_disabled": "已關閉電子郵件驗證"
   },
   "admin": {
     "user_tab_users": "使用者",
@@ -473,18 +484,7 @@
     "prompts_label_title_prompt": "對話標題提示詞",
     "prompts_desc_title_prompt": "使用者發出第一條訊息後，Agent 自動生成對話標題時使用的提示詞。必須包含 '{message}' 佔位符（執行時替換為使用者的第一條訊息）。",
     "prompts_label_whatsnew_prompt": "最新動態摘要提示詞",
-    "prompts_desc_whatsnew_prompt": "定時任務為每個空間生成「最新動態」摘要時使用的提示詞。必須包含 '{workspace_name}'、'{period}'、'{doc_count}'、'{documents}'、'{timestamp}' 五個佔位符。",
-    "site_base_url_title": "網站基礎 URL",
-    "site_base_url_desc": "驗證郵件中連結的域名，例如 https://kb.example.com。啟用郵箱驗證前請先填寫。",
-    "site_base_url_save": "儲存",
-    "site_base_url_saved": "已儲存",
-    "site_base_url_current": "目前",
-    "email_verification_title": "註冊電子郵件驗證",
-    "email_verification_desc": "開啟後，新註冊使用者須點擊驗證郵件中的連結才能登入。請先設定 SMTP 和網站基礎 URL。",
-    "email_verification_on": "已開啟（新使用者需驗證電子郵件）",
-    "email_verification_off": "已關閉（註冊即可登入）",
-    "email_verification_enabled": "已開啟電子郵件驗證",
-    "email_verification_disabled": "已關閉電子郵件驗證"
+    "prompts_desc_whatsnew_prompt": "定時任務為每個空間生成「最新動態」摘要時使用的提示詞。必須包含 '{workspace_name}'、'{period}'、'{doc_count}'、'{documents}'、'{timestamp}' 五個佔位符。"
   },
   "verifyEmail": {
     "verifying": "正在驗證，請稍候…",
