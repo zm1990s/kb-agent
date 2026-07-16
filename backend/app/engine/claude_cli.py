@@ -69,6 +69,13 @@ class ClaudeCliEngine:
         if system:
             argv += ["--append-system-prompt", system]
 
+        # 记录实际传给 CLI 的参数（prompt 截断避免日志过长）
+        argv_log = [
+            a if a != prompt else f"<prompt:{len(prompt)}chars>"
+            for a in argv
+        ]
+        logger.debug("Claude CLI 启动: %s", argv_log)
+
         try:
             proc = await asyncio.create_subprocess_exec(
                 *argv,
@@ -111,8 +118,12 @@ class ClaudeCliEngine:
             # CLI 常把错误信息写到 stdout（如模型不可访问），stderr 可能为空
             detail = stderr_str or stdout_tail or "(无输出)"
             logger.error(
-                "Claude CLI 退出码 %d | stderr=%r | stdout_tail=%r",
-                proc.returncode, stderr_str[:500], stdout_tail[:500],
+                "Claude CLI 失败 | 退出码=%d | model=%r | argv=%s | stderr=%r | stdout=%r",
+                proc.returncode,
+                self._model,
+                argv_log,
+                stderr_str[:500],
+                stdout_tail[:500],
             )
             raise EngineError(f"Claude CLI 返回非零退出码 {proc.returncode}: {detail}")
 
