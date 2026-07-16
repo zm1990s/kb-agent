@@ -35,6 +35,7 @@ MAX_INDEX_DOCS = 200
 class AnswerResult:
     answer: str
     sources: list[dict] = field(default_factory=list)
+    error_key: str | None = None
 
 
 async def _build_source(doc: Document) -> dict:
@@ -154,7 +155,7 @@ async def answer_question_streamed(
 
     if not index and not history:
         yield Stage("done", "空间暂无文档")
-        yield AnswerResult(answer=NO_DOCS_ANSWER, sources=[])
+        yield AnswerResult(answer=NO_DOCS_ANSWER, sources=[], error_key="no_docs")
         return
 
     if index:
@@ -187,7 +188,7 @@ async def answer_question_streamed(
     except EngineError as exc:
         logger.error("phase1 engine 调用失败 workspace=%s: %s", workspace_id, exc)
         yield Stage("done", "完成")
-        yield AnswerResult(answer="抱歉，AI 引擎暂时不可用，请稍后重试。", sources=[])
+        yield AnswerResult(answer="engine_unavailable", sources=[], error_key="engine_unavailable")
         return
 
     yield Stage("parsing", "正在解析 Agent 判断结果…")
@@ -197,7 +198,11 @@ async def answer_question_streamed(
         fallback = _extract_answer_fallback(phase1_result.text)
         logger.warning("phase1 JSON 解析失败，fallback answer=%s", bool(fallback))
         yield Stage("done", "完成")
-        yield AnswerResult(answer=fallback or "抱歉，处理回答时出现格式问题，请重新提问。", sources=[])
+        yield AnswerResult(
+            answer=fallback or "format_error",
+            sources=[],
+            error_key=None if fallback else "format_error",
+        )
         return
 
     if phase1.get("mode") == "fetch":
@@ -237,7 +242,9 @@ async def answer_question_streamed(
         except EngineError as exc:
             logger.error("phase2 engine 调用失败 workspace=%s: %s", workspace_id, exc)
             yield Stage("done", "完成")
-            yield AnswerResult(answer="抱歉，AI 引擎暂时不可用，请稍后重试。", sources=[])
+            yield AnswerResult(
+                answer="engine_unavailable", sources=[], error_key="engine_unavailable"
+            )
             return
         yield Stage("parsing", "正在整理答案与相关文档…")
         try:
@@ -248,7 +255,11 @@ async def answer_question_streamed(
             fallback = _extract_answer_fallback(result.text)
             logger.warning("phase2 JSON 解析失败，fallback answer=%s", bool(fallback))
             yield Stage("done", "完成")
-            yield AnswerResult(answer=fallback or "抱歉，处理回答时出现格式问题，请重新提问。", sources=[])
+            yield AnswerResult(
+                answer=fallback or "format_error",
+                sources=[],
+                error_key=None if fallback else "format_error",
+            )
             return
     else:
         # mode == "answer"：摘要已够，直接用 Phase 1 的结果
@@ -260,12 +271,15 @@ async def answer_question_streamed(
         if isinstance(num, int) and 1 <= num <= len(index):
             sources.append(await _build_source(index[num - 1][0]))
 
+    error_key: str | None = None
     if not answer:
         logger.warning("answer 字段为空，尝试 fallback")
-        answer = _extract_answer_fallback(phase1_result.text) or "抱歉，未能获取有效回答，请重新提问。"
+        answer = _extract_answer_fallback(phase1_result.text) or ""
+        if not answer:
+            error_key = "no_answer"
     logger.info("answer done workspace=%s sources=%d", workspace_id, len(sources))
     yield Stage("done", "完成")
-    yield AnswerResult(answer=answer, sources=sources)
+    yield AnswerResult(answer=answer, sources=sources, error_key=error_key)
 
 
 async def answer_question(

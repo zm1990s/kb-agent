@@ -87,7 +87,11 @@
     "edit_resend": "编辑并重新发送",
     "cancel": "取消",
     "resend": "重新发送",
-    "download_original": "下载原文"
+    "download_original": "下载原文",
+    "engine_unavailable": "抱歉，AI 引擎暂时不可用，请稍后重试。",
+    "format_error": "抱歉，处理回答时出现格式问题，请重新提问。",
+    "no_answer": "抱歉，未能获取有效回答，请重新提问。",
+    "no_docs": "当前空间还没有已归类的文档，暂时无法回答。"
   },
   "documents": {
     "workspace_label": "空间：",

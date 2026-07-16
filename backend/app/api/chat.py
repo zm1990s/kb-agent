@@ -159,7 +159,7 @@ async def chat_stream(
             elif isinstance(item, AnswerResult):
                 final = item
         if final is None:
-            final = AnswerResult(answer="（无响应）", sources=[])
+            final = AnswerResult(answer="", sources=[], error_key="no_answer")
         # 落库助手消息
         await add_message(
             session,
@@ -196,14 +196,14 @@ async def chat_stream(
                     conversation_id=conv.id,
                     first_message=body.message,
                 )
-        yield sse(
-            "done",
-            {
-                "answer": final.answer,
-                "sources": final.sources,
-                "conversation_id": str(conv.id),
-            },
-        )
+        done_payload: dict = {
+            "answer": final.answer,
+            "sources": final.sources,
+            "conversation_id": str(conv.id),
+        }
+        if final.error_key:
+            done_payload["error_key"] = final.error_key
+        yield sse("done", done_payload)
 
     return StreamingResponse(
         gen(),

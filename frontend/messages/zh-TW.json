@@ -87,7 +87,11 @@
     "edit_resend": "編輯並重新傳送",
     "cancel": "取消",
     "resend": "重新傳送",
-    "download_original": "下載原文"
+    "download_original": "下載原文",
+    "engine_unavailable": "抱歉，AI 引擎暫時無法使用，請稍後再試。",
+    "format_error": "抱歉，處理回答時出現格式問題，請重新提問。",
+    "no_answer": "抱歉，無法取得有效回答，請重新提問。",
+    "no_docs": "目前空間尚無已歸類的文件，暫時無法回答。"
   },
   "documents": {
     "workspace_label": "空間：",

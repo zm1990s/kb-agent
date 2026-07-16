@@ -87,7 +87,11 @@
     "edit_resend": "편집 후 재전송",
     "cancel": "취소",
     "resend": "재전송",
-    "download_original": "원본 다운로드"
+    "download_original": "원본 다운로드",
+    "engine_unavailable": "죄송합니다. AI 엔진을 일시적으로 사용할 수 없습니다. 잠시 후 다시 시도해 주세요.",
+    "format_error": "죄송합니다. 응답 처리 중 형식 오류가 발생했습니다. 다시 질문해 주세요.",
+    "no_answer": "죄송합니다. 유효한 답변을 가져올 수 없습니다. 다시 질문해 주세요.",
+    "no_docs": "이 워크스페이스에는 아직 분류된 문서가 없습니다."
   },
   "documents": {
     "workspace_label": "워크스페이스:",

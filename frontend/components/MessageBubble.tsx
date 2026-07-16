@@ -9,12 +9,13 @@ interface Props {
   role: "user" | "assistant";
   content: string;
   sources?: SourceRef[];
+  errorKey?: string;
   onDownload?: (s: SourceRef) => void;
   onEdit?: (newContent: string) => void;
   onResend?: () => void;
 }
 
-export default function MessageBubble({ role, content, sources, onDownload, onEdit, onResend }: Props) {
+export default function MessageBubble({ role, content, sources, errorKey, onDownload, onEdit, onResend }: Props) {
   const t = useTranslations("messageBubble");
   const isUser = role === "user";
   const [editing, setEditing] = useState(false);
@@ -100,7 +101,12 @@ export default function MessageBubble({ role, content, sources, onDownload, onEd
                   : "rounded-tl-sm bg-white text-gray-900 border border-gray-200 shadow-sm"
               }`}
             >
-              {isUser ? content : <Markdown content={content} />}
+              {isUser
+                ? content
+                : errorKey
+                  ? <span className="text-red-500">{t(errorKey as Parameters<typeof t>[0])}</span>
+                  : <Markdown content={content} />
+              }
             </div>
             {isUser && onEdit && (
               <button

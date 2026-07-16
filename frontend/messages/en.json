@@ -87,7 +87,11 @@
     "edit_resend": "Edit and resend",
     "cancel": "Cancel",
     "resend": "Resend",
-    "download_original": "Download source"
+    "download_original": "Download source",
+    "engine_unavailable": "Sorry, the AI engine is temporarily unavailable. Please try again later.",
+    "format_error": "Sorry, there was a formatting issue with the response. Please try asking again.",
+    "no_answer": "Sorry, no valid answer could be retrieved. Please try asking again.",
+    "no_docs": "There are no classified documents in this workspace yet."
   },
   "documents": {
     "workspace_label": "Workspace:",

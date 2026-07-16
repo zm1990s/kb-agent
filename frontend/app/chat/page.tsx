@@ -20,12 +20,14 @@ interface Turn {
   role: "user" | "assistant";
   content: string;
   sources?: SourceRef[];
+  error_key?: string;
 }
 
 interface DonePayload {
   answer: string;
   sources: SourceRef[];
   conversation_id: string;
+  error_key?: string;
 }
 
 const SESSION_KEY = "chat_state";
@@ -184,7 +186,7 @@ export default function ChatPage() {
             setConversationId(d.conversation_id);
             setTurns((t) => [
               ...t,
-              { role: "assistant", content: d.answer, sources: d.sources },
+              { role: "assistant", content: d.answer, sources: d.sources, error_key: d.error_key },
             ]);
           }
         },
@@ -312,6 +314,7 @@ export default function ChatPage() {
                 role={t.role}
                 content={t.content}
                 sources={t.sources}
+                errorKey={t.error_key}
                 onDownload={download}
                 onEdit={t.role === "user" && !busy ? (newContent) => handleEdit(i, newContent) : undefined}
                 onResend={interrupted && !busy && t.role === "user" && i === turns.length - 1 ? () => sendMessage(t.content) : undefined}
