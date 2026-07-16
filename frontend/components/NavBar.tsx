@@ -34,6 +34,7 @@ export default function NavBar() {
   const [branding, setBranding] = useState<Branding>({ name: "KB-Agent", logo_url: "" });
   const [dropOpen, setDropOpen] = useState(false);
   const [langOpen, setLangOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const dropRef = useRef<HTMLDivElement>(null);
   const langRef = useRef<HTMLDivElement>(null);
 
@@ -55,6 +56,13 @@ export default function NavBar() {
       .then(setBranding)
       .catch(() => {});
   }, []);
+
+  // 路由跳转后关闭所有弹出层
+  useEffect(() => {
+    setMenuOpen(false);
+    setDropOpen(false);
+    setLangOpen(false);
+  }, [pathname]);
 
   useEffect(() => {
     function handle(e: MouseEvent) {
@@ -110,8 +118,8 @@ export default function NavBar() {
           </Link>
         </div>
 
-        {/* 中：菜单居中 */}
-        <div className="absolute left-1/2 flex -translate-x-1/2 items-center gap-0.5">
+        {/* 中：菜单居中（桌面） */}
+        <div className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-0.5 md:flex">
           {visible.map((l) => (
             <Link
               key={l.href}
@@ -127,8 +135,8 @@ export default function NavBar() {
           ))}
         </div>
 
-        {/* 右：语言切换 + 用户 dropdown */}
-        <div className="ml-auto flex items-center gap-1">
+        {/* 右：语言切换 + 用户 dropdown（桌面） */}
+        <div className="ml-auto hidden items-center gap-1 md:flex">
           {/* 语言切换 */}
           <div className="relative" ref={langRef}>
             <button
@@ -189,7 +197,77 @@ export default function NavBar() {
             )}
           </div>
         </div>
+
+        {/* 汉堡按钮（移动端） */}
+        <button
+          className="ml-auto rounded p-2 text-gray-300 hover:bg-white/10 md:hidden"
+          onClick={() => setMenuOpen((v) => !v)}
+          aria-label="菜单"
+        >
+          {menuOpen ? (
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          ) : (
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          )}
+        </button>
       </nav>
+
+      {/* 移动端下拉面板 */}
+      {menuOpen && (
+        <div className="border-t border-gray-700 bg-gray-900 px-4 py-3 md:hidden">
+          <div className="space-y-1">
+            {visible.map((l) => (
+              <Link
+                key={l.href}
+                href={l.href}
+                className={`block rounded px-3 py-2 text-sm transition-colors ${
+                  pathname === l.href
+                    ? "bg-white/15 text-white font-medium"
+                    : "text-gray-300 hover:bg-white/10 hover:text-white"
+                }`}
+              >
+                {l.label}
+              </Link>
+            ))}
+          </div>
+
+          <div className="mt-2 space-y-1 border-t border-gray-700 pt-2">
+            <p className="px-3 py-1 text-xs text-gray-500">{t("lang_label")}</p>
+            {LOCALES.map((l) => (
+              <button
+                key={l}
+                onClick={() => { setLocale(l); setMenuOpen(false); }}
+                className={`block w-full rounded px-3 py-2 text-left text-sm hover:bg-white/10 ${
+                  l === locale ? "text-white font-medium" : "text-gray-300"
+                }`}
+              >
+                {LANG_LABELS[l]}
+              </button>
+            ))}
+          </div>
+
+          <div className="mt-2 space-y-1 border-t border-gray-700 pt-2">
+            <p className="truncate px-3 py-1 text-xs text-gray-500">{email ?? t("user_fallback")}</p>
+            <Link
+              href="/account"
+              onClick={() => setMenuOpen(false)}
+              className="block rounded px-3 py-2 text-sm text-gray-200 hover:bg-white/10 hover:text-white"
+            >
+              {t("account")}
+            </Link>
+            <button
+              onClick={() => { logout(); setMenuOpen(false); }}
+              className="block w-full rounded px-3 py-2 text-left text-sm text-red-400 hover:bg-white/10 hover:text-red-300"
+            >
+              {t("logout")}
+            </button>
+          </div>
+        </div>
+      )}
     </>
   );
 }
