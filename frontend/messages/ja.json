@@ -400,7 +400,18 @@
     "openai_api_key_label": "API キー",
     "openai_api_key_set": "設定済み（空白のまま変更しない）",
     "openai_model_label": "モデル名",
-    "chat_engine_saved": "チャットエンジン設定を保存しました"
+    "chat_engine_saved": "チャットエンジン設定を保存しました",
+    "task_headers_title": "タスクリクエスト Headers",
+    "task_headers_desc": "OpenAI 互換エンジンにのみ適用されます。Portkey などのゲートウェイのルーティングとラベル付けに使用します。",
+    "task_classify": "ドキュメント分類",
+    "task_title": "タイトル生成",
+    "task_chat_route": "チャットルーティング",
+    "task_chat_answer": "チャット回答生成",
+    "task_headers_add": "Header を追加",
+    "task_headers_save": "保存",
+    "task_headers_saved": "保存しました",
+    "task_headers_key_placeholder": "Header 名（例: x-portkey-virtual-key）",
+    "task_headers_value_placeholder": "Header 値"
   },
   "admin": {
     "user_tab_users": "ユーザー",

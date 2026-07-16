@@ -23,10 +23,18 @@ class OpenAICompatEngineError(EngineError):
 class OpenAICompatEngine:
     """调用 OpenAI 兼容 /v1/chat/completions 接口。"""
 
-    def __init__(self, *, base_url: str, api_key: str = "none", model: str) -> None:
+    def __init__(
+        self,
+        *,
+        base_url: str,
+        api_key: str = "none",
+        model: str,
+        extra_headers: dict[str, str] | None = None,
+    ) -> None:
         self._base_url = base_url.rstrip("/")
         self._api_key = api_key
         self._model = model
+        self._extra_headers = extra_headers or {}
 
     async def complete(
         self,
@@ -49,6 +57,7 @@ class OpenAICompatEngine:
         headers = {
             "Authorization": f"Bearer {self._api_key}",
             "Content-Type": "application/json",
+            **self._extra_headers,
         }
 
         try:
@@ -97,6 +106,7 @@ class OpenAICompatEngine:
         headers = {
             "Authorization": f"Bearer {self._api_key}",
             "Content-Type": "application/json",
+            **self._extra_headers,
         }
 
         try:

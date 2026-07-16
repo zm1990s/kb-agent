@@ -172,18 +172,26 @@ async def answer_question_streamed(
     from app.services.settings_service import (
         ANSWER_FETCH_PROMPT_KEY,
         ANSWER_PROMPT_KEY,
+        TASK_HEADERS_CHAT_ANSWER_KEY,
+        TASK_HEADERS_CHAT_ROUTE_KEY,
         get_prompt,
+        get_task_headers,
     )
 
     yield Stage("thinking", "stage_thinking_phase1")
-    engine = await get_chat_engine(session)
+    engine_route = await get_chat_engine(
+        session, extra_headers=await get_task_headers(session, TASK_HEADERS_CHAT_ROUTE_KEY)
+    )
+    engine_answer = await get_chat_engine(
+        session, extra_headers=await get_task_headers(session, TASK_HEADERS_CHAT_ANSWER_KEY)
+    )
     hist_text = _format_history(history)
     timestamp = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
 
     # ── Phase 1：只给摘要，让 Agent 判断够不够用 ────────────────
     fetch_prompt_tpl = await get_prompt(session, ANSWER_FETCH_PROMPT_KEY)
     try:
-        phase1_result = await engine.complete(
+        phase1_result = await engine_route.complete(
             fetch_prompt_tpl.format(
                 question=question, catalog=catalog, history=hist_text, timestamp=timestamp
             )
@@ -250,14 +258,14 @@ async def answer_question_streamed(
         timestamp=timestamp,
     )
     try:
-        if hasattr(engine, "complete_streaming"):
+        if hasattr(engine_answer, "complete_streaming"):
             token_chunks: list[str] = []
-            async for token in engine.complete_streaming(phase2_prompt):
+            async for token in engine_answer.complete_streaming(phase2_prompt):
                 token_chunks.append(token)
                 yield TokenChunk(text=token)
             answer = "".join(token_chunks).strip()
         else:
-            r = await engine.complete(phase2_prompt)
+            r = await engine_answer.complete(phase2_prompt)
             answer = r.text.strip()
     except EngineError as exc:
         logger.error("phase2 engine 调用失败 workspace=%s: %s", workspace_id, exc)

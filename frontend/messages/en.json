@@ -400,7 +400,18 @@
     "openai_api_key_label": "API Key",
     "openai_api_key_set": "Already set (leave blank to keep unchanged)",
     "openai_model_label": "Model name",
-    "chat_engine_saved": "Chat engine settings saved"
+    "chat_engine_saved": "Chat engine settings saved",
+    "task_headers_title": "Task Request Headers",
+    "task_headers_desc": "Only applies to the OpenAI-compatible engine. Use for routing and labeling in gateways like Portkey.",
+    "task_classify": "Document Classification",
+    "task_title": "Title Generation",
+    "task_chat_route": "Chat Routing",
+    "task_chat_answer": "Chat Answer Generation",
+    "task_headers_add": "Add Header",
+    "task_headers_save": "Save",
+    "task_headers_saved": "Saved",
+    "task_headers_key_placeholder": "Header name (e.g. x-portkey-virtual-key)",
+    "task_headers_value_placeholder": "Header value"
   },
   "admin": {
     "user_tab_users": "Users",

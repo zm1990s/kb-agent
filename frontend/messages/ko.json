@@ -400,7 +400,18 @@
     "openai_api_key_label": "API 키",
     "openai_api_key_set": "설정됨（비워두면 변경 없음）",
     "openai_model_label": "모델 이름",
-    "chat_engine_saved": "채팅 엔진 설정이 저장되었습니다"
+    "chat_engine_saved": "채팅 엔진 설정이 저장되었습니다",
+    "task_headers_title": "태스크 요청 Headers",
+    "task_headers_desc": "OpenAI 호환 엔진에만 적용됩니다. Portkey 등 게이트웨이의 라우팅 및 레이블링에 사용됩니다.",
+    "task_classify": "문서 분류",
+    "task_title": "제목 생성",
+    "task_chat_route": "대화 라우팅",
+    "task_chat_answer": "대화 답변 생성",
+    "task_headers_add": "Header 추가",
+    "task_headers_save": "저장",
+    "task_headers_saved": "저장됨",
+    "task_headers_key_placeholder": "Header 이름（예: x-portkey-virtual-key）",
+    "task_headers_value_placeholder": "Header 값"
   },
   "admin": {
     "user_tab_users": "사용자",

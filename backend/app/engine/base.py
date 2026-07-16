@@ -61,9 +61,12 @@ def get_engine(backend: str | None = None, model: str | None = None) -> EnginePr
     raise NotImplementedError(f"未实现的引擎后端: {resolved!r}")
 
 
-async def get_chat_engine(session) -> "EngineProtocol":
+async def get_chat_engine(
+    session, *, extra_headers: dict[str, str] | None = None
+) -> "EngineProtocol":
     """对话引擎工厂：读 chat_engine_backend 配置，返回相应引擎实例。
 
+    extra_headers 仅对 OpenAICompatEngine 生效（ClaudeCliEngine 静默忽略）。
     文档归类请直接用 get_engine("claude_cli", model=...)，不要用此函数。
     """
     from app.services.settings_service import (
@@ -82,8 +85,13 @@ async def get_chat_engine(session) -> "EngineProtocol":
         base_url = await get_openai_base_url(session)
         api_key = await get_openai_api_key(session)
         model = await get_openai_model(session)
-        return OpenAICompatEngine(base_url=base_url, api_key=api_key or "none", model=model)
+        return OpenAICompatEngine(
+            base_url=base_url,
+            api_key=api_key or "none",
+            model=model,
+            extra_headers=extra_headers,
+        )
 
-    # 默认 claude_cli
+    # 默认 claude_cli（extra_headers 静默忽略）
     model = await get_task_model(session, MODEL_CHAT_KEY)
     return get_engine("claude_cli", model=model)

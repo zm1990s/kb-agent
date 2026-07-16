@@ -4,6 +4,7 @@
 选择持久化在 app_settings，重启仍生效。
 """
 
+import json
 from dataclasses import dataclass, field
 
 from sqlalchemy import func, select
@@ -463,3 +464,41 @@ async def get_openai_model(session: AsyncSession) -> str:
 
 async def set_openai_model(session: AsyncSession, model: str) -> None:
     await set_setting(session, OPENAI_MODEL_KEY, model)
+
+
+# ── 任务级请求 Headers ────────────────────────────────────────────────────────
+
+TASK_HEADERS_CLASSIFY_KEY   = "task_headers::classify"
+TASK_HEADERS_TITLE_KEY      = "task_headers::title"
+TASK_HEADERS_CHAT_ROUTE_KEY = "task_headers::chat_route"
+TASK_HEADERS_CHAT_ANSWER_KEY = "task_headers::chat_answer"
+
+_TASK_HEADERS_DEFAULTS: dict[str, str] = {
+    TASK_HEADERS_CLASSIFY_KEY:    '{"x-task": "classify"}',
+    TASK_HEADERS_TITLE_KEY:       '{"x-task": "title"}',
+    TASK_HEADERS_CHAT_ROUTE_KEY:  '{"x-task": "chat_route"}',
+    TASK_HEADERS_CHAT_ANSWER_KEY: '{"x-task": "chat_answer"}',
+}
+
+ALL_TASK_HEADER_KEYS = [
+    TASK_HEADERS_CLASSIFY_KEY,
+    TASK_HEADERS_TITLE_KEY,
+    TASK_HEADERS_CHAT_ROUTE_KEY,
+    TASK_HEADERS_CHAT_ANSWER_KEY,
+]
+
+
+async def get_task_headers(session: AsyncSession, key: str) -> dict[str, str]:
+    """读取指定任务的自定义 headers，未配置时返回默认值。"""
+    val = await get_setting(session, key)
+    raw = val if val is not None else _TASK_HEADERS_DEFAULTS.get(key, "{}")
+    try:
+        result = json.loads(raw)
+        return result if isinstance(result, dict) else {}
+    except (json.JSONDecodeError, TypeError):
+        return {}
+
+
+async def set_task_headers(session: AsyncSession, key: str, headers: dict[str, str]) -> None:
+    """保存指定任务的自定义 headers（覆盖写）。"""
+    await set_setting(session, key, json.dumps(headers, ensure_ascii=False))

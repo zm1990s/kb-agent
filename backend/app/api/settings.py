@@ -17,6 +17,10 @@ from app.services.settings_service import (
     MODEL_TITLE_KEY,
     MODEL_WHATSNEW_KEY,
     PROMPT_CATALOG,
+    TASK_HEADERS_CHAT_ANSWER_KEY,
+    TASK_HEADERS_CHAT_ROUTE_KEY,
+    TASK_HEADERS_CLASSIFY_KEY,
+    TASK_HEADERS_TITLE_KEY,
     WHATSNEW_FREQ_DAYS,
     EngineNotAvailableError,
     InvalidPromptError,
@@ -30,6 +34,7 @@ from app.services.settings_service import (
     get_setting,
     get_site_base_url,
     get_suggested_questions,
+    get_task_headers,
     get_task_model,
     get_whatsnew_freq,
     get_whatsnew_hour,
@@ -46,6 +51,7 @@ from app.services.settings_service import (
     set_setting,
     set_site_base_url,
     set_suggested_questions,
+    set_task_headers,
     set_task_model,
     set_whatsnew_freq,
     set_whatsnew_hour,
@@ -604,4 +610,63 @@ async def update_chat_engine_config(
         openai_base_url=await get_openai_base_url(session),
         openai_api_key="***" if raw_key else "",
         openai_model=await get_openai_model(session),
+    )
+
+
+# ── 任务级请求 Headers ────────────────────────────────────────────────────────
+
+_TASK_KEY_MAP = {
+    "classify":    TASK_HEADERS_CLASSIFY_KEY,
+    "title":       TASK_HEADERS_TITLE_KEY,
+    "chat_route":  TASK_HEADERS_CHAT_ROUTE_KEY,
+    "chat_answer": TASK_HEADERS_CHAT_ANSWER_KEY,
+}
+
+
+class TaskHeadersOut(BaseModel):
+    classify:    dict[str, str]
+    title:       dict[str, str]
+    chat_route:  dict[str, str]
+    chat_answer: dict[str, str]
+
+
+class TaskHeadersUpdateIn(BaseModel):
+    headers: dict[str, str]
+
+
+@router.get("/task-headers", response_model=TaskHeadersOut)
+async def get_task_headers_config(
+    _admin: User = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+) -> TaskHeadersOut:
+    return TaskHeadersOut(
+        classify=await get_task_headers(session, TASK_HEADERS_CLASSIFY_KEY),
+        title=await get_task_headers(session, TASK_HEADERS_TITLE_KEY),
+        chat_route=await get_task_headers(session, TASK_HEADERS_CHAT_ROUTE_KEY),
+        chat_answer=await get_task_headers(session, TASK_HEADERS_CHAT_ANSWER_KEY),
+    )
+
+
+@router.put("/task-headers/{task}", response_model=TaskHeadersOut)
+async def update_task_headers(
+    task: str,
+    body: TaskHeadersUpdateIn,
+    admin: User = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+) -> TaskHeadersOut:
+    if task not in _TASK_KEY_MAP:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            f"未知任务类型: {task!r}，有效值: {list(_TASK_KEY_MAP)}"
+        )
+    await set_task_headers(session, _TASK_KEY_MAP[task], body.headers)
+    logger.info("audit admin update_task_headers admin=%s task=%s", admin.id, task)
+    await record_event(
+        session, action="admin_update_task_headers", user_id=admin.id, meta={"task": task}
+    )
+    return TaskHeadersOut(
+        classify=await get_task_headers(session, TASK_HEADERS_CLASSIFY_KEY),
+        title=await get_task_headers(session, TASK_HEADERS_TITLE_KEY),
+        chat_route=await get_task_headers(session, TASK_HEADERS_CHAT_ROUTE_KEY),
+        chat_answer=await get_task_headers(session, TASK_HEADERS_CHAT_ANSWER_KEY),
     )

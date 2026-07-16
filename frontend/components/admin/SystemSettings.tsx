@@ -96,6 +96,16 @@ export default function SystemSettings({ perms }: Props) {
   });
   const [chatEngineMsg, setChatEngineMsg] = useState<string | null>(null);
 
+  type TaskHeadersConfig = Record<"classify" | "title" | "chat_route" | "chat_answer", Record<string, string>>;
+  const TASK_KEYS = ["classify", "title", "chat_route", "chat_answer"] as const;
+  const [taskHeaders, setTaskHeaders] = useState<TaskHeadersConfig>({
+    classify: { "x-task": "classify" },
+    title: { "x-task": "title" },
+    chat_route: { "x-task": "chat_route" },
+    chat_answer: { "x-task": "chat_answer" },
+  });
+  const [taskHeadersMsg, setTaskHeadersMsg] = useState<string | null>(null);
+
   const loadDomains = useCallback(async () => {
     try {
       setDomains(await api.get<AllowedDomain[]>("/auth/allowed-domains"));
@@ -170,6 +180,13 @@ export default function SystemSettings({ perms }: Props) {
     } catch { /* 非 admin 正常 */ }
   }, []);
 
+  const loadTaskHeaders = useCallback(async () => {
+    try {
+      const d = await api.get<TaskHeadersConfig>("/settings/task-headers");
+      setTaskHeaders(d);
+    } catch { /* 非 admin 正常 */ }
+  }, []);
+
   useEffect(() => {
     loadDomains();
     loadEngine();
@@ -179,7 +196,8 @@ export default function SystemSettings({ perms }: Props) {
     loadTaskModels();
     loadEmailVerification();
     loadChatEngine();
-  }, [loadDomains, loadEngine, loadBranding, loadWnSchedule, loadSuggestedQuestions, loadTaskModels, loadEmailVerification, loadChatEngine]);
+    loadTaskHeaders();
+  }, [loadDomains, loadEngine, loadBranding, loadWnSchedule, loadSuggestedQuestions, loadTaskModels, loadEmailVerification, loadChatEngine, loadTaskHeaders]);
 
   async function addDomain(e: React.FormEvent) {
     e.preventDefault();
@@ -324,6 +342,50 @@ export default function SystemSettings({ perms }: Props) {
     } catch (err) {
       setError(err instanceof ApiError ? err.message : t("save_failed"));
     }
+  }
+
+  async function saveTaskHeadersForTask(task: typeof TASK_KEYS[number]) {
+    setTaskHeadersMsg(null);
+    try {
+      const updated = await api.put<TaskHeadersConfig>(`/settings/task-headers/${task}`, {
+        headers: taskHeaders[task],
+      });
+      setTaskHeaders(updated);
+      setTaskHeadersMsg(t("task_headers_saved"));
+      setTimeout(() => setTaskHeadersMsg(null), 2000);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : t("save_failed"));
+    }
+  }
+
+  function updateTaskHeaderKey(
+    task: typeof TASK_KEYS[number],
+    oldKey: string,
+    newKey: string
+  ) {
+    setTaskHeaders((prev) => {
+      const entries = Object.entries(prev[task]);
+      const idx = entries.findIndex(([k]) => k === oldKey);
+      if (idx === -1) return prev;
+      entries[idx] = [newKey, entries[idx][1]];
+      return { ...prev, [task]: Object.fromEntries(entries) };
+    });
+  }
+
+  function updateTaskHeaderValue(task: typeof TASK_KEYS[number], key: string, value: string) {
+    setTaskHeaders((prev) => ({ ...prev, [task]: { ...prev[task], [key]: value } }));
+  }
+
+  function addTaskHeaderRow(task: typeof TASK_KEYS[number]) {
+    setTaskHeaders((prev) => ({ ...prev, [task]: { ...prev[task], "": "" } }));
+  }
+
+  function removeTaskHeaderRow(task: typeof TASK_KEYS[number], key: string) {
+    setTaskHeaders((prev) => {
+      const next = { ...prev[task] };
+      delete next[key];
+      return { ...prev, [task]: next };
+    });
   }
 
   async function saveSuggestedQuestions(e: React.FormEvent) {
@@ -548,6 +610,65 @@ export default function SystemSettings({ perms }: Props) {
               </button>
             </form>
             {chatEngineMsg && <p className="mt-2 text-xs text-green-600">{chatEngineMsg}</p>}
+          </section>
+
+          {/* 任务请求 Headers */}
+          <section className="rounded border bg-white p-4">
+            <h2 className="mb-1 text-sm font-medium">{t("task_headers_title")}</h2>
+            <p className="mb-4 text-xs text-gray-400">{t("task_headers_desc")}</p>
+            <div className="space-y-5">
+              {TASK_KEYS.map((task) => (
+                <div key={task}>
+                  <p className="mb-2 text-xs font-medium text-gray-600">
+                    {t(`task_${task}` as Parameters<typeof t>[0])}
+                  </p>
+                  <div className="space-y-1.5">
+                    {Object.entries(taskHeaders[task]).map(([k, v], idx) => (
+                      <div key={idx} className="flex items-center gap-2">
+                        <input
+                          className="w-5/12 rounded border px-2 py-1 text-xs font-mono"
+                          value={k}
+                          placeholder={t("task_headers_key_placeholder")}
+                          onChange={(e) => updateTaskHeaderKey(task, k, e.target.value)}
+                        />
+                        <input
+                          className="flex-1 rounded border px-2 py-1 text-xs font-mono"
+                          value={v}
+                          placeholder={t("task_headers_value_placeholder")}
+                          onChange={(e) => updateTaskHeaderValue(task, k, e.target.value)}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeTaskHeaderRow(task, k)}
+                          className="shrink-0 rounded px-2 py-1 text-xs text-gray-400 hover:bg-red-50 hover:text-red-500"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-2 flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => addTaskHeaderRow(task)}
+                      className="rounded border px-2 py-1 text-xs text-gray-500 hover:bg-gray-50"
+                    >
+                      + {t("task_headers_add")}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => saveTaskHeadersForTask(task)}
+                      className="rounded bg-blue-600 px-3 py-1 text-xs text-white hover:bg-blue-700"
+                    >
+                      {t("task_headers_save")}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            {taskHeadersMsg && (
+              <p className="mt-3 text-xs text-green-600">{taskHeadersMsg}</p>
+            )}
           </section>
 
           {/* 域名白名单 */}

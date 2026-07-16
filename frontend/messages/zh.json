@@ -400,7 +400,18 @@
     "openai_api_key_label": "API Key",
     "openai_api_key_set": "已配置（留空保持不变）",
     "openai_model_label": "模型名称",
-    "chat_engine_saved": "对话引擎配置已保存"
+    "chat_engine_saved": "对话引擎配置已保存",
+    "task_headers_title": "任务请求 Headers",
+    "task_headers_desc": "仅对 OpenAI 兼容引擎生效，用于 Portkey 等网关的流量路由与标签",
+    "task_classify": "文档归类",
+    "task_title": "标题生成",
+    "task_chat_route": "对话路由判断",
+    "task_chat_answer": "对话回答生成",
+    "task_headers_add": "添加 Header",
+    "task_headers_save": "保存",
+    "task_headers_saved": "已保存",
+    "task_headers_key_placeholder": "Header 名（如 x-portkey-virtual-key）",
+    "task_headers_value_placeholder": "Header 值"
   },
   "admin": {
     "user_tab_users": "用户",
