@@ -6,9 +6,11 @@ import { clearAuth, getToken } from "./auth";
 
 export class ApiError extends Error {
   status: number;
-  constructor(status: number, message: string) {
+  detail: unknown;
+  constructor(status: number, message: string, detail?: unknown) {
     super(message);
     this.status = status;
+    this.detail = detail;
   }
 }
 
@@ -47,14 +49,16 @@ async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
   }
 
   if (!res.ok) {
-    let detail = `请求失败 (${res.status})`;
+    let message = `请求失败 (${res.status})`;
+    let rawDetail: unknown = null;
     try {
       const data = await res.json();
-      if (data?.detail) detail = typeof data.detail === "string" ? data.detail : detail;
+      rawDetail = data?.detail ?? null;
+      if (typeof rawDetail === "string") message = rawDetail;
     } catch {
       // 忽略非 JSON 响应
     }
-    throw new ApiError(res.status, detail);
+    throw new ApiError(res.status, message, rawDetail);
   }
 
   if (res.status === 204) return undefined as T;

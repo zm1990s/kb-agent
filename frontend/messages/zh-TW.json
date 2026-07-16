@@ -61,6 +61,7 @@
     "err_duplicate": "此電子郵件已被註冊",
     "err_credentials": "電子郵件或密碼錯誤",
     "err_email_not_verified": "電子郵件尚未驗證，請查收註冊時發送的驗證郵件",
+    "err_account_locked": "帳號已被暫時鎖定，請 {minutes} 分鐘後再試",
     "pending_verification_title": "註冊成功，請驗證電子郵件",
     "pending_verification_desc": "驗證郵件已發送至 {email}，請點擊郵件中的連結完成驗證後再登入（24小時內有效）"
   },

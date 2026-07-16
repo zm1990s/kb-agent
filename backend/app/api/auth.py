@@ -23,6 +23,7 @@ from app.schemas.auth import (
 from app.services.rbac_service import delete_user
 from app.services.usage_service import record_event
 from app.services.user_service import (
+    AccountLockedError,
     DomainNotAllowedError,
     EmailExistsError,
     EmailNotVerifiedError,
@@ -92,6 +93,11 @@ async def login(
 ) -> TokenResponse:
     try:
         user = await authenticate(session, email=body.email, password=body.password)
+    except AccountLockedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_423_LOCKED,
+            detail={"code": "account_locked", "remaining_seconds": exc.remaining_seconds},
+        ) from exc
     except EmailNotVerifiedError as exc:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

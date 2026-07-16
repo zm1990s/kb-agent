@@ -20,6 +20,8 @@ from app.models.auth import AllowedDomain, User
 logger = logging.getLogger(__name__)
 
 _VERIFICATION_TOKEN_EXPIRE_HOURS = 24
+_MAX_LOGIN_ATTEMPTS = 5
+_LOCKOUT_DURATION_MINUTES = 15
 
 
 class InvalidCredentialsError(Exception):
@@ -36,6 +38,13 @@ class EmailExistsError(Exception):
 
 class EmailNotVerifiedError(Exception):
     """邮箱未验证，不允许登录。"""
+
+
+class AccountLockedError(Exception):
+    """账号因连续密码错误被暂时锁定。"""
+
+    def __init__(self, remaining_seconds: int) -> None:
+        self.remaining_seconds = remaining_seconds
 
 
 def _email_domain(email: str) -> str:
@@ -135,15 +144,35 @@ async def authenticate(
     session: AsyncSession, *, email: str, password: str
 ) -> User | None:
     """校验邮箱+密码，成功返回 User，失败返回 None（不区分邮箱不存在/密码错）。
-    邮箱未验证时抛 EmailNotVerifiedError。
+    账号锁定时抛 AccountLockedError，邮箱未验证时抛 EmailNotVerifiedError。
     """
     user = await get_user_by_email(session, email)
     if user is None:
         return None
     if not user.is_active:
         return None
+
+    # 锁定检查（在密码校验之前，避免泄露账号是否存在）
+    now = datetime.now(UTC)
+    if user.locked_until is not None and user.locked_until > now:
+        remaining = int((user.locked_until - now).total_seconds())
+        raise AccountLockedError(remaining)
+
     if not verify_password(password, user.password_hash):
+        user.failed_login_attempts += 1
+        if user.failed_login_attempts >= _MAX_LOGIN_ATTEMPTS:
+            user.locked_until = now + timedelta(minutes=_LOCKOUT_DURATION_MINUTES)
+            logger.warning(
+                "authenticate: 账号已锁定 email=%s until=%s", email, user.locked_until
+            )
+        await session.commit()
         return None
+
+    # 密码正确：重置计数器（在 email_verified 检查之前，确保密码正确不受惩罚）
+    if user.failed_login_attempts != 0 or user.locked_until is not None:
+        user.failed_login_attempts = 0
+        user.locked_until = None
+        await session.commit()
 
     # 仅当功能启用时才阻止未验证用户登录
     from app.services.settings_service import get_require_email_verification

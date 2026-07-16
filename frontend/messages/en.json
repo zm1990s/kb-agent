@@ -61,6 +61,7 @@
     "err_duplicate": "This email is already registered",
     "err_credentials": "Invalid email or password",
     "err_email_not_verified": "Email not verified. Please check your inbox for the verification email.",
+    "err_account_locked": "Account temporarily locked. Try again in {minutes} minute(s).",
     "pending_verification_title": "Registration successful — verify your email",
     "pending_verification_desc": "A verification email has been sent to {email}. Click the link in the email to activate your account (valid for 24 hours)."
   },

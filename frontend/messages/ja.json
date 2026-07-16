@@ -61,6 +61,7 @@
     "err_duplicate": "このメールアドレスはすでに登録されています",
     "err_credentials": "メールアドレスまたはパスワードが無効です",
     "err_email_not_verified": "メールアドレスが未確認です。登録時に送信された確認メールをご確認ください。",
+    "err_account_locked": "アカウントが一時的にロックされました。{minutes}分後に再試行してください。",
     "pending_verification_title": "登録完了 — メールアドレスを確認してください",
     "pending_verification_desc": "確認メールを {email} に送信しました。メール内のリンクをクリックして認証を完了してください（24時間以内有効）。"
   },

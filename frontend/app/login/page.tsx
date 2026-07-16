@@ -43,7 +43,11 @@ export default function LoginPage() {
       router.replace("/chat");
     } catch (err) {
       if (err instanceof ApiError) {
-        if (err.status === 403 && err.message === "email_not_verified")
+        if (err.status === 423) {
+          const d = err.detail as { remaining_seconds?: number } | null;
+          const minutes = Math.ceil((d?.remaining_seconds ?? 900) / 60);
+          setError(t("err_account_locked", { minutes }));
+        } else if (err.status === 403 && err.message === "email_not_verified")
           setError(t("err_email_not_verified"));
         else if (err.status === 403) setError(t("err_domain"));
         else if (err.status === 409) setError(t("err_duplicate"));
