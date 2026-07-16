@@ -9,12 +9,12 @@ from pathlib import Path
 
 import httpx
 
-from app.engine.base import EngineResult
+from app.engine.base import EngineError, EngineResult
 
 logger = logging.getLogger(__name__)
 
 
-class OpenAICompatEngineError(RuntimeError):
+class OpenAICompatEngineError(EngineError):
     """OpenAI 兼容引擎调用失败。"""
 
 

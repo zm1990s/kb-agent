@@ -18,8 +18,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
-from app.engine.base import get_chat_engine
-from app.engine.claude_cli import EngineError
+from app.engine.base import EngineError, get_chat_engine
 from app.models.document import Category, Document
 from app.storage.base import get_storage
 

@@ -11,13 +11,9 @@ import logging
 from pathlib import Path
 
 from app.core.config import get_settings
-from app.engine.base import EngineResult
+from app.engine.base import EngineError, EngineResult
 
 logger = logging.getLogger(__name__)
-
-
-class EngineError(RuntimeError):
-    """引擎调用失败。"""
 
 
 class ClaudeCliEngine:

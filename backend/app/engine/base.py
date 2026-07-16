@@ -11,6 +11,10 @@ from typing import Protocol, runtime_checkable
 from app.core.config import get_settings
 
 
+class EngineError(RuntimeError):
+    """引擎调用失败（所有引擎实现的公共基类）。"""
+
+
 @dataclass
 class EngineResult:
     """引擎调用的统一返回。"""
