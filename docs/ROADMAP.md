@@ -16,6 +16,8 @@
 | F15b | 上传限制 | `proxyClientMaxBodySize: "200mb"`，前端单次上传最大 200 MB | ✅ 已交付 |
 | F16 | 按任务模型配置 | 系统设置新增模型配置面板；`model::classify / chat / whatsnew / title` 四个 `app_settings` key；engine 调用时按 key 读取模型 | ✅ 已交付 |
 | F17 | 国际化（i18n） | next-intl 客户端 i18n；5 语言（zh/zh-TW/en/ja/ko）；NavBar 切换器；localStorage 持久化；DialogProvider 替换 window.confirm/prompt | ✅ 已交付 |
+| F18 | 自助找回密码 | 邮箱 6 位验证码（10 分钟有效）；1 分钟发送限速；5 次错误锁定；uniform 响应防枚举；前端 forgot/reset 流程；migration 019 新增 4 列 | ✅ 已交付 |
+| F19 | 任务级 HTTP Header 配置 | 4 类 LLM 任务（归类/标题/对话路由/对话回答）各自可配 HTTP Header，供 Portkey 等网关路由；`task_headers::*` 持久化；OpenAI 兼容引擎透传，ClaudeCliEngine 静默忽略；系统设置 key-value 编辑器 UI | ✅ 已交付 |
 | M4 | Skill 插拔框架 | SkillBase 抽象、registry、invoke、审批契约 | 预留（未实现） |
 | M5 | SCM 示范 skill | PANW 配置生成，pending_approval→approve→下发 | 预留（未实现） |
 

@@ -58,6 +58,7 @@ class EngineProtocol(Protocol):
 - **页面**：①登录/注册 ②对话查询（答案 + 每条来源的原文下载链接）③文档管理（上传、归类状态、列表、下载）④管理后台（空间授权及配置/用户管理）⑤系统设置（通用/提示词/空间管理/用户管理）⑥数据统计 ⑦新动态 ⑧账户设置。
 - **引擎选择**：管理员在系统设置切换 Agent 引擎，选择持久化于 `app_settings`（键 `engine_backend`），归类/问答运行时按此解析。Claude CLI 可用；Codex / OpenClaw 前端灰显、后端拒绝（`available=false`），为未来预留。
 - **按任务模型配置**：系统设置独立配置归类/对话/新动态/会话标题所用模型，持久化于 `app_settings`（键 `model::classify` / `model::chat` / `model::whatsnew` / `model::title`），engine 调用时按 key 读取；未设则使用引擎默认模型。
+- **按任务 HTTP Header 配置**：系统设置支持为四类 LLM 任务（归类/标题生成/对话路由/对话回答）各自配置 HTTP Header，存于 `app_settings`（键 `task_headers::classify` / `task_headers::title` / `task_headers::chat_route` / `task_headers::chat_answer`），默认 `{"x-task": "<task_name>"}`。仅对 OpenAI 兼容引擎生效（ClaudeCliEngine 静默忽略），用于 Portkey 等网关路由标签。
 - **国际化**：`next-intl` 客户端 i18n；5 语言（`zh` / `zh-TW` / `en` / `ja` / `ko`）；locale 存 `localStorage`，首次访问按 `navigator.language` 匹配；NavBar 右上角语言切换器；`IntlProvider`（动态加载 `messages/*.json`）+ `LocaleContext`；所有 `window.confirm`/`window.prompt` 替换为 `DialogProvider` 提供的 Promise-based 自定义 Modal。
 - **技术版本**：Next.js 16.2.10 + React 19。
 - **XSS**：LLM 产物（summary/answer）渲染必须净化（SECURITY #6）。
@@ -150,6 +151,8 @@ class StorageProtocol(Protocol):
 |------|------|------|
 | GET/PUT | /settings/engine | 查/设引擎后端（Claude 可用；Codex/OpenClaw 灰显） |
 | GET/PUT | /settings/models | 查/设各任务模型（`classify` / `chat` / `whatsnew` / `title`，每个 task 独立，持久化 `model::*` key） |
+| GET | /settings/task-headers | 查四个任务的 HTTP Header 配置（`classify` / `title` / `chat_route` / `chat_answer`） |
+| PUT | /settings/task-headers/{task} | 设单个任务的 HTTP Header（body: `{"headers": {...}}`，需 admin；仅 OpenAI 兼容引擎生效） |
 | GET/POST | /auth/allowed-domains | 注册域名白名单（DB 维护） |
 | DELETE | /auth/allowed-domains/{id} | 删白名单域名 |
 | GET/PUT | /settings/brand | 品牌配置（Logo/名称） |
@@ -194,6 +197,8 @@ class StorageProtocol(Protocol):
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | POST | /auth/change-password | 改自己的密码 |
+| POST | /auth/forgot-password | 发送密码重置验证码（6 位，10 分钟有效，始终返回 200 防枚举） |
+| POST | /auth/reset-password | 验证码 + 新密码重置（5 次错误锁定） |
 
 ### Skill（M4 预留，未实现，仅登记契约）
 | 方法 | 路径 | 说明 |
@@ -306,6 +311,7 @@ class StorageProtocol(Protocol):
 - **document_brief**（migration 010）：文档 `brief` 字段（两阶段索引摘要）。
 - **conversations**（migration 011）新增 `title, is_pinned` 字段（会话命名 + Pin）。
 - **users**（migration 012）：合并角色 internal/partner → user；CHECK `('admin','user')`。
+- **users**（migration 019）：新增 `reset_code_hash`、`reset_code_exp`、`reset_attempts`、`reset_rate_exp` 四列，支持自助找回密码。
 - **prompt_history**（migration 013）：提示词版本历史表（key/content/created_at）。
 - **whatsnew_reports**（migration 014）：新动态报告表（workspace 级，定时生成）。
 - **whatsnew_subscriptions**（migration 015）：用户订阅频率表（weekly/biweekly/monthly）。
