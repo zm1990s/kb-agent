@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
+import AgentLog from "@/components/AgentLog";
 import ConversationSidebar from "@/components/ConversationSidebar";
 import MessageBubble from "@/components/MessageBubble";
 import NavBar from "@/components/NavBar";
@@ -21,6 +22,7 @@ interface Turn {
   content: string;
   sources?: SourceRef[];
   error_key?: string;
+  agentLog?: string[];
 }
 
 interface DonePayload {
@@ -42,6 +44,7 @@ export default function ChatPage() {
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [stage, setStage] = useState<string | null>(null);
+  const [thinkingLog, setThinkingLog] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [interrupted, setInterrupted] = useState(false);
   const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>([]);
@@ -181,13 +184,21 @@ export default function ChatPage() {
         (event, data) => {
           if (event === "stage") {
             setStage((data as { message: string }).message);
+            setThinkingLog([]);
+          } else if (event === "output") {
+            const { chunk } = data as { chunk: string };
+            setThinkingLog((prev) => [...prev, chunk]);
           } else if (event === "done") {
             const d = data as DonePayload;
             setConversationId(d.conversation_id);
-            setTurns((t) => [
-              ...t,
-              { role: "assistant", content: d.answer, sources: d.sources, error_key: d.error_key },
-            ]);
+            setThinkingLog((prev) => {
+              const snapshot = prev;
+              setTurns((t) => [
+                ...t,
+                { role: "assistant", content: d.answer, sources: d.sources, error_key: d.error_key, agentLog: snapshot },
+              ]);
+              return [];
+            });
           }
         },
         ac.signal,
@@ -202,6 +213,7 @@ export default function ChatPage() {
     } finally {
       setBusy(false);
       setStage(null);
+      setThinkingLog([]);
       abortRef.current = null;
     }
   }
@@ -309,18 +321,22 @@ export default function ChatPage() {
               </div>
             )}
             {turns.map((t, i) => (
-              <MessageBubble
-                key={i}
-                role={t.role}
-                content={t.content}
-                sources={t.sources}
-                errorKey={t.error_key}
-                onDownload={download}
-                onEdit={t.role === "user" && !busy ? (newContent) => handleEdit(i, newContent) : undefined}
-                onResend={interrupted && !busy && t.role === "user" && i === turns.length - 1 ? () => sendMessage(t.content) : undefined}
-              />
+              <div key={i}>
+                <MessageBubble
+                  role={t.role}
+                  content={t.content}
+                  sources={t.sources}
+                  errorKey={t.error_key}
+                  onDownload={download}
+                  onEdit={t.role === "user" && !busy ? (newContent) => handleEdit(i, newContent) : undefined}
+                  onResend={interrupted && !busy && t.role === "user" && i === turns.length - 1 ? () => sendMessage(t.content) : undefined}
+                />
+                {t.role === "assistant" && t.agentLog && t.agentLog.length > 0 && (
+                  <AgentLog log={t.agentLog} />
+                )}
+              </div>
             ))}
-{busy && <ThinkingBubble stage={stage} />}
+{busy && <ThinkingBubble stage={stage} log={thinkingLog} />}
           </div>
 
           {error && (
