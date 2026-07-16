@@ -4,7 +4,10 @@
 避免 `user@fakecompany.com` 混入白名单 `company.com`。
 """
 
+import logging
+import secrets
 import uuid
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -13,6 +16,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import get_settings
 from app.core.security import hash_password, verify_password
 from app.models.auth import AllowedDomain, User
+
+logger = logging.getLogger(__name__)
+
+_VERIFICATION_TOKEN_EXPIRE_HOURS = 24
 
 
 class InvalidCredentialsError(Exception):
@@ -25,6 +32,10 @@ class DomainNotAllowedError(Exception):
 
 class EmailExistsError(Exception):
     """邮箱已注册。"""
+
+
+class EmailNotVerifiedError(Exception):
+    """邮箱未验证，不允许登录。"""
 
 
 def _email_domain(email: str) -> str:
@@ -123,14 +134,22 @@ async def seed_admin(session: AsyncSession) -> User | None:
 async def authenticate(
     session: AsyncSession, *, email: str, password: str
 ) -> User | None:
-    """校验邮箱+密码，成功返回 User，失败返回 None（不区分邮箱不存在/密码错）。"""
+    """校验邮箱+密码，成功返回 User，失败返回 None（不区分邮箱不存在/密码错）。
+    邮箱未验证时抛 EmailNotVerifiedError。
+    """
     user = await get_user_by_email(session, email)
     if user is None:
         return None
     if not user.is_active:
-        return None  # 已禁用用户不能登录
+        return None
     if not verify_password(password, user.password_hash):
         return None
+
+    # 仅当功能启用时才阻止未验证用户登录
+    from app.services.settings_service import get_require_email_verification
+    if await get_require_email_verification(session) and not user.email_verified:
+        raise EmailNotVerifiedError(email)
+
     return user
 
 
@@ -140,8 +159,10 @@ async def register_user(
     email: str,
     password: str,
     role: str = "user",
-) -> User:
-    """注册新用户。域名不合法抛 DomainNotAllowedError，重复抛 EmailExistsError。"""
+) -> tuple["User", bool]:
+    """注册新用户。域名不合法抛 DomainNotAllowedError，重复抛 EmailExistsError。
+    返回 (user, email_verification_pending)。
+    """
     email = email.lower()
 
     if not await is_domain_allowed(session, email):
@@ -150,22 +171,65 @@ async def register_user(
     if await get_user_by_email(session, email) is not None:
         raise EmailExistsError(email)
 
+    from app.services.settings_service import (
+        get_require_email_verification,
+        get_site_base_url,
+    )
+    require_verification = await get_require_email_verification(session)
+
+    token: str | None = None
+    token_exp: datetime | None = None
+    email_verified = True
+    if require_verification:
+        token = secrets.token_urlsafe(32)
+        token_exp = datetime.now(UTC) + timedelta(hours=_VERIFICATION_TOKEN_EXPIRE_HOURS)
+        email_verified = False
+
     user = User(
         id=uuid.uuid4(),
         email=email,
         password_hash=hash_password(password),
         role=role,
+        email_verified=email_verified,
+        verification_token=token,
+        verification_token_exp=token_exp,
     )
     session.add(user)
     try:
         await session.commit()
-    except IntegrityError:
+    except IntegrityError as exc:
         await session.rollback()
-        raise EmailExistsError(email)
+        raise EmailExistsError(email) from exc
     await session.refresh(user)
 
     # 注册时按规则自动入组
     from app.services.rbac_service import sync_user_groups
 
     await sync_user_groups(session, user=user)
-    return user
+
+    if require_verification and token:
+        site_url = await get_site_base_url(session)
+        verify_url = f"{site_url}/verify-email?token={token}"
+        from app.services.email_service import send_verification_email
+        await send_verification_email(email, verify_url)
+        logger.info("register: 验证邮件已发送 email=%s", email)
+
+    return user, require_verification
+
+
+async def verify_email_token(session: AsyncSession, *, token: str) -> bool:
+    """用验证 token 完成邮箱验证。token 无效或过期返回 False，成功返回 True。"""
+    result = await session.execute(
+        select(User).where(User.verification_token == token)
+    )
+    user = result.scalar_one_or_none()
+    if user is None:
+        return False
+    if user.verification_token_exp is None or user.verification_token_exp < datetime.now(UTC):
+        return False
+    user.email_verified = True
+    user.verification_token = None
+    user.verification_token_exp = None
+    await session.commit()
+    logger.info("verify_email: 邮箱验证成功 user_id=%s", user.id)
+    return True

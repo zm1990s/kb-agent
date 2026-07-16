@@ -59,7 +59,10 @@
     "team_name": "Palo Alto Networks 通路團隊",
     "err_domain": "電子郵件網域不在允許清單中",
     "err_duplicate": "此電子郵件已被註冊",
-    "err_credentials": "電子郵件或密碼錯誤"
+    "err_credentials": "電子郵件或密碼錯誤",
+    "err_email_not_verified": "電子郵件尚未驗證，請查收註冊時發送的驗證郵件",
+    "pending_verification_title": "註冊成功，請驗證電子郵件",
+    "pending_verification_desc": "驗證郵件已發送至 {email}，請點擊郵件中的連結完成驗證後再登入（24小時內有效）"
   },
   "chat": {
     "workspace_label": "空間：",
@@ -470,6 +473,26 @@
     "prompts_label_title_prompt": "對話標題提示詞",
     "prompts_desc_title_prompt": "使用者發出第一條訊息後，Agent 自動生成對話標題時使用的提示詞。必須包含 '{message}' 佔位符（執行時替換為使用者的第一條訊息）。",
     "prompts_label_whatsnew_prompt": "最新動態摘要提示詞",
-    "prompts_desc_whatsnew_prompt": "定時任務為每個空間生成「最新動態」摘要時使用的提示詞。必須包含 '{workspace_name}'、'{period}'、'{doc_count}'、'{documents}'、'{timestamp}' 五個佔位符。"
+    "prompts_desc_whatsnew_prompt": "定時任務為每個空間生成「最新動態」摘要時使用的提示詞。必須包含 '{workspace_name}'、'{period}'、'{doc_count}'、'{documents}'、'{timestamp}' 五個佔位符。",
+    "site_base_url_title": "網站基礎 URL",
+    "site_base_url_desc": "驗證郵件中連結的域名，例如 https://kb.example.com。啟用郵箱驗證前請先填寫。",
+    "site_base_url_save": "儲存",
+    "site_base_url_saved": "已儲存",
+    "site_base_url_current": "目前",
+    "email_verification_title": "註冊電子郵件驗證",
+    "email_verification_desc": "開啟後，新註冊使用者須點擊驗證郵件中的連結才能登入。請先設定 SMTP 和網站基礎 URL。",
+    "email_verification_on": "已開啟（新使用者需驗證電子郵件）",
+    "email_verification_off": "已關閉（註冊即可登入）",
+    "email_verification_enabled": "已開啟電子郵件驗證",
+    "email_verification_disabled": "已關閉電子郵件驗證"
+  },
+  "verifyEmail": {
+    "verifying": "正在驗證，請稍候…",
+    "success": "電子郵件驗證成功",
+    "success_desc": "您的電子郵件已驗證，現在可以登入了。",
+    "go_login": "前往登入",
+    "error_title": "驗證失敗",
+    "expired": "驗證連結已過期（有效期 24 小時），請重新註冊或聯絡管理員。",
+    "invalid": "驗證連結無效，請確認連結是否完整。"
   }
 }

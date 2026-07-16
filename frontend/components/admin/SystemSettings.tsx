@@ -71,6 +71,11 @@ export default function SystemSettings({ perms }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [brandingMsg, setBrandingMsg] = useState<string | null>(null);
   const [engineMsg, setEngineMsg] = useState<string | null>(null);
+  const [siteBaseUrl, setSiteBaseUrl] = useState("");
+  const [siteBaseUrlInput, setSiteBaseUrlInput] = useState("");
+  const [siteBaseUrlMsg, setSiteBaseUrlMsg] = useState<string | null>(null);
+  const [requireEmailVerification, setRequireEmailVerification] = useState(false);
+  const [emailVerificationMsg, setEmailVerificationMsg] = useState<string | null>(null);
 
   const loadDomains = useCallback(async () => {
     try {
@@ -127,6 +132,17 @@ export default function SystemSettings({ perms }: Props) {
     } catch { /* 非 admin 正常 */ }
   }, []);
 
+  const loadEmailVerification = useCallback(async () => {
+    try {
+      const d = await api.get<{ require_email_verification: boolean; site_base_url: string }>(
+        "/settings/email-verification"
+      );
+      setRequireEmailVerification(d.require_email_verification);
+      setSiteBaseUrl(d.site_base_url);
+      setSiteBaseUrlInput(d.site_base_url);
+    } catch { /* 非 admin 正常 */ }
+  }, []);
+
   useEffect(() => {
     loadDomains();
     loadEngine();
@@ -134,7 +150,8 @@ export default function SystemSettings({ perms }: Props) {
     loadWnSchedule();
     loadSuggestedQuestions();
     loadTaskModels();
-  }, [loadDomains, loadEngine, loadBranding, loadWnSchedule, loadSuggestedQuestions, loadTaskModels]);
+    loadEmailVerification();
+  }, [loadDomains, loadEngine, loadBranding, loadWnSchedule, loadSuggestedQuestions, loadTaskModels, loadEmailVerification]);
 
   async function addDomain(e: React.FormEvent) {
     e.preventDefault();
@@ -234,6 +251,34 @@ export default function SystemSettings({ perms }: Props) {
       setEngineMsg(t("engine_updated"));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : t("update_failed"));
+    }
+  }
+
+  async function saveSiteBaseUrl(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setSiteBaseUrlMsg(null);
+    try {
+      const d = await api.put<{ site_base_url: string }>("/settings/email-verification", {
+        site_base_url: siteBaseUrlInput.trim(),
+      });
+      setSiteBaseUrl(d.site_base_url);
+      setSiteBaseUrlInput(d.site_base_url);
+      setSiteBaseUrlMsg(t("site_base_url_saved"));
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : t("save_failed"));
+    }
+  }
+
+  async function toggleEmailVerification(enabled: boolean) {
+    setError(null);
+    setEmailVerificationMsg(null);
+    try {
+      await api.put("/settings/email-verification", { require_email_verification: enabled });
+      setRequireEmailVerification(enabled);
+      setEmailVerificationMsg(enabled ? t("email_verification_enabled") : t("email_verification_disabled"));
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : t("save_failed"));
     }
   }
 
@@ -509,6 +554,51 @@ export default function SystemSettings({ perms }: Props) {
               </button>
             </form>
             {sqMsg && <p className="mt-2 text-xs text-green-600">{sqMsg}</p>}
+          </section>
+
+          {/* 站点基础 URL */}
+          <section className="rounded border bg-white p-4">
+            <h2 className="mb-1 text-sm font-medium">{t("site_base_url_title")}</h2>
+            <p className="mb-3 text-xs text-gray-400">{t("site_base_url_desc")}</p>
+            <form onSubmit={saveSiteBaseUrl} className="flex gap-2">
+              <input
+                type="url"
+                value={siteBaseUrlInput}
+                onChange={(e) => setSiteBaseUrlInput(e.target.value)}
+                placeholder="https://kb.example.com"
+                className="flex-1 rounded border px-3 py-2 text-sm focus:border-blue-400 focus:outline-none"
+              />
+              <button
+                type="submit"
+                className="rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700"
+              >
+                {t("site_base_url_save")}
+              </button>
+            </form>
+            {siteBaseUrl && (
+              <p className="mt-2 text-xs text-gray-400">
+                {t("site_base_url_current")}: <code className="text-gray-600">{siteBaseUrl}</code>
+              </p>
+            )}
+            {siteBaseUrlMsg && <p className="mt-2 text-xs text-green-600">{siteBaseUrlMsg}</p>}
+          </section>
+
+          {/* 邮箱验证开关 */}
+          <section className="rounded border bg-white p-4">
+            <h2 className="mb-1 text-sm font-medium">{t("email_verification_title")}</h2>
+            <p className="mb-3 text-xs text-gray-400">{t("email_verification_desc")}</p>
+            <label className="flex cursor-pointer items-center gap-3">
+              <input
+                type="checkbox"
+                checked={requireEmailVerification}
+                onChange={(e) => toggleEmailVerification(e.target.checked)}
+                className="h-4 w-4 rounded border-gray-300 accent-blue-600"
+              />
+              <span className="text-sm text-gray-700">
+                {requireEmailVerification ? t("email_verification_on") : t("email_verification_off")}
+              </span>
+            </label>
+            {emailVerificationMsg && <p className="mt-2 text-xs text-green-600">{emailVerificationMsg}</p>}
           </section>
 
           {error && <p className="text-sm text-red-600">{error}</p>}

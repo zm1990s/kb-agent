@@ -22,7 +22,9 @@ from app.services.settings_service import (
     InvalidPromptError,
     get_engine_backend,
     get_prompt,
+    get_require_email_verification,
     get_setting,
+    get_site_base_url,
     get_suggested_questions,
     get_task_model,
     get_whatsnew_freq,
@@ -32,7 +34,9 @@ from app.services.settings_service import (
     rollback_prompt,
     set_engine_backend,
     set_prompt,
+    set_require_email_verification,
     set_setting,
+    set_site_base_url,
     set_suggested_questions,
     set_task_model,
     set_whatsnew_freq,
@@ -485,3 +489,46 @@ async def update_branding(
     await record_event(session, action="admin_update_branding", user_id=admin.id,
                        meta={"name": body.name, "logo_url": body.logo_url})
     return BrandingOut(name=name, logo_url=logo_url)
+
+
+# ── 邮箱验证配置 ──────────────────────────────────────────────────────────────
+
+class EmailVerificationOut(BaseModel):
+    require_email_verification: bool
+    site_base_url: str
+
+
+class EmailVerificationIn(BaseModel):
+    require_email_verification: bool | None = None
+    site_base_url: str | None = None
+
+
+@router.get("/email-verification", response_model=EmailVerificationOut)
+async def get_email_verification_config(
+    _admin: User = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+) -> EmailVerificationOut:
+    return EmailVerificationOut(
+        require_email_verification=await get_require_email_verification(session),
+        site_base_url=await get_site_base_url(session),
+    )
+
+
+@router.put("/email-verification", response_model=EmailVerificationOut)
+async def update_email_verification_config(
+    body: EmailVerificationIn,
+    admin: User = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+) -> EmailVerificationOut:
+    if body.require_email_verification is not None:
+        await set_require_email_verification(session, body.require_email_verification)
+        logger.info(
+            "audit admin set_require_email_verification admin=%s enabled=%s",
+            admin.id, body.require_email_verification,
+        )
+    if body.site_base_url is not None:
+        await set_site_base_url(session, body.site_base_url)
+    return EmailVerificationOut(
+        require_email_verification=await get_require_email_verification(session),
+        site_base_url=await get_site_base_url(session),
+    )

@@ -396,3 +396,26 @@ async def set_whatsnew_freq(session: AsyncSession, freq: str) -> None:
     if freq not in WHATSNEW_FREQ_DAYS:
         raise ValueError(f"freq 须为 {list(WHATSNEW_FREQ_DAYS.keys())} 之一")
     await set_setting(session, WHATSNEW_FREQ_KEY, freq)
+
+
+# ── 邮箱验证配置 ─────────────────────────────────────────────
+
+REQUIRE_EMAIL_VERIFICATION_KEY = "require_email_verification"
+SITE_BASE_URL_KEY = "site_base_url"
+
+
+async def get_require_email_verification(session: AsyncSession) -> bool:
+    stored = await get_setting(session, REQUIRE_EMAIL_VERIFICATION_KEY)
+    return stored == "true" if stored is not None else False
+
+
+async def set_require_email_verification(session: AsyncSession, enabled: bool) -> None:
+    await set_setting(session, REQUIRE_EMAIL_VERIFICATION_KEY, "true" if enabled else "false")
+
+
+async def get_site_base_url(session: AsyncSession) -> str:
+    return await get_setting(session, SITE_BASE_URL_KEY) or ""
+
+
+async def set_site_base_url(session: AsyncSession, url: str) -> None:
+    await set_setting(session, SITE_BASE_URL_KEY, url.rstrip("/"))

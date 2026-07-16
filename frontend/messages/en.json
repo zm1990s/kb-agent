@@ -59,7 +59,10 @@
     "team_name": "Palo Alto Networks Channel Team",
     "err_domain": "Email domain is not on the allowed list",
     "err_duplicate": "This email is already registered",
-    "err_credentials": "Invalid email or password"
+    "err_credentials": "Invalid email or password",
+    "err_email_not_verified": "Email not verified. Please check your inbox for the verification email.",
+    "pending_verification_title": "Registration successful — verify your email",
+    "pending_verification_desc": "A verification email has been sent to {email}. Click the link in the email to activate your account (valid for 24 hours)."
   },
   "chat": {
     "workspace_label": "Workspace:",
@@ -470,6 +473,26 @@
     "prompts_label_title_prompt": "Conversation Title Prompt",
     "prompts_desc_title_prompt": "Used to auto-generate a conversation title after the user sends the first message. Must include the '{message}' placeholder (replaced at runtime with the first user message).",
     "prompts_label_whatsnew_prompt": "What's New Summary Prompt",
-    "prompts_desc_whatsnew_prompt": "Used by the scheduled task to generate the What's New summary for each workspace. Must include '{workspace_name}', '{period}', '{doc_count}', '{documents}', '{timestamp}'."
+    "prompts_desc_whatsnew_prompt": "Used by the scheduled task to generate the What's New summary for each workspace. Must include '{workspace_name}', '{period}', '{doc_count}', '{documents}', '{timestamp}'.",
+    "site_base_url_title": "Site Base URL",
+    "site_base_url_desc": "The domain used in verification email links, e.g. https://kb.example.com. Set this before enabling email verification.",
+    "site_base_url_save": "Save",
+    "site_base_url_saved": "Saved",
+    "site_base_url_current": "Current",
+    "email_verification_title": "Registration Email Verification",
+    "email_verification_desc": "When enabled, new users must click the verification link in their email before they can log in. Make sure SMTP and Site Base URL are configured first.",
+    "email_verification_on": "Enabled (new users must verify email)",
+    "email_verification_off": "Disabled (users can log in immediately after registration)",
+    "email_verification_enabled": "Email verification enabled",
+    "email_verification_disabled": "Email verification disabled"
+  },
+  "verifyEmail": {
+    "verifying": "Verifying, please wait…",
+    "success": "Email verified successfully",
+    "success_desc": "Your email has been verified. You can now log in.",
+    "go_login": "Go to login",
+    "error_title": "Verification failed",
+    "expired": "The verification link has expired (valid for 24 hours). Please register again or contact your administrator.",
+    "invalid": "Invalid verification link. Please check that you copied the full URL."
   }
 }

@@ -16,6 +16,7 @@ from app.schemas.auth import (
     ChangePasswordRequest,
     LoginRequest,
     RegisterRequest,
+    RegisterResponse,
     TokenResponse,
     UserPublic,
 )
@@ -24,6 +25,7 @@ from app.services.usage_service import record_event
 from app.services.user_service import (
     DomainNotAllowedError,
     EmailExistsError,
+    EmailNotVerifiedError,
     InvalidCredentialsError,
     add_allowed_domain,
     authenticate,
@@ -31,6 +33,7 @@ from app.services.user_service import (
     list_allowed_domains,
     register_user,
     remove_allowed_domain,
+    verify_email_token,
 )
 
 logger = logging.getLogger(__name__)
@@ -40,15 +43,15 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 @router.post(
     "/register",
-    response_model=UserPublic,
+    response_model=RegisterResponse,
     status_code=status.HTTP_201_CREATED,
 )
 async def register(
     body: RegisterRequest,
     session: AsyncSession = Depends(get_session),
-) -> UserPublic:
+) -> RegisterResponse:
     try:
-        user = await register_user(
+        user, pending = await register_user(
             session, email=body.email, password=body.password
         )
     except DomainNotAllowedError as exc:
@@ -61,7 +64,24 @@ async def register(
             status_code=status.HTTP_409_CONFLICT,
             detail="该邮箱已注册",
         ) from exc
-    return UserPublic.model_validate(user)
+    resp = RegisterResponse.model_validate(user)
+    resp.email_verification_pending = pending
+    return resp
+
+
+@router.get("/verify-email")
+async def verify_email(
+    token: str,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """验证邮箱 token；无效或过期返回 400。"""
+    ok = await verify_email_token(session, token=token)
+    if not ok:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="验证链接无效或已过期",
+        )
+    return {"message": "ok"}
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -70,7 +90,13 @@ async def login(
     background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
 ) -> TokenResponse:
-    user = await authenticate(session, email=body.email, password=body.password)
+    try:
+        user = await authenticate(session, email=body.email, password=body.password)
+    except EmailNotVerifiedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="email_not_verified",
+        ) from exc
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
