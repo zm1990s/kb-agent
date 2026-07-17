@@ -198,11 +198,28 @@ async def register_user(
     if not await is_domain_allowed(session, email):
         raise DomainNotAllowedError(email)
 
-    if await get_user_by_email(session, email) is not None:
-        raise EmailExistsError(email)
-
     from app.services.settings_service import get_require_email_verification
     require_verification = await get_require_email_verification(session)
+
+    existing = await get_user_by_email(session, email)
+    if existing is not None:
+        # 已注册且已验证 → 正常报重复
+        if existing.email_verified:
+            raise EmailExistsError(email)
+        # 已注册但未验证 → 更新密码并重新发送 PIN，让用户重试验证
+        existing.password_hash = hash_password(password)
+        if require_verification:
+            token = f"{secrets.randbelow(1_000_000):06d}"
+            existing.verification_token = token
+            existing.verification_token_exp = datetime.now(UTC) + timedelta(minutes=_VERIFICATION_PIN_EXPIRE_MINUTES)
+            await session.commit()
+            from app.services.email_service import send_verification_pin  # noqa: PLC0415
+            await send_verification_pin(email, token)
+            logger.info("register: 未验证用户重新注册，新 PIN 已发送 email=%s", email)
+        else:
+            existing.email_verified = True
+            await session.commit()
+        return existing, require_verification
 
     token: str | None = None
     token_exp: datetime | None = None
