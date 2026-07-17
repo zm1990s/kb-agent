@@ -18,7 +18,7 @@ from app.api import (
     whatsnew,
     workspaces,
 )
-from app.core.db import SessionLocal, run_migrations
+from app.core.db import SessionLocal
 from app.core.logging_setup import configure_logging
 from app.services.user_service import seed_admin
 from app.tasks.whatsnew_worker import start_mail_loop, start_whatsnew_loop
@@ -29,8 +29,6 @@ _bg_tasks: set = set()
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     configure_logging()
-    # 启动时自动执行 SQL 迁移（幂等，所有迁移均 IF NOT EXISTS）
-    await run_migrations()
     # 幂等创建首个管理员（读 ADMIN_EMAIL/ADMIN_PASSWORD）
     async with SessionLocal() as session:
         await seed_admin(session)

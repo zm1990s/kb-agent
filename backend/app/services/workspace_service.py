@@ -83,8 +83,13 @@ async def add_member(
 async def list_my_workspaces(
     session: AsyncSession, *, user: User
 ) -> list[tuple[Workspace, str]]:
-    """列出当前用户可见的空间（个人成员 ∪ 所属组被授权），附带空间内角色。"""
+    """列出当前用户可见的空间（admin 看全部；普通用户：个人成员 ∪ 所属组被授权），附带空间内角色。"""
     from app.models.rbac import GroupMember, WorkspaceGroupGrant
+
+    # admin 可见全部空间，角色标为 owner
+    if user.role == "admin":
+        result = await session.execute(select(Workspace))
+        return [(ws, "owner") for ws in result.scalars().all()]
 
     seen: dict[uuid.UUID, tuple[Workspace, str]] = {}
 
@@ -159,7 +164,10 @@ async def list_group_grants(session: AsyncSession, *, workspace_id: uuid.UUID):
 async def is_member(
     session: AsyncSession, *, workspace_id: uuid.UUID, user_id: uuid.UUID
 ) -> bool:
-    """当前用户是否有该空间访问权：个人成员 ∪ 所属组被授权（F7）。"""
+    """当前用户是否有该空间访问权：admin 全绕过；个人成员 ∪ 所属组被授权（F7）。"""
+    user = await session.get(User, user_id)
+    if user is not None and user.role == "admin":
+        return True
     member = await session.get(WorkspaceMember, (workspace_id, user_id))
     if member is not None:
         return True
