@@ -18,11 +18,14 @@ done
 
 # 测试用独立数据库 kbagent_test，与 dev 库 kbagent 隔离——
 # 测试的建表/drop 不会影响 dev 数据（避免登录 500: relation "users" does not exist）。
-echo ">> 确保测试数据库 kbagent_test 存在..."
+echo ">> 确保测试数据库 kbagent_test 存在（含必要扩展）..."
 docker compose exec -T postgres psql -U kbagent -d kbagent -tc \
   "SELECT 1 FROM pg_database WHERE datname='kbagent_test'" 2>/dev/null | grep -q 1 \
   || docker compose exec -T postgres psql -U kbagent -d kbagent -q \
        -c "CREATE DATABASE kbagent_test" 2>&1 | tail -1
+# uuid-ossp 和 pg_trgm 扩展（migrate.py 会在 kbagent_test 里跑，依赖这两个扩展）
+docker compose exec -T postgres psql -U kbagent -d kbagent_test -q \
+  -c 'CREATE EXTENSION IF NOT EXISTS "uuid-ossp"; CREATE EXTENSION IF NOT EXISTS pg_trgm;'
 
 echo ">> 运行 pytest（独立测试库）..."
 # CLAUDE_CLI_PATH=/bin/false：测试用假引擎，禁止真实调用 CLI 兜底

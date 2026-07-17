@@ -1,12 +1,28 @@
 """测试夹具：在导入应用前注入最小必需的环境变量，并提供 DB / HTTP client。"""
 
 import os
+import sys
 import tempfile
 
 # 在任何 app.* 导入之前设置环境变量（config 用 lru_cache 读取）
 os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://kbagent:kbagent@localhost/kbagent")
 os.environ.setdefault("JWT_SECRET", "test-secret-not-for-prod")
 os.environ.setdefault("LOCAL_STORAGE_DIR", tempfile.mkdtemp(prefix="kb_test_store_"))
+
+# ── 安全护栏：禁止在生产数据库上运行测试 ─────────────────────────────────────
+# conftest 的 db_engine fixture 会执行 drop_all，若指向生产库将清空所有数据。
+# 合法的测试库名必须包含 "test"（如 kbagent_test）。
+_db_url = os.environ["DATABASE_URL"]
+_db_name = _db_url.rstrip("/").rsplit("/", 1)[-1].split("?")[0]
+if "test" not in _db_name.lower():
+    print(
+        f"\n[FATAL] 测试拒绝连接生产数据库 '{_db_name}'！\n"
+        "        请用 scripts/test.sh 运行测试，它会自动使用 kbagent_test 隔离库。\n"
+        "        若要手动运行，请设置：\n"
+        "          DATABASE_URL=postgresql+asyncpg://kbagent:kbagent@postgres:5432/kbagent_test\n",
+        file=sys.stderr,
+    )
+    sys.exit(1)
 
 import pytest  # noqa: E402
 import pytest_asyncio  # noqa: E402
