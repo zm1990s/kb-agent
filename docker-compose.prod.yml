@@ -51,6 +51,7 @@ services:
     volumes:
       - ./data/documents:/app/local_storage
       - ./data/logs:/app/logs
+      - ./infra:/app/infra:ro
 
   frontend:
     build:
