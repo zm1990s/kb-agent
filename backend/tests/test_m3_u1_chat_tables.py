@@ -15,7 +15,7 @@ async def _ws_user(session):
     ws = Workspace(id=uuid.uuid4(), name="ws")
     user = User(
         id=uuid.uuid4(), email=f"{uuid.uuid4().hex[:8]}@company.com",
-        password_hash="x", role="internal",
+        password_hash="x", role="user",
     )
     session.add_all([ws, user])
     await session.commit()

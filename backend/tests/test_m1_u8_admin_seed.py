@@ -46,7 +46,7 @@ async def test_seed_admin_skipped_when_unset(db_session, monkeypatch):
 
 async def test_change_password_flow(client, seed_user):
     # 用 seed_user 造一个用户并拿 token，但 seed_user 用固定密码 longenough1
-    _, headers = await seed_user("internal")
+    _, headers = await seed_user("user")
     # 错误当前密码 -> 400
     bad = await client.post(
         "/auth/change-password",

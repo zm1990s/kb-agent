@@ -5,7 +5,7 @@ import uuid
 
 import pytest
 
-from app.engine.base import EngineResult
+from app.engine.base import EngineResult, TextChunk
 from app.models.document import Document
 from app.services import answer_service
 
@@ -16,12 +16,14 @@ class _FakeEngine:
     """返回 Agent 式 JSON（answer + doc_numbers）。"""
 
     def __init__(self, answer="基于文档的回答", doc_numbers=None):
-        self._payload = json.dumps(
-            {"answer": answer, "doc_numbers": doc_numbers or []}
-        )
+        self._answer = answer
+        self._phase1_payload = json.dumps({"doc_numbers": doc_numbers or []})
 
     async def complete(self, prompt, *, files=None, system=None):
-        return EngineResult(text=self._payload)
+        return EngineResult(text=self._phase1_payload)
+
+    async def complete_streaming(self, prompt, *, system=None, files=None):
+        yield TextChunk(text=self._answer)
 
 
 async def _ws(client, headers, name="ws"):
@@ -68,9 +70,8 @@ async def test_chat_with_hit_returns_answer_and_sources(
     ws_id = await _ws(client, admin)
     await _make_ready_doc(db_session, ws_id, title="防火墙", content="firewall policy")
     # Claude 选中第 1 篇文档
-    monkeypatch.setattr(
-        answer_service, "get_engine", lambda *a, **k: _FakeEngine(doc_numbers=[1])
-    )
+    async def _engine(*a, **k): return _FakeEngine(doc_numbers=[1])
+    monkeypatch.setattr(answer_service, "get_chat_engine", _engine)
 
     resp = await client.post(
         "/chat", json={"workspace_id": ws_id, "message": "firewall"}, headers=admin
@@ -85,7 +86,7 @@ async def test_chat_with_hit_returns_answer_and_sources(
 async def test_chat_non_member_403(client, seed_user):
     _, admin = await seed_user("admin")
     ws_id = await _ws(client, admin)
-    _, partner = await seed_user("partner")
+    _, partner = await seed_user("user")
     resp = await client.post(
         "/chat", json={"workspace_id": ws_id, "message": "hi"}, headers=partner
     )
@@ -94,7 +95,8 @@ async def test_chat_non_member_403(client, seed_user):
 
 async def test_chat_persists_messages(client, seed_user, monkeypatch):
     # 第二轮有历史 → 无命中也会调引擎，用 stub 避免真实 CLI
-    monkeypatch.setattr(answer_service, "get_engine", lambda *a, **k: _FakeEngine())
+    async def _engine(*a, **k): return _FakeEngine()
+    monkeypatch.setattr(answer_service, "get_chat_engine", _engine)
     _, admin = await seed_user("admin")
     ws_id = await _ws(client, admin)
     first = await client.post(

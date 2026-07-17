@@ -67,7 +67,7 @@ async def test_folder_crud(client, seed_user):
 async def test_folder_non_member_403(client, seed_user):
     _, admin = await seed_user("admin")
     ws_id = await _ws(client, admin)
-    _, other = await seed_user("internal")
+    _, other = await seed_user("user")
     resp = await client.get(f"/folders?workspace={ws_id}", headers=other)
     assert resp.status_code == 403
 
@@ -140,7 +140,7 @@ async def test_delete_requires_admin(client, seed_user):
     _, admin = await seed_user("admin")
     ws_id = await _ws(client, admin)
     doc_id = (await _upload(client, admin, ws_id)).json()["id"]
-    internal_id, internal = await seed_user("internal")
+    internal_id, internal = await seed_user("user")
     await client.post(
         f"/workspaces/{ws_id}/members",
         json={"user_id": str(internal_id), "role_in_ws": "editor"},

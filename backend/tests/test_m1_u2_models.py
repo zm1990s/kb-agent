@@ -35,7 +35,7 @@ def test_workspace_with_role_from_attributes():
 
 
 def test_role_constants():
-    assert USER_ROLES == ("admin", "internal", "partner")
+    assert USER_ROLES == ("admin", "user")
 
 
 @pytest.mark.asyncio

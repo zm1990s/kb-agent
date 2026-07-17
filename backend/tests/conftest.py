@@ -130,7 +130,7 @@ async def seed_user(db_engine):
 
     maker = async_sessionmaker(bind=db_engine, class_=AsyncSession, expire_on_commit=False)
 
-    async def _make(role: str = "internal", email: str | None = None):
+    async def _make(role: str = "user", email: str | None = None):
         uid = uuid.uuid4()
         email = email or f"{role}-{uid.hex[:8]}@company.com"
         async with maker() as session:

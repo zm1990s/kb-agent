@@ -36,7 +36,7 @@ async def test_set_engine_unavailable_400(client, seed_user):
 
 
 async def test_engine_config_admin_only(client, seed_user):
-    _, internal = await seed_user("internal")
+    _, internal = await seed_user("user")
     assert (await client.get("/settings/engine", headers=internal)).status_code == 403
     assert (
         await client.put(

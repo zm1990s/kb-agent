@@ -5,7 +5,7 @@ import uuid
 
 import pytest
 
-from app.engine.base import EngineResult
+from app.engine.base import EngineResult, TextChunk
 from app.models.auth import Workspace
 from app.models.document import Document
 from app.services import answer_service
@@ -18,16 +18,21 @@ class _FakeEngine:
     """按预设 JSON 回应；记录收到的 catalog 以便断言。"""
 
     def __init__(self, answer="这是答案", doc_numbers=None):
-        self._payload = json.dumps(
-            {"answer": answer, "doc_numbers": doc_numbers or []}
-        )
+        self._answer = answer
+        self._phase1_payload = json.dumps({"doc_numbers": doc_numbers or []})
         self.called = False
         self.last_prompt = None
 
     async def complete(self, prompt, *, files=None, system=None):
+        # Phase 1：返回包含 doc_numbers 的 JSON
         self.called = True
         self.last_prompt = prompt
-        return EngineResult(text=self._payload)
+        return EngineResult(text=self._phase1_payload)
+
+    async def complete_streaming(self, prompt, *, system=None, files=None):
+        # Phase 2：yield 纯文本答案
+        self.last_prompt = prompt
+        yield TextChunk(text=self._answer)
 
 
 async def _ready_doc(session, ws_id, *, title, summary="摘要", tags=None):
@@ -56,7 +61,8 @@ async def test_answer_feeds_full_index_and_selects_docs(db_session, monkeypatch)
 
     # Claude 选中第 1 篇（索引按 created_at 倒序，[1] 为最新创建的“报销流程”）
     fake = _FakeEngine(answer="防火墙这样配置……", doc_numbers=[1])
-    monkeypatch.setattr(answer_service, "get_engine", lambda *a, **k: fake)
+    async def _engine(*a, **k): return fake
+    monkeypatch.setattr(answer_service, "get_chat_engine", _engine)
 
     res = await answer_question(db_session, workspace_id=ws.id, question="防火墙怎么配")
     assert fake.called
@@ -77,7 +83,8 @@ async def test_answer_no_docs_selected_returns_no_sources(db_session, monkeypatc
     await _ready_doc(db_session, ws.id, title="报销流程")
 
     fake = _FakeEngine(answer="没有找到防火墙相关文档。", doc_numbers=[])
-    monkeypatch.setattr(answer_service, "get_engine", lambda *a, **k: fake)
+    async def _engine(*a, **k): return fake
+    monkeypatch.setattr(answer_service, "get_chat_engine", _engine)
 
     res = await answer_question(db_session, workspace_id=ws.id, question="防火墙")
     assert res.answer == "没有找到防火墙相关文档。"
@@ -90,7 +97,8 @@ async def test_answer_empty_workspace_no_history(db_session, monkeypatch):
     await db_session.commit()
 
     fake = _FakeEngine()
-    monkeypatch.setattr(answer_service, "get_engine", lambda *a, **k: fake)
+    async def _engine(*a, **k): return fake
+    monkeypatch.setattr(answer_service, "get_chat_engine", _engine)
 
     res = await answer_question(db_session, workspace_id=ws.id, question="任意问题")
     # 空间无文档且无历史：不调用引擎，直接提示
@@ -106,7 +114,8 @@ async def test_answer_hallucinated_doc_number_ignored(db_session, monkeypatch):
     await _ready_doc(db_session, ws.id, title="唯一文档")
 
     fake = _FakeEngine(answer="见文档", doc_numbers=[99])  # 越界
-    monkeypatch.setattr(answer_service, "get_engine", lambda *a, **k: fake)
+    async def _engine(*a, **k): return fake
+    monkeypatch.setattr(answer_service, "get_chat_engine", _engine)
 
     res = await answer_question(db_session, workspace_id=ws.id, question="q")
     assert res.sources == []  # 越界编号被丢弃

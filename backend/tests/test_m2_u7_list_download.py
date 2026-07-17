@@ -39,7 +39,7 @@ async def test_list_isolation_cross_workspace(client, seed_user):
     ws_a = await _ws(client, admin, "A")
     await _upload(client, admin, ws_a)
 
-    _, partner = await seed_user("partner")
+    _, partner = await seed_user("user")
     resp = await client.get(f"/workspaces/{ws_a}/documents", headers=partner)
     assert resp.status_code == 403  # 非成员
 
@@ -57,7 +57,7 @@ async def test_detail_non_member_404(client, seed_user):
     _, admin = await seed_user("admin")
     ws_id = await _ws(client, admin)
     doc_id = await _upload(client, admin, ws_id)
-    _, other = await seed_user("internal")
+    _, other = await seed_user("user")
     resp = await client.get(f"/documents/{doc_id}", headers=other)
     assert resp.status_code == 404
 
@@ -78,7 +78,7 @@ async def test_download_non_member_404(client, seed_user):
     _, admin = await seed_user("admin")
     ws_id = await _ws(client, admin)
     doc_id = await _upload(client, admin, ws_id)
-    _, other = await seed_user("partner")
+    _, other = await seed_user("user")
     resp = await client.get(f"/documents/{doc_id}/download", headers=other)
     assert resp.status_code == 404
 

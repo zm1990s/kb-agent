@@ -17,7 +17,7 @@ async def test_admin_creates_workspace(client, seed_user):
 
 
 async def test_non_admin_cannot_create_workspace(client, seed_user):
-    _, internal_headers = await seed_user("internal")
+    _, internal_headers = await seed_user("user")
     resp = await client.post(
         "/workspaces", json={"name": "空间B"}, headers=internal_headers
     )
@@ -45,7 +45,7 @@ async def test_partner_cannot_see_unauthorized_workspace(client, seed_user):
     _, admin_headers = await seed_user("admin")
     await client.post("/workspaces", json={"name": "内部空间"}, headers=admin_headers)
 
-    _, partner_headers = await seed_user("partner")
+    _, partner_headers = await seed_user("user")
     resp = await client.get("/workspaces", headers=partner_headers)
     assert resp.status_code == 200
     assert resp.json() == []  # 未被授权，看不到任何空间
@@ -59,7 +59,7 @@ async def test_add_member_grants_visibility(client, seed_user):
     )
     ws_id = ws.json()["id"]
 
-    partner_id, partner_headers = await seed_user("partner")
+    partner_id, partner_headers = await seed_user("user")
     add = await client.post(
         f"/workspaces/{ws_id}/members",
         json={"user_id": str(partner_id), "role_in_ws": "viewer"},
@@ -79,7 +79,7 @@ async def test_non_admin_cannot_add_member(client, seed_user):
     ws = await client.post("/workspaces", json={"name": "空间X"}, headers=admin_headers)
     ws_id = ws.json()["id"]
 
-    _, internal_headers = await seed_user("internal")
+    _, internal_headers = await seed_user("user")
     resp = await client.post(
         f"/workspaces/{ws_id}/members",
         json={"user_id": str(uuid.uuid4()), "role_in_ws": "viewer"},
@@ -90,7 +90,7 @@ async def test_non_admin_cannot_add_member(client, seed_user):
 
 async def test_add_member_unknown_workspace_404(client, seed_user):
     _, admin_headers = await seed_user("admin")
-    partner_id, _ = await seed_user("partner")
+    partner_id, _ = await seed_user("user")
     resp = await client.post(
         f"/workspaces/{uuid.uuid4()}/members",
         json={"user_id": str(partner_id), "role_in_ws": "viewer"},
@@ -103,7 +103,7 @@ async def test_add_duplicate_member_409(client, seed_user):
     _, admin_headers = await seed_user("admin")
     ws = await client.post("/workspaces", json={"name": "空间Y"}, headers=admin_headers)
     ws_id = ws.json()["id"]
-    partner_id, _ = await seed_user("partner")
+    partner_id, _ = await seed_user("user")
     payload = {"user_id": str(partner_id), "role_in_ws": "viewer"}
     first = await client.post(
         f"/workspaces/{ws_id}/members", json=payload, headers=admin_headers

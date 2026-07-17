@@ -33,7 +33,7 @@ async def test_upload_requires_admin(client, seed_user):
     _, admin_headers = await seed_user("admin")
     ws_id = await _make_ws(client, admin_headers)
     # 把一个 internal 用户加入空间，但其非 admin
-    internal_id, internal_headers = await seed_user("internal")
+    internal_id, internal_headers = await seed_user("user")
     await client.post(
         f"/workspaces/{ws_id}/members",
         json={"user_id": str(internal_id), "role_in_ws": "editor"},

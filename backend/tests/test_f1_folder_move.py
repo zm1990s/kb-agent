@@ -69,7 +69,7 @@ async def test_move_folder_non_member_403(client, seed_user):
     _, admin = await seed_user("admin")
     ws_id = await _ws(client, admin)
     a = await _folder(client, admin, ws_id, "A")
-    _, other = await seed_user("internal")
+    _, other = await seed_user("user")
     resp = await client.patch(
         f"/folders/{a}/move?workspace_id={ws_id}",
         json={"parent_id": None},

@@ -5,7 +5,7 @@ import uuid
 import pytest
 from sqlalchemy import func, update
 
-from app.engine.base import EngineResult
+from app.engine.base import EngineResult, TextChunk
 from app.models.document import Document
 from app.services import answer_service
 
@@ -19,8 +19,13 @@ class _CapturingEngine:
         self.last_prompt = None
 
     async def complete(self, prompt, *, files=None, system=None):
+        # Phase 1：返回空 JSON（走 answer 分支）
+        return EngineResult(text="{}")
+
+    async def complete_streaming(self, prompt, *, system=None, files=None):
+        # Phase 2：记录 prompt，yield 答案
         self.last_prompt = prompt
-        return EngineResult(text="答案")
+        yield TextChunk(text="答案")
 
 
 async def _ready_doc(session, ws_id, *, title="防火墙", content="firewall policy"):
@@ -53,7 +58,8 @@ async def test_history_is_passed_to_engine(client, seed_user, db_session, monkey
     await _ready_doc(db_session, ws_id)
 
     cap = _CapturingEngine()
-    monkeypatch.setattr(answer_service, "get_engine", lambda *a, **k: cap)
+    async def _engine(*a, **k): return cap
+    monkeypatch.setattr(answer_service, "get_chat_engine", _engine)
 
     # 第一轮（用单一命中词，plainto_tsquery 对多词做 AND）
     r1 = await client.post(
@@ -79,7 +85,8 @@ async def test_no_hit_with_history_still_answers(db_session, monkeypatch):
     from app.services.answer_service import answer_question
 
     cap = _CapturingEngine()
-    monkeypatch.setattr(answer_service, "get_engine", lambda *a, **k: cap)
+    async def _engine(*a, **k): return cap
+    monkeypatch.setattr(answer_service, "get_chat_engine", _engine)
 
     res = await answer_question(
         db_session,
@@ -111,7 +118,7 @@ async def test_list_conversations_isolated_by_user(client, seed_user):
     await client.post("/conversations", json={"workspace_id": ws_id}, headers=admin)
 
     # 另一个用户即便是成员，也只看到自己的会话（这里未加入，403）
-    _, other = await seed_user("partner")
+    _, other = await seed_user("user")
     resp = await client.get(f"/conversations?workspace_id={ws_id}", headers=other)
     assert resp.status_code == 403
 
@@ -119,6 +126,6 @@ async def test_list_conversations_isolated_by_user(client, seed_user):
 async def test_create_conversation_non_member_403(client, seed_user):
     _, admin = await seed_user("admin")
     ws_id = await _ws(client, admin)
-    _, other = await seed_user("internal")
+    _, other = await seed_user("user")
     resp = await client.post("/conversations", json={"workspace_id": ws_id}, headers=other)
     assert resp.status_code == 403

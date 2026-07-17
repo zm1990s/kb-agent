@@ -99,7 +99,7 @@ async def test_stream_emits_stages_then_done(client, seed_user, db_session, monk
 async def test_stream_non_member_403(client, seed_user):
     _, admin = await seed_user("admin")
     ws_id = await _ws(client, admin)
-    _, partner = await seed_user("partner")
+    _, partner = await seed_user("user")
     resp = await client.post(
         "/chat/stream", json={"workspace_id": ws_id, "message": "hi"}, headers=partner
     )

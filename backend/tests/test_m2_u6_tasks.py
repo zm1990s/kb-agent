@@ -33,7 +33,7 @@ async def test_list_tasks_returns_task(client, seed_user):
 async def test_list_tasks_non_member_404(client, seed_user):
     _, admin_headers = await seed_user("admin")
     _, doc_id = await _ws_and_upload(client, admin_headers)
-    _, other = await seed_user("internal")
+    _, other = await seed_user("user")
     resp = await client.get(f"/documents/{doc_id}/tasks", headers=other)
     assert resp.status_code == 404  # 不泄漏存在性
 
@@ -54,7 +54,7 @@ async def test_reprocess_creates_new_task(client, seed_user):
 async def test_reprocess_requires_admin(client, seed_user):
     _, admin_headers = await seed_user("admin")
     ws_id, doc_id = await _ws_and_upload(client, admin_headers)
-    internal_id, internal_headers = await seed_user("internal")
+    internal_id, internal_headers = await seed_user("user")
     await client.post(
         f"/workspaces/{ws_id}/members",
         json={"user_id": str(internal_id), "role_in_ws": "editor"},

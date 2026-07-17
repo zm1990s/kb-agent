@@ -46,7 +46,7 @@ def test_token_roundtrip_carries_claims():
 
 
 def test_decode_rejects_tampered_token():
-    token = create_access_token(user_id=uuid.uuid4(), role="internal")
+    token = create_access_token(user_id=uuid.uuid4(), role="user")
     tampered = token[:-2] + ("aa" if token[-2:] != "aa" else "bb")
     with pytest.raises(TokenError):
         decode_access_token(tampered)

@@ -55,7 +55,7 @@ async def test_admin_lists_and_manages_users(client, seed_user, seed_domain):
 
 
 async def test_user_endpoints_admin_only(client, seed_user):
-    _, internal = await seed_user("internal")
+    _, internal = await seed_user("user")
     assert (await client.get("/admin/users", headers=internal)).status_code == 403
 
 
@@ -130,7 +130,7 @@ async def test_group_permissions_and_effective(client, seed_user, db_session):
             id=uid,
             email=f"{uid.hex[:6]}@company.com",
             password_hash=hash_password("x"),
-            role="internal",
+            role="user",
         )
     )
     db_session.add(GroupMember(group_id=uuid.UUID(gid), user_id=uid))
@@ -176,7 +176,7 @@ async def test_workspace_group_grant_gives_access(client, seed_user, db_session)
             id=uid,
             email=f"{uid.hex[:6]}@company.com",
             password_hash=hash_password("x"),
-            role="internal",
+            role="user",
         )
     )
     db_session.add(GroupMember(group_id=uuid.UUID(gid), user_id=uid))

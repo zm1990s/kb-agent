@@ -11,7 +11,7 @@ from app.models.auth import User, Workspace, WorkspaceMember
 pytestmark = pytest.mark.asyncio
 
 
-async def _mk_user(session, role="internal") -> User:
+async def _mk_user(session, role="user") -> User:
     u = User(
         id=uuid.uuid4(),
         email=f"{role}-{uuid.uuid4().hex[:8]}@company.com",

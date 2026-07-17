@@ -31,7 +31,7 @@ async def test_admin_add_list_delete_domain(client, seed_user):
 
 
 async def test_non_admin_cannot_manage_domains(client, seed_user):
-    _, internal = await seed_user("internal")
+    _, internal = await seed_user("user")
     assert (await client.get("/auth/allowed-domains", headers=internal)).status_code == 403
     assert (
         await client.post(

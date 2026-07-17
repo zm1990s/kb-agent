@@ -22,7 +22,7 @@ async def test_login_correct_credentials_returns_jwt(client, seed_domain):
     body = resp.json()
     assert body["access_token"]
     assert body["token_type"] == "bearer"
-    assert body["role"] == "internal"
+    assert body["role"] == "user"
 
 
 async def test_login_wrong_password_returns_401(client):

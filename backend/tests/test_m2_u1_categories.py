@@ -46,7 +46,7 @@ async def test_create_child_category(client, seed_user):
 async def test_non_admin_cannot_create_category(client, seed_user):
     _, admin_headers = await seed_user("admin")
     ws_id = await _make_ws(client, admin_headers)
-    _, internal_headers = await seed_user("internal")
+    _, internal_headers = await seed_user("user")
     resp = await client.post(
         f"/categories?workspace_id={ws_id}",
         json={"name": "x"},
