@@ -45,7 +45,7 @@ from app.services.document_service import (
 )
 from app.services.folder_service import get_folder_in_workspace
 from app.services.usage_service import record_event
-from app.services.workspace_service import is_member
+from app.services.workspace_service import get_ws_role, is_member
 from app.storage.base import get_storage
 from app.tasks.worker import enqueue_classification
 
@@ -86,6 +86,15 @@ async def _get_doc_for_member(
     return doc
 
 
+async def _require_ws_write(
+    session: AsyncSession, workspace_id: uuid.UUID, user: User
+) -> None:
+    """要求用户对该空间有写权限（全局 admin 或空间 owner/editor）；否则 403。"""
+    role = await get_ws_role(session, workspace_id=workspace_id, user_id=user.id)
+    if role not in ("owner", "editor"):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "需要空间管理员或编辑权限")
+
+
 @router.post(
     "/workspaces/{workspace_id}/documents",
     response_model=DocumentUploadAccepted,
@@ -99,10 +108,8 @@ async def upload(
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> DocumentUploadAccepted:
-    # 上传为管理员操作，且须为该空间成员（越权校验 SECURITY #4）
-    if current_user.role != "admin":
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "需要管理员权限")
-    await _ensure_member(session, workspace_id, current_user)
+    # 须为该空间 owner 或 editor（越权校验 SECURITY #4）
+    await _require_ws_write(session, workspace_id, current_user)
 
     if folder_id is not None:
         folder = await get_folder_in_workspace(
@@ -184,8 +191,7 @@ async def delete_doc(
     session: AsyncSession = Depends(get_session),
 ) -> None:
     doc = await _get_doc_for_member(session, document_id, current_user)
-    if current_user.role != "admin":
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "需要管理员权限")
+    await _require_ws_write(session, doc.workspace_id, current_user)
     await delete_document(session, doc=doc)
 
 
@@ -199,10 +205,8 @@ async def list_trash(
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> list[DocumentPublic]:
-    """列出回收站文档（仅管理员）。"""
-    await _ensure_member(session, workspace_id, current_user)
-    if current_user.role != "admin":
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "需要管理员权限")
+    """列出回收站文档（需要空间写权限）。"""
+    await _require_ws_write(session, workspace_id, current_user)
     docs = await list_trashed_documents(
         session,
         workspace_id=workspace_id,
@@ -221,10 +225,9 @@ async def restore_doc(
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> None:
-    """从回收站恢复文档（仅管理员）。"""
+    """从回收站恢复文档（需要空间写权限）。"""
     doc = await _get_doc_for_member(session, document_id, current_user)
-    if current_user.role != "admin":
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "需要管理员权限")
+    await _require_ws_write(session, doc.workspace_id, current_user)
     if doc.deleted_at is None:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "文档不在回收站")
     await restore_document(session, doc=doc)
@@ -257,8 +260,7 @@ async def rename_doc(
     session: AsyncSession = Depends(get_session),
 ) -> DocumentPublic:
     doc = await _get_doc_for_member(session, document_id, current_user)
-    if current_user.role != "admin":
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "需要管理员权限")
+    await _require_ws_write(session, doc.workspace_id, current_user)
     doc = await rename_document(session, doc=doc, title=body.title)
     return DocumentPublic.model_validate(doc)
 
@@ -275,8 +277,7 @@ async def replace_doc(
     session: AsyncSession = Depends(get_session),
 ) -> DocumentUploadAccepted:
     doc = await _get_doc_for_member(session, document_id, current_user)
-    if current_user.role != "admin":
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "需要管理员权限")
+    await _require_ws_write(session, doc.workspace_id, current_user)
     data = await file.read()
     raw_name = PurePosixPath(file.filename or doc.title).name
     clean_name = sanitize_filename(raw_name)
@@ -390,10 +391,8 @@ async def reprocess(
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> ReprocessAccepted:
-    # 重试为管理员操作，且须为该文档所属空间成员
-    if current_user.role != "admin":
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "需要管理员权限")
-    await _get_doc_for_member(session, document_id, current_user)
+    doc = await _get_doc_for_member(session, document_id, current_user)
+    await _require_ws_write(session, doc.workspace_id, current_user)
     task = await create_reprocess_task(session, document_id=document_id)
     enqueue_classification(task.id)
     return ReprocessAccepted(task_id=task.id, status="queued")

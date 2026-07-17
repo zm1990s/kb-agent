@@ -185,3 +185,42 @@ async def is_member(
     )
     result = await session.execute(stmt)
     return result.first() is not None
+
+
+async def get_ws_role(
+    session: AsyncSession, *, workspace_id: uuid.UUID, user_id: uuid.UUID
+) -> str | None:
+    """返回用户在该空间内的有效角色（owner/editor/viewer），不是成员返回 None。
+
+    优先级：全局 admin → 个人成员角色 → 组授权角色（取最高权限）。
+    角色优先级：owner > editor > viewer。
+    """
+    from app.models.rbac import GroupMember, WorkspaceGroupGrant
+
+    _rank = {"owner": 3, "editor": 2, "viewer": 1}
+
+    user = await session.get(User, user_id)
+    if user is not None and user.role == "admin":
+        return "owner"
+
+    best: str | None = None
+
+    member = await session.get(WorkspaceMember, (workspace_id, user_id))
+    if member is not None:
+        best = member.role_in_ws
+
+    # 组授权
+    stmt = (
+        select(WorkspaceGroupGrant.role_in_ws)
+        .join(GroupMember, GroupMember.group_id == WorkspaceGroupGrant.group_id)
+        .where(
+            WorkspaceGroupGrant.workspace_id == workspace_id,
+            GroupMember.user_id == user_id,
+        )
+    )
+    rows = (await session.execute(stmt)).scalars().all()
+    for role in rows:
+        if best is None or _rank.get(role, 0) > _rank.get(best, 0):
+            best = role
+
+    return best

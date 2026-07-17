@@ -11,7 +11,7 @@ import { useDialog } from "@/components/DialogProvider";
 import { api, ApiError } from "@/lib/api";
 import { getToken, isAdmin } from "@/lib/auth";
 import { useAuthGuard } from "@/lib/useAuthGuard";
-import type { Category, DocumentPublic, Folder } from "@/lib/types";
+import type { Category, DocumentPublic, Folder, Workspace } from "@/lib/types";
 
 // 规范化文件/目录名：空格→_, 控制字符移除, 合并连续下划线
 function sanitizeName(name: string): string {
@@ -31,7 +31,10 @@ export default function DocumentsPage() {
   const t = useTranslations("documents");
   const { showConfirm, showPrompt } = useDialog();
   const ready = useAuthGuard();
-  const admin = isAdmin();
+  const globalAdmin = isAdmin();
+  // workspace 内的写权限：全局 admin，或空间 owner/editor
+  const [wsRole, setWsRole] = useState<string | null>(null);
+  const admin = globalAdmin || wsRole === "owner" || wsRole === "editor";
   const STATUS_LABEL: Record<string, string> = {
     processing: t("status_processing"),
     ready: t("status_ready"),
@@ -115,6 +118,7 @@ export default function DocumentsPage() {
   useEffect(() => {
     setActiveFolder(ALL);
     setShowTrash(false);
+    setWsRole(null);
     loadFolders();
   }, [workspaceId, loadFolders]);
 
@@ -412,7 +416,11 @@ export default function DocumentsPage() {
       <NavBar />
       <div className="flex items-center gap-3 border-b bg-white px-4 py-2">
         <span className="text-sm text-gray-500">{t("workspace_label")}</span>
-        <WorkspacePicker value={workspaceId} onChange={setWorkspaceId} />
+        <WorkspacePicker
+          value={workspaceId}
+          onChange={setWorkspaceId}
+          onWorkspaceChange={(ws: Workspace) => setWsRole(ws.role_in_ws)}
+        />
       </div>
 
       <div className="flex flex-1 overflow-hidden">
