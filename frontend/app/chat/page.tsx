@@ -53,6 +53,8 @@ export default function ChatPage() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  // 用 ref 累积 thinking，绕过闭包捕获旧 state 的问题
+  const thinkingAccRef = useRef("");
   // 标记正在从 sessionStorage 恢复，避免 workspace 变更 effect 重置 turns
   const restoringRef = useRef(false);
 
@@ -193,13 +195,15 @@ export default function ChatPage() {
             setStageKey(sk);
             setStage(t(message_key, message_params as Record<string, string>));
           } else if (event === "thinking") {
-            setStreamingThinking((prev) => prev + (data as { text: string }).text);
+            thinkingAccRef.current += (data as { text: string }).text;
+            setStreamingThinking(thinkingAccRef.current);
           } else if (event === "token") {
             setStreamingText((prev) => prev + (data as { text: string }).text);
           } else if (event === "done") {
             setStreamingText("");
-            const savedThinking = streamingThinking || undefined;
             setStreamingThinking("");
+            const savedThinking = thinkingAccRef.current || undefined;
+            thinkingAccRef.current = "";
             const d = data as DonePayload;
             setConversationId(d.conversation_id);
             setTurns((t) => [
@@ -223,6 +227,7 @@ export default function ChatPage() {
       setStageKey(null);
       setStreamingText("");
       setStreamingThinking("");
+      thinkingAccRef.current = "";
       abortRef.current = null;
     }
   }

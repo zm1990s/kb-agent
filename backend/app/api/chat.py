@@ -170,7 +170,16 @@ async def chat_stream(
                 final = item
         if final is None:
             final = AnswerResult(answer="", sources=[], error_key="no_answer")
-        # 落库助手消息
+        # 先发 done，让前端立即收到答案，不阻塞在后续 DB 写入和标题生成
+        done_payload: dict = {
+            "answer": final.answer,
+            "sources": final.sources,
+            "conversation_id": str(conv.id),
+        }
+        if final.error_key:
+            done_payload["error_key"] = final.error_key
+        yield sse("done", done_payload)
+        # 落库助手消息（done 已发，后续延迟不影响用户体验）
         await add_message(
             session,
             conversation_id=conv.id,
@@ -206,14 +215,6 @@ async def chat_stream(
                     conversation_id=conv.id,
                     first_message=body.message,
                 )
-        done_payload: dict = {
-            "answer": final.answer,
-            "sources": final.sources,
-            "conversation_id": str(conv.id),
-        }
-        if final.error_key:
-            done_payload["error_key"] = final.error_key
-        yield sse("done", done_payload)
 
     return StreamingResponse(
         gen(),
