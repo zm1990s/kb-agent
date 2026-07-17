@@ -393,7 +393,7 @@
     "email_verification_enabled": "メールアドレス確認を有効にしました",
     "email_verification_disabled": "メールアドレス確認を無効にしました",
     "chat_engine_title": "チャットエンジン",
-    "chat_engine_desc": "チャット回答と会話タイトルのエンジンバックエンドを選択します（文書分類は常に Claude CLI を使用）",
+    "chat_engine_desc": "チャット回答、会話タイトル、新着ダイジェストのエンジンバックエンドを選択します（文書分類は常に Claude CLI を使用）",
     "chat_engine_backend_label": "エンジンバックエンド",
     "chat_engine_claude_cli": "Claude CLI",
     "chat_engine_openai_compat": "OpenAI 互換（Ollama / vLLM / OpenAI / Azure）",
@@ -412,7 +412,8 @@
     "task_headers_save": "保存",
     "task_headers_saved": "保存しました",
     "task_headers_key_placeholder": "Header 名（例: x-portkey-virtual-key）",
-    "task_headers_value_placeholder": "Header 値"
+    "task_headers_value_placeholder": "Header 値",
+    "tab_ai_engine": "AIエンジン"
   },
   "admin": {
     "user_tab_users": "ユーザー",

@@ -21,7 +21,10 @@ export default function WorkspacePicker({ value, onChange }: Props) {
       .get<Workspace[]>("/workspaces")
       .then((ws) => {
         setWorkspaces(ws);
-        if (ws.length > 0 && !value) onChange(ws[0].id);
+        if (ws.length === 0) return;
+        // 若缓存的 value 不在列表中（如 DB 重建后旧 ID 失效），自动切换到第一个
+        const valid = ws.some((w) => w.id === value);
+        if (!valid) onChange(ws[0].id);
       })
       .finally(() => setLoading(false));
   }, [onChange, value]);

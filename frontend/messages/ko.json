@@ -393,7 +393,7 @@
     "email_verification_enabled": "이메일 인증이 활성화되었습니다",
     "email_verification_disabled": "이메일 인증이 비활성화되었습니다",
     "chat_engine_title": "채팅 엔진",
-    "chat_engine_desc": "채팅 Q&A 및 대화 제목의 엔진 백엔드를 선택합니다（문서 분류는 항상 Claude CLI를 사용）",
+    "chat_engine_desc": "채팅 Q&A, 대화 제목 및 새소식 요약의 엔진 백엔드를 선택합니다（문서 분류는 항상 Claude CLI를 사용）",
     "chat_engine_backend_label": "엔진 백엔드",
     "chat_engine_claude_cli": "Claude CLI",
     "chat_engine_openai_compat": "OpenAI 호환（Ollama / vLLM / OpenAI / Azure）",
@@ -412,7 +412,8 @@
     "task_headers_save": "저장",
     "task_headers_saved": "저장됨",
     "task_headers_key_placeholder": "Header 이름（예: x-portkey-virtual-key）",
-    "task_headers_value_placeholder": "Header 값"
+    "task_headers_value_placeholder": "Header 값",
+    "tab_ai_engine": "AI 엔진"
   },
   "admin": {
     "user_tab_users": "사용자",

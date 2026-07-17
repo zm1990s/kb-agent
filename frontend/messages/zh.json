@@ -393,7 +393,7 @@
     "email_verification_enabled": "已开启邮箱验证",
     "email_verification_disabled": "已关闭邮箱验证",
     "chat_engine_title": "对话引擎",
-    "chat_engine_desc": "选择处理对话问答和会话标题的引擎后端（文档归类始终使用 Claude CLI）",
+    "chat_engine_desc": "选择处理对话问答、会话标题和新动态摘要的引擎后端（文档归类始终使用 Claude CLI）",
     "chat_engine_backend_label": "引擎后端",
     "chat_engine_claude_cli": "Claude CLI",
     "chat_engine_openai_compat": "OpenAI 兼容（Ollama / vLLM / OpenAI / Azure）",
@@ -412,7 +412,8 @@
     "task_headers_save": "保存",
     "task_headers_saved": "已保存",
     "task_headers_key_placeholder": "Header 名（如 x-portkey-virtual-key）",
-    "task_headers_value_placeholder": "Header 值"
+    "task_headers_value_placeholder": "Header 值",
+    "tab_ai_engine": "AI 引擎"
   },
   "admin": {
     "user_tab_users": "用户",

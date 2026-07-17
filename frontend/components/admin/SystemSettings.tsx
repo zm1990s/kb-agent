@@ -3,42 +3,19 @@
 import { useCallback, useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import Image from "next/image";
+import AIEngineSettings from "@/components/admin/AIEngineSettings";
 import PromptsTab from "@/components/admin/PromptsTab";
 import UserAdmin from "@/components/admin/UserAdmin";
 import WorkspaceAdmin from "@/components/admin/WorkspaceAdmin";
 import { api, ApiError } from "@/lib/api";
 import type { AllowedDomain } from "@/lib/types";
 
-interface EngineOption {
-  id: string;
-  label: string;
-  available: boolean;
-}
-interface EngineConfig {
-  current: string;
-  options: EngineOption[];
-}
 interface Branding {
   name: string;
   logo_url: string;
 }
-interface TaskModel {
-  key: string;
-  label: string;
-  model: string | null;
-}
-interface TaskModelsConfig {
-  default_model: string;
-  tasks: TaskModel[];
-}
-interface ChatEngineConfig {
-  chat_engine_backend: string;
-  openai_base_url: string;
-  openai_api_key: string;
-  openai_model: string;
-}
 
-type Tab = "workspaces" | "users" | "general" | "prompts";
+type Tab = "workspaces" | "users" | "general" | "prompts" | "ai_engine";
 
 interface Props {
   // null = admin（全部可见）；Record = 普通用户权限表
@@ -58,7 +35,6 @@ export default function SystemSettings({ perms }: Props) {
   const [tab, setTab] = useState<Tab>(defaultTab);
   const [domains, setDomains] = useState<AllowedDomain[]>([]);
   const [domainName, setDomainName] = useState("");
-  const [engine, setEngine] = useState<EngineConfig | null>(null);
   const [branding, setBranding] = useState<Branding>({ name: "", logo_url: "" });
   const [brandingName, setBrandingName] = useState("");
   const [brandingLogo, setBrandingLogo] = useState("");
@@ -67,44 +43,17 @@ export default function SystemSettings({ perms }: Props) {
   const [wnFreq, setWnFreq] = useState<string>("weekly");
   const [wnFreqInput, setWnFreqInput] = useState<string>("weekly");
   const [wnFreqOptions, setWnFreqOptions] = useState<string[]>([]);
-  const [taskModels, setTaskModels] = useState<TaskModelsConfig | null>(null);
-  const [taskModelInputs, setTaskModelInputs] = useState<Record<string, string>>({});
-  const [taskModelMsg, setTaskModelMsg] = useState<string | null>(null);
   const [wnTriggering, setWnTriggering] = useState(false);
   const [wnMsg, setWnMsg] = useState<string | null>(null);
   const [sqText, setSqText] = useState("");
   const [sqMsg, setSqMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [brandingMsg, setBrandingMsg] = useState<string | null>(null);
-  const [engineMsg, setEngineMsg] = useState<string | null>(null);
   const [siteBaseUrl, setSiteBaseUrl] = useState("");
   const [siteBaseUrlInput, setSiteBaseUrlInput] = useState("");
   const [siteBaseUrlMsg, setSiteBaseUrlMsg] = useState<string | null>(null);
   const [requireEmailVerification, setRequireEmailVerification] = useState(false);
   const [emailVerificationMsg, setEmailVerificationMsg] = useState<string | null>(null);
-  const [chatEngine, setChatEngine] = useState<ChatEngineConfig>({
-    chat_engine_backend: "claude_cli",
-    openai_base_url: "",
-    openai_api_key: "",
-    openai_model: "",
-  });
-  const [chatEngineInput, setChatEngineInput] = useState<ChatEngineConfig>({
-    chat_engine_backend: "claude_cli",
-    openai_base_url: "",
-    openai_api_key: "",
-    openai_model: "",
-  });
-  const [chatEngineMsg, setChatEngineMsg] = useState<string | null>(null);
-
-  type TaskHeadersConfig = Record<"classify" | "title" | "chat" | "whatsnew", Record<string, string>>;
-  const TASK_KEYS = ["classify", "title", "chat", "whatsnew"] as const;
-  const [taskHeaders, setTaskHeaders] = useState<TaskHeadersConfig>({
-    classify: { "x-portkey-metadata": '{"x-task": "classify"}' },
-    title:    { "x-portkey-metadata": '{"x-task": "title"}' },
-    chat:     { "x-portkey-metadata": '{"x-task": "chat"}' },
-    whatsnew: { "x-portkey-metadata": '{"x-task": "whatsnew"}' },
-  });
-  const [taskHeadersMsg, setTaskHeadersMsg] = useState<string | null>(null);
 
   const loadDomains = useCallback(async () => {
     try {
@@ -114,23 +63,13 @@ export default function SystemSettings({ perms }: Props) {
     }
   }, []);
 
-  const loadEngine = useCallback(async () => {
-    try {
-      setEngine(await api.get<EngineConfig>("/settings/engine"));
-    } catch {
-      setEngine(null);
-    }
-  }, []);
-
   const loadBranding = useCallback(async () => {
     try {
       const b = await api.get<Branding>("/settings/branding");
       setBranding(b);
       setBrandingName(b.name);
       setBrandingLogo(b.logo_url);
-    } catch {
-      // 非管理员读不到也没关系
-    }
+    } catch { /* 非管理员读不到也没关系 */ }
   }, []);
 
   const loadWnSchedule = useCallback(async () => {
@@ -151,16 +90,6 @@ export default function SystemSettings({ perms }: Props) {
     } catch { /* 非 admin 正常 */ }
   }, []);
 
-  const loadTaskModels = useCallback(async () => {
-    try {
-      const d = await api.get<TaskModelsConfig>("/settings/models");
-      setTaskModels(d);
-      const inputs: Record<string, string> = {};
-      for (const t of d.tasks) inputs[t.key] = t.model ?? "";
-      setTaskModelInputs(inputs);
-    } catch { /* 非 admin 正常 */ }
-  }, []);
-
   const loadEmailVerification = useCallback(async () => {
     try {
       const d = await api.get<{ require_email_verification: boolean; site_base_url: string }>(
@@ -172,32 +101,13 @@ export default function SystemSettings({ perms }: Props) {
     } catch { /* 非 admin 正常 */ }
   }, []);
 
-  const loadChatEngine = useCallback(async () => {
-    try {
-      const d = await api.get<ChatEngineConfig>("/settings/chat-engine");
-      setChatEngine(d);
-      setChatEngineInput({ ...d, openai_api_key: "" });
-    } catch { /* 非 admin 正常 */ }
-  }, []);
-
-  const loadTaskHeaders = useCallback(async () => {
-    try {
-      const d = await api.get<TaskHeadersConfig>("/settings/task-headers");
-      setTaskHeaders(d);
-    } catch { /* 非 admin 正常 */ }
-  }, []);
-
   useEffect(() => {
     loadDomains();
-    loadEngine();
     loadBranding();
     loadWnSchedule();
     loadSuggestedQuestions();
-    loadTaskModels();
     loadEmailVerification();
-    loadChatEngine();
-    loadTaskHeaders();
-  }, [loadDomains, loadEngine, loadBranding, loadWnSchedule, loadSuggestedQuestions, loadTaskModels, loadEmailVerification, loadChatEngine, loadTaskHeaders]);
+  }, [loadDomains, loadBranding, loadWnSchedule, loadSuggestedQuestions, loadEmailVerification]);
 
   async function addDomain(e: React.FormEvent) {
     e.preventDefault();
@@ -275,31 +185,6 @@ export default function SystemSettings({ perms }: Props) {
     }
   }
 
-  async function saveTaskModel(key: string) {
-    setError(null);
-    setTaskModelMsg(null);
-    try {
-      const model = taskModelInputs[key]?.trim() || null;
-      await api.put(`/settings/models/${key}`, { model });
-      await loadTaskModels();
-      setTaskModelMsg(t("task_model_saved"));
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : t("save_failed"));
-    }
-  }
-
-  async function selectEngine(backend: string) {
-    setError(null);
-    setEngineMsg(null);
-    try {
-      const updated = await api.put<EngineConfig>("/settings/engine", { backend });
-      setEngine(updated);
-      setEngineMsg(t("engine_updated"));
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : t("update_failed"));
-    }
-  }
-
   async function saveSiteBaseUrl(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -328,66 +213,6 @@ export default function SystemSettings({ perms }: Props) {
     }
   }
 
-  async function saveChatEngine(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-    setChatEngineMsg(null);
-    try {
-      const updated = await api.put<ChatEngineConfig>("/settings/chat-engine", chatEngineInput);
-      if (updated) {
-        setChatEngine(updated);
-        setChatEngineInput({ ...updated, openai_api_key: "" });
-      }
-      setChatEngineMsg(t("chat_engine_saved"));
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : t("save_failed"));
-    }
-  }
-
-  async function saveTaskHeadersForTask(task: typeof TASK_KEYS[number]) {
-    setTaskHeadersMsg(null);
-    try {
-      const updated = await api.put<TaskHeadersConfig>(`/settings/task-headers/${task}`, {
-        headers: taskHeaders[task],
-      });
-      setTaskHeaders(updated);
-      setTaskHeadersMsg(t("task_headers_saved"));
-      setTimeout(() => setTaskHeadersMsg(null), 2000);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : t("save_failed"));
-    }
-  }
-
-  function updateTaskHeaderKey(
-    task: typeof TASK_KEYS[number],
-    oldKey: string,
-    newKey: string
-  ) {
-    setTaskHeaders((prev) => {
-      const entries = Object.entries(prev[task]);
-      const idx = entries.findIndex(([k]) => k === oldKey);
-      if (idx === -1) return prev;
-      entries[idx] = [newKey, entries[idx][1]];
-      return { ...prev, [task]: Object.fromEntries(entries) };
-    });
-  }
-
-  function updateTaskHeaderValue(task: typeof TASK_KEYS[number], key: string, value: string) {
-    setTaskHeaders((prev) => ({ ...prev, [task]: { ...prev[task], [key]: value } }));
-  }
-
-  function addTaskHeaderRow(task: typeof TASK_KEYS[number]) {
-    setTaskHeaders((prev) => ({ ...prev, [task]: { ...prev[task], "": "" } }));
-  }
-
-  function removeTaskHeaderRow(task: typeof TASK_KEYS[number], key: string) {
-    setTaskHeaders((prev) => {
-      const next = { ...prev[task] };
-      delete next[key];
-      return { ...prev, [task]: next };
-    });
-  }
-
   async function saveSuggestedQuestions(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -411,16 +236,17 @@ export default function SystemSettings({ perms }: Props) {
           ["users", t("tab_users")],
           ["general", t("tab_general")],
           ["prompts", t("tab_prompts")],
+          ["ai_engine", t("tab_ai_engine")],
         ] as [Tab, string][])
           .filter(([tabKey]) => {
             if (tabKey === "workspaces") return canSee("workspaces");
             if (tabKey === "users") return canSee("users");
-            return isAdmin; // general / prompts 仅管理员
+            return isAdmin; // general / prompts / ai_engine 仅管理员
           })
           .map(([tabKey, label]) => (
             <button
               key={tabKey}
-              onClick={() => { setTab(tabKey); setError(null); setBrandingMsg(null); setEngineMsg(null); }}
+              onClick={() => { setTab(tabKey); setError(null); setBrandingMsg(null); }}
               className={`px-4 py-2 text-sm ${
                 tab === tabKey
                   ? "border-b-2 border-blue-600 font-medium text-blue-700"
@@ -435,6 +261,7 @@ export default function SystemSettings({ perms }: Props) {
       {tab === "workspaces" && <WorkspaceAdmin />}
       {tab === "users" && <UserAdmin />}
       {tab === "prompts" && <PromptsTab />}
+      {tab === "ai_engine" && <AIEngineSettings />}
 
       {tab === "general" && (
         <div className="space-y-6">
@@ -481,202 +308,10 @@ export default function SystemSettings({ perms }: Props) {
             {brandingMsg && <p className="mt-2 text-xs text-green-600">{brandingMsg}</p>}
           </section>
 
-          {/* 默认 Agent 引擎配置（含任务模型子菜单） */}
-          <section className="rounded border bg-white p-4">
-            <h2 className="mb-1 text-sm font-medium">{t("engine_title")}</h2>
-            <p className="mb-3 text-xs text-gray-400">
-              {t("engine_desc")}
-            </p>
-            <div className="space-y-2">
-              {engine?.options.map((o) => (
-                <label
-                  key={o.id}
-                  className={`flex items-center gap-2 rounded border px-3 py-2 text-sm ${
-                    o.available
-                      ? "cursor-pointer hover:bg-gray-50"
-                      : "cursor-not-allowed bg-gray-50 text-gray-400"
-                  } ${engine.current === o.id ? "border-blue-500 bg-blue-50" : ""}`}
-                >
-                  <input
-                    type="radio"
-                    name="engine"
-                    disabled={!o.available}
-                    checked={engine.current === o.id}
-                    onChange={() => selectEngine(o.id)}
-                  />
-                  {o.label}
-                  {engine.current === o.id && (
-                    <span className="ml-auto text-xs text-blue-600">{t("engine_current")}</span>
-                  )}
-                </label>
-              ))}
-              {!engine && <p className="text-sm text-gray-400">{t("engine_loading")}</p>}
-            </div>
-            {engineMsg && <p className="mt-2 text-xs text-green-600">{engineMsg}</p>}
-
-            {/* 任务级模型配置（子菜单） */}
-            <div className="mt-4 rounded border border-gray-100 bg-gray-50 p-3">
-              <h3 className="mb-1 text-xs font-medium text-gray-700">{t("task_model_title")}</h3>
-              <p className="mb-3 text-xs text-gray-400">
-                {t("task_model_desc", { default: taskModels ? taskModels.default_model : t("task_model_loading") })}
-              </p>
-              {taskModels ? (
-                <div className="space-y-3">
-                  {taskModels.tasks.map((task) => (
-                    <div key={task.key} className="flex items-center gap-2">
-                      <label className="w-36 flex-shrink-0 text-xs text-gray-600">{task.label}</label>
-                      <input
-                        value={taskModelInputs[task.key] ?? ""}
-                        onChange={(e) =>
-                          setTaskModelInputs((prev) => ({ ...prev, [task.key]: e.target.value }))
-                        }
-                        placeholder={taskModels.default_model}
-                        className="flex-1 rounded border bg-white px-3 py-1.5 text-sm font-mono focus:border-blue-400 focus:outline-none"
-                      />
-                      <button
-                        onClick={() => saveTaskModel(task.key)}
-                        className="rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700"
-                      >
-                        {t("whatsnew_save")}
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-gray-400">{t("task_model_loading")}</p>
-              )}
-              {taskModelMsg && <p className="mt-2 text-xs text-green-600">{taskModelMsg}</p>}
-            </div>
-          </section>
-
-          {/* 对话引擎配置 */}
-          <section className="rounded border bg-white p-4">
-            <h2 className="mb-1 text-sm font-medium">{t("chat_engine_title")}</h2>
-            <p className="mb-3 text-xs text-gray-400">{t("chat_engine_desc")}</p>
-            <form onSubmit={saveChatEngine} className="space-y-3">
-              <div>
-                <label className="mb-1 block text-xs text-gray-500">{t("chat_engine_backend_label")}</label>
-                <select
-                  value={chatEngineInput.chat_engine_backend}
-                  onChange={(e) => setChatEngineInput((prev) => ({ ...prev, chat_engine_backend: e.target.value }))}
-                  className="rounded border px-3 py-2 text-sm focus:border-blue-400 focus:outline-none"
-                >
-                  <option value="claude_cli">{t("chat_engine_claude_cli")}</option>
-                  <option value="openai_compat">{t("chat_engine_openai_compat")}</option>
-                </select>
-              </div>
-              {chatEngineInput.chat_engine_backend === "openai_compat" && (
-                <div className="space-y-2 rounded border border-gray-100 bg-gray-50 p-3">
-                  <div>
-                    <label className="mb-1 block text-xs text-gray-500">{t("openai_base_url_label")}</label>
-                    <input
-                      value={chatEngineInput.openai_base_url}
-                      onChange={(e) => setChatEngineInput((prev) => ({ ...prev, openai_base_url: e.target.value }))}
-                      placeholder="http://localhost:11434/v1"
-                      className="w-full rounded border px-3 py-1.5 text-sm font-mono focus:border-blue-400 focus:outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-xs text-gray-500">
-                      {t("openai_api_key_label")}
-                      {chatEngine.openai_api_key === "***" && (
-                        <span className="ml-2 text-gray-400">{t("openai_api_key_set")}</span>
-                      )}
-                    </label>
-                    <input
-                      type="password"
-                      value={chatEngineInput.openai_api_key}
-                      onChange={(e) => setChatEngineInput((prev) => ({ ...prev, openai_api_key: e.target.value }))}
-                      placeholder={chatEngine.openai_api_key === "***" ? "（留空保持不变）" : "none"}
-                      className="w-full rounded border px-3 py-1.5 text-sm font-mono focus:border-blue-400 focus:outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-xs text-gray-500">{t("openai_model_label")}</label>
-                    <input
-                      value={chatEngineInput.openai_model}
-                      onChange={(e) => setChatEngineInput((prev) => ({ ...prev, openai_model: e.target.value }))}
-                      placeholder="qwen2.5:72b"
-                      className="w-full rounded border px-3 py-1.5 text-sm font-mono focus:border-blue-400 focus:outline-none"
-                    />
-                  </div>
-                </div>
-              )}
-              <button
-                type="submit"
-                className="rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700"
-              >
-                {t("whatsnew_save")}
-              </button>
-            </form>
-            {chatEngineMsg && <p className="mt-2 text-xs text-green-600">{chatEngineMsg}</p>}
-          </section>
-
-          {/* 任务请求 Headers */}
-          <section className="rounded border bg-white p-4">
-            <h2 className="mb-1 text-sm font-medium">{t("task_headers_title")}</h2>
-            <p className="mb-4 text-xs text-gray-400">{t("task_headers_desc")}</p>
-            <div className="space-y-5">
-              {TASK_KEYS.map((task) => (
-                <div key={task}>
-                  <p className="mb-2 text-xs font-medium text-gray-600">
-                    {t(`task_${task}` as Parameters<typeof t>[0])}
-                  </p>
-                  <div className="space-y-1.5">
-                    {Object.entries(taskHeaders[task]).map(([k, v], idx) => (
-                      <div key={idx} className="flex items-center gap-2">
-                        <input
-                          className="w-5/12 rounded border px-2 py-1 text-xs font-mono"
-                          value={k}
-                          placeholder={t("task_headers_key_placeholder")}
-                          onChange={(e) => updateTaskHeaderKey(task, k, e.target.value)}
-                        />
-                        <input
-                          className="flex-1 rounded border px-2 py-1 text-xs font-mono"
-                          value={v}
-                          placeholder={t("task_headers_value_placeholder")}
-                          onChange={(e) => updateTaskHeaderValue(task, k, e.target.value)}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => removeTaskHeaderRow(task, k)}
-                          className="shrink-0 rounded px-2 py-1 text-xs text-gray-400 hover:bg-red-50 hover:text-red-500"
-                        >
-                          ×
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="mt-2 flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => addTaskHeaderRow(task)}
-                      className="rounded border px-2 py-1 text-xs text-gray-500 hover:bg-gray-50"
-                    >
-                      + {t("task_headers_add")}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => saveTaskHeadersForTask(task)}
-                      className="rounded bg-blue-600 px-3 py-1 text-xs text-white hover:bg-blue-700"
-                    >
-                      {t("task_headers_save")}
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-            {taskHeadersMsg && (
-              <p className="mt-3 text-xs text-green-600">{taskHeadersMsg}</p>
-            )}
-          </section>
-
           {/* 域名白名单 */}
           <section className="rounded border bg-white p-4">
             <h2 className="mb-1 text-sm font-medium">{t("domain_title")}</h2>
-            <p className="mb-3 text-xs text-gray-400">
-              {t("domain_desc")}
-            </p>
+            <p className="mb-3 text-xs text-gray-400">{t("domain_desc")}</p>
             <form onSubmit={addDomain} className="mb-3 flex gap-2">
               <input
                 value={domainName}
@@ -763,9 +398,7 @@ export default function SystemSettings({ perms }: Props) {
           {/* 引导问题 */}
           <section className="rounded border bg-white p-4">
             <h2 className="mb-1 text-sm font-medium">{t("suggested_title")}</h2>
-            <p className="mb-3 text-xs text-gray-400">
-              {t("suggested_desc")}
-            </p>
+            <p className="mb-3 text-xs text-gray-400">{t("suggested_desc")}</p>
             <form onSubmit={saveSuggestedQuestions} className="space-y-3">
               <textarea
                 value={sqText}

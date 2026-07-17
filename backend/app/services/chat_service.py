@@ -5,9 +5,11 @@
 
 import uuid
 
+from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.auth import Workspace
 from app.models.chat import Conversation, Message
 
 
@@ -27,6 +29,9 @@ async def get_or_create_conversation(
             and conv.user_id == user_id
         ):
             return conv
+    ws = await session.get(Workspace, workspace_id)
+    if ws is None:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "空间不存在")
     conv = Conversation(
         id=uuid.uuid4(), workspace_id=workspace_id, user_id=user_id
     )
@@ -98,6 +103,9 @@ async def recent_history(
 async def create_conversation(
     session: AsyncSession, *, workspace_id: uuid.UUID, user_id: uuid.UUID
 ) -> Conversation:
+    ws = await session.get(Workspace, workspace_id)
+    if ws is None:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "空间不存在")
     conv = Conversation(id=uuid.uuid4(), workspace_id=workspace_id, user_id=user_id)
     session.add(conv)
     await session.commit()

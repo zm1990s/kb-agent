@@ -393,7 +393,7 @@
     "email_verification_enabled": "Email verification enabled",
     "email_verification_disabled": "Email verification disabled",
     "chat_engine_title": "Chat Engine",
-    "chat_engine_desc": "Select the engine backend for chat Q&A and conversation titles (document classification always uses Claude CLI)",
+    "chat_engine_desc": "Select the engine backend for chat Q&A, conversation titles, and What's New summaries (document classification always uses Claude CLI)",
     "chat_engine_backend_label": "Engine backend",
     "chat_engine_claude_cli": "Claude CLI",
     "chat_engine_openai_compat": "OpenAI-compatible (Ollama / vLLM / OpenAI / Azure)",
@@ -412,7 +412,8 @@
     "task_headers_save": "Save",
     "task_headers_saved": "Saved",
     "task_headers_key_placeholder": "Header name (e.g. x-portkey-virtual-key)",
-    "task_headers_value_placeholder": "Header value"
+    "task_headers_value_placeholder": "Header value",
+    "tab_ai_engine": "AI Engine"
   },
   "admin": {
     "user_tab_users": "Users",
