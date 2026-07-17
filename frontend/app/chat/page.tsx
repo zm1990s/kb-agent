@@ -210,11 +210,16 @@ export default function ChatPage() {
               ...t,
               { role: "assistant", content: d.answer, sources: d.sources, error_key: d.error_key, thinking: savedThinking },
             ]);
+            // 立即结束 busy 状态，不等侧边栏刷新
+            setBusy(false);
+            setStage(null);
+            setStageKey(null);
+            // 侧边栏在后台静默刷新，不阻塞 UI
+            loadConversations();
           }
         },
         ac.signal,
       );
-      await loadConversations();
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") {
         // user stopped — keep turns as-is
