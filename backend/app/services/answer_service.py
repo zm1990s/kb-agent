@@ -108,9 +108,12 @@ def _parse_engine_json(text: str) -> dict:
     _placeholder = chr(0) + "BS" + chr(0)
     def _escape_ctrl(m: re.Match) -> str:
         inner = m.group(0)[1:-1].replace("\\", _placeholder)
-        inner = re.sub(r'[\x00-\x1f]', lambda c: (
-            {"\\": "\\\\", "\n": "\\n", "\r": "\\r", "\t": "\\t"}.get(c.group(), f"\\u{ord(c.group()):04x}")
-        ), inner)
+        _escapes = {"\\": "\\\\", "\n": "\\n", "\r": "\\r", "\t": "\\t"}
+        inner = re.sub(
+            r'[\x00-\x1f]',
+            lambda c: _escapes.get(c.group(), f"\\u{ord(c.group()):04x}"),
+            inner,
+        )
         inner = inner.replace(_placeholder, "\\")
         return f'"{inner}"'
     return json.loads(re.sub(r'"(?:[^"\\]|\\.)*"', _escape_ctrl, raw, flags=re.DOTALL))
@@ -139,7 +142,14 @@ class Stage:
 
 @dataclass
 class TokenChunk:
-    """单个 token 增量，Phase 2 流式生成时逐个 yield。"""
+    """单个文本 token 增量，Phase 2 流式生成时逐个 yield。"""
+
+    text: str
+
+
+@dataclass
+class ThinkingChunk:
+    """Phase 2 流式 thinking 增量（仅 thinking 模型产出）。"""
 
     text: str
 
@@ -255,11 +265,17 @@ async def answer_question_streamed(
     )
     try:
         if hasattr(engine, "complete_streaming"):
-            token_chunks: list[str] = []
-            async for token in engine.complete_streaming(phase2_prompt):
-                token_chunks.append(token)
-                yield TokenChunk(text=token)
-            answer = "".join(token_chunks).strip()
+            from app.engine.base import TextChunk as EngineTextChunk
+            from app.engine.base import ThinkingChunk as EngineThinkingChunk
+
+            text_chunks: list[str] = []
+            async for chunk in engine.complete_streaming(phase2_prompt):
+                if isinstance(chunk, EngineThinkingChunk):
+                    yield ThinkingChunk(text=chunk.text)
+                elif isinstance(chunk, EngineTextChunk):
+                    text_chunks.append(chunk.text)
+                    yield TokenChunk(text=chunk.text)
+            answer = "".join(text_chunks).strip()
         else:
             r = await engine.complete(phase2_prompt)
             answer = r.text.strip()

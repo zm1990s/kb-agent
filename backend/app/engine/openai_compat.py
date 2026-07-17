@@ -11,7 +11,7 @@ from pathlib import Path
 
 import httpx
 
-from app.engine.base import EngineError, EngineResult
+from app.engine.base import EngineError, EngineResult, TextChunk, ThinkingChunk
 
 logger = logging.getLogger(__name__)
 
@@ -90,8 +90,8 @@ class OpenAICompatEngine:
 
     async def complete_streaming(
         self, prompt: str, *, system: str | None = None
-    ) -> AsyncGenerator[str, None]:
-        """流式调用：逐 token yield 文字增量。"""
+    ) -> AsyncGenerator[ThinkingChunk | TextChunk, None]:
+        """流式调用：逐 token yield TextChunk（OpenAI 兼容引擎无 thinking 输出）。"""
         messages: list[dict] = []
         if system:
             messages.append({"role": "system", "content": system})
@@ -125,7 +125,7 @@ class OpenAICompatEngine:
                             chunk = json.loads(line[6:])
                             delta = chunk["choices"][0]["delta"].get("content") or ""
                             if delta:
-                                yield delta
+                                yield TextChunk(text=delta)
                         except (json.JSONDecodeError, KeyError, IndexError):
                             continue
         except httpx.HTTPStatusError as exc:

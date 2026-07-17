@@ -5,7 +5,7 @@ import uuid
 
 import pytest
 
-from app.engine.base import EngineResult
+from app.engine.base import EngineResult, TextChunk
 from app.models.document import Document
 from app.services import answer_service
 
@@ -14,10 +14,16 @@ pytestmark = pytest.mark.asyncio
 
 class _FakeEngine:
     def __init__(self, answer="流式答案", doc_numbers=None):
-        self._payload = json.dumps({"answer": answer, "doc_numbers": doc_numbers or []})
+        self._answer = answer
+        self._payload = json.dumps({"doc_numbers": doc_numbers or []})
 
     async def complete(self, prompt, *, files=None, system=None):
+        # Phase 1：返回包含 doc_numbers 的 JSON（无 mode → else 分支）
         return EngineResult(text=self._payload)
+
+    async def complete_streaming(self, prompt, *, system=None, files=None):
+        # Phase 2：直接 yield 纯文本答案
+        yield TextChunk(text=self._answer)
 
 
 async def _ws(client, headers):
@@ -61,9 +67,11 @@ async def test_stream_emits_stages_then_done(client, seed_user, db_session, monk
     _, admin = await seed_user("admin")
     ws_id = await _ws(client, admin)
     await _ready_doc(db_session, ws_id)
-    monkeypatch.setattr(
-        answer_service, "get_engine", lambda *a, **k: _FakeEngine(doc_numbers=[1])
-    )
+
+    async def _fake_chat_engine(*a, **k):
+        return _FakeEngine(doc_numbers=[1])
+
+    monkeypatch.setattr(answer_service, "get_chat_engine", _fake_chat_engine)
 
     resp = await client.post(
         "/chat/stream", json={"workspace_id": ws_id, "message": "有什么文档"}, headers=admin

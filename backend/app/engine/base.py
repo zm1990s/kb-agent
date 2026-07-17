@@ -4,6 +4,7 @@
 通过 ENGINE_BACKEND 配置切换实现。
 """
 
+from collections.abc import AsyncGenerator
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Protocol, runtime_checkable
@@ -23,6 +24,20 @@ class EngineResult:
     raw: dict = field(default_factory=dict)
 
 
+@dataclass
+class ThinkingChunk:
+    """流式 thinking 增量（仅 thinking 模型产出）。"""
+
+    text: str
+
+
+@dataclass
+class TextChunk:
+    """流式文本增量。"""
+
+    text: str
+
+
 @runtime_checkable
 class EngineProtocol(Protocol):
     """所有引擎实现遵守的接口。"""
@@ -35,6 +50,17 @@ class EngineProtocol(Protocol):
         system: str | None = None,
     ) -> EngineResult:
         """给定 prompt（可附带文件），返回模型输出。"""
+        ...
+
+    async def complete_streaming(
+        self,
+        prompt: str,
+        *,
+        system: str | None = None,
+    ) -> AsyncGenerator["ThinkingChunk | TextChunk", None]:
+        """流式调用：逐块 yield ThinkingChunk 或 TextChunk。
+        不支持的引擎可以不实现此方法（用 hasattr 判断）。
+        """
         ...
 
 

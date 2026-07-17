@@ -105,7 +105,8 @@
     "stage_fetching": "Fetching {count} document(s)…",
     "stage_thinking_phase2": "Agent is composing the answer…",
     "stage_done": "Done",
-    "stage_no_docs": "No documents in this workspace"
+    "stage_no_docs": "No documents in this workspace",
+    "thinking_label": "AI is thinking…"
   },
   "messageBubble": {
     "me": "Me",

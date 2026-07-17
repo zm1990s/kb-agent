@@ -7,11 +7,13 @@
 """
 
 import asyncio
+import json
 import logging
+from collections.abc import AsyncGenerator
 from pathlib import Path
 
 from app.core.config import get_settings
-from app.engine.base import EngineError, EngineResult
+from app.engine.base import EngineError, EngineResult, TextChunk, ThinkingChunk
 
 logger = logging.getLogger(__name__)
 
@@ -84,7 +86,10 @@ class ClaudeCliEngine:
         # 逐块读 stdout，每次收到数据就重置空闲计时器。
         # 只有连续 idle_timeout 秒无任何输出才视为卡死并报错。
         chunks: list[bytes] = []
-        assert proc.stdout is not None
+        if proc.stdout is None:
+            proc.kill()
+            await proc.wait()
+            raise EngineError("无法读取 Claude CLI 输出（stdout 为空）")
         idle = self._idle_timeout
         timed_out = False
         try:
@@ -124,3 +129,104 @@ class ClaudeCliEngine:
             raise EngineError(f"Claude CLI 返回非零退出码 {proc.returncode}: {detail}")
 
         return EngineResult(text=b"".join(chunks).decode("utf-8", errors="replace").strip())
+
+    async def complete_streaming(
+        self,
+        prompt: str,
+        *,
+        system: str | None = None,
+        files: list[Path] | None = None,
+    ) -> AsyncGenerator[ThinkingChunk | TextChunk, None]:
+        """流式调用：解析 CLI stream-json NDJSON，yield ThinkingChunk / TextChunk。"""
+        argv = self._build_argv(prompt, files)
+        if system:
+            argv += ["--append-system-prompt", system]
+        argv += ["--output-format", "stream-json", "--verbose", "--include-partial-messages"]
+
+        argv_log = [a if a != prompt else f"<prompt:{len(prompt)}chars>" for a in argv]
+        logger.debug("Claude CLI 流式启动: %s", argv_log)
+
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                *argv,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+        except FileNotFoundError as exc:
+            raise EngineError(f"找不到 Claude CLI: {self._cli_path!r}") from exc
+
+        if proc.stdout is None:
+            proc.kill()
+            await proc.wait()
+            raise EngineError("无法读取 Claude CLI 流式输出（stdout 为空）")
+        idle = self._idle_timeout
+        timed_out = False
+        stderr_task = asyncio.ensure_future(proc.stderr.read())  # type: ignore[union-attr]
+
+        try:
+            while True:
+                try:
+                    line_bytes = await asyncio.wait_for(
+                        proc.stdout.readline(), timeout=idle
+                    )
+                except TimeoutError:
+                    timed_out = True
+                    break
+
+                if not line_bytes:
+                    break  # EOF
+
+                line = line_bytes.decode("utf-8", errors="replace").strip()
+                if not line:
+                    continue
+
+                try:
+                    obj = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+
+                # 只处理 stream_event 类型
+                if obj.get("type") != "stream_event":
+                    # result 行：检查是否有错误
+                    if obj.get("type") == "result" and obj.get("is_error"):
+                        raise EngineError(
+                            f"Claude CLI 返回错误: {obj.get('error', obj)}"
+                        )
+                    continue
+
+                event = obj.get("event", {})
+                delta = event.get("delta", {})
+                delta_type = delta.get("type", "")
+
+                if delta_type == "thinking_delta":
+                    text = delta.get("thinking", "")
+                    if text:
+                        yield ThinkingChunk(text=text)
+                elif delta_type == "text_delta":
+                    text = delta.get("text", "")
+                    if text:
+                        yield TextChunk(text=text)
+                # signature_delta 和其他类型静默忽略
+
+        finally:
+            if proc.returncode is None:
+                proc.kill()
+                await proc.wait()
+
+        if timed_out:
+            raise EngineError(f"Claude CLI 流式超过 {idle}s 无输出，判定为无响应")
+
+        stderr_bytes = await asyncio.wait_for(stderr_task, timeout=idle)
+        await proc.wait()
+
+        if proc.returncode != 0:
+            stderr_str = stderr_bytes.decode("utf-8", errors="replace").strip()
+            logger.error(
+                "Claude CLI 流式失败 | 退出码=%d | model=%r | stderr=%r",
+                proc.returncode,
+                self._model,
+                stderr_str[:500],
+            )
+            raise EngineError(
+                f"Claude CLI 返回非零退出码 {proc.returncode}: {stderr_str or '(无输出)'}"
+            )

@@ -105,7 +105,8 @@
     "stage_fetching": "正在獲取 {count} 篇文件原文…",
     "stage_thinking_phase2": "Agent 正在組織回答…",
     "stage_done": "完成",
-    "stage_no_docs": "此空間尚無文件"
+    "stage_no_docs": "此空間尚無文件",
+    "thinking_label": "AI 深度思考中…"
   },
   "messageBubble": {
     "me": "我",

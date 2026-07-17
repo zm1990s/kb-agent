@@ -105,7 +105,8 @@
     "stage_fetching": "{count} 件のドキュメントを取得中…",
     "stage_thinking_phase2": "Agent が回答を整理しています…",
     "stage_done": "完了",
-    "stage_no_docs": "このスペースにドキュメントがありません"
+    "stage_no_docs": "このスペースにドキュメントがありません",
+    "thinking_label": "AI が思考中…"
   },
   "messageBubble": {
     "me": "自分",

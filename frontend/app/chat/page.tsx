@@ -45,6 +45,7 @@ export default function ChatPage() {
   const [stage, setStage] = useState<string | null>(null);
   const [stageKey, setStageKey] = useState<string | null>(null);
   const [streamingText, setStreamingText] = useState("");
+  const [streamingThinking, setStreamingThinking] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [interrupted, setInterrupted] = useState(false);
   const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>([]);
@@ -190,10 +191,13 @@ export default function ChatPage() {
             };
             setStageKey(sk);
             setStage(t(message_key, message_params as Record<string, string>));
+          } else if (event === "thinking") {
+            setStreamingThinking((prev) => prev + (data as { text: string }).text);
           } else if (event === "token") {
             setStreamingText((prev) => prev + (data as { text: string }).text);
           } else if (event === "done") {
             setStreamingText("");
+            setStreamingThinking("");
             const d = data as DonePayload;
             setConversationId(d.conversation_id);
             setTurns((t) => [
@@ -216,6 +220,7 @@ export default function ChatPage() {
       setStage(null);
       setStageKey(null);
       setStreamingText("");
+      setStreamingThinking("");
       abortRef.current = null;
     }
   }
@@ -334,13 +339,23 @@ export default function ChatPage() {
                 onResend={interrupted && !busy && t.role === "user" && i === turns.length - 1 ? () => sendMessage(t.content) : undefined}
               />
             ))}
-{busy && streamingText ? (
+{busy && (streamingThinking || streamingText) ? (
               <div className="flex gap-3">
                 <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-gray-200 bg-white text-xs font-semibold text-gray-700 shadow-sm">
                   AI
                 </div>
-                <div className="max-w-[75%] rounded-2xl rounded-tl-sm border border-gray-200 bg-white px-4 py-3 text-sm leading-relaxed text-gray-900 shadow-sm">
-                  <Markdown content={streamingText} />
+                <div className="max-w-[75%] space-y-2">
+                  {streamingThinking && (
+                    <div className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-2">
+                      <p className="mb-1 text-xs font-medium text-gray-400">{t("thinking_label")}</p>
+                      <p className="whitespace-pre-wrap text-xs leading-relaxed text-gray-500">{streamingThinking}</p>
+                    </div>
+                  )}
+                  {streamingText && (
+                    <div className="rounded-2xl rounded-tl-sm border border-gray-200 bg-white px-4 py-3 text-sm leading-relaxed text-gray-900 shadow-sm">
+                      <Markdown content={streamingText} />
+                    </div>
+                  )}
                 </div>
               </div>
             ) : busy ? (

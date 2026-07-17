@@ -105,7 +105,8 @@
     "stage_fetching": "{count}개의 문서 원문을 가져오는 중…",
     "stage_thinking_phase2": "Agent가 답변을 구성하고 있습니다…",
     "stage_done": "완료",
-    "stage_no_docs": "이 스페이스에 문서가 없습니다"
+    "stage_no_docs": "이 스페이스에 문서가 없습니다",
+    "thinking_label": "AI 사고 중…"
   },
   "messageBubble": {
     "me": "나",

@@ -24,6 +24,7 @@ from app.schemas.chat import (
 from app.services.answer_service import (
     AnswerResult,
     Stage,
+    ThinkingChunk,
     TokenChunk,
     answer_question,
     answer_question_streamed,
@@ -161,6 +162,8 @@ async def chat_stream(
                     "message_key": item.message_key,
                     "message_params": item.message_params,
                 })
+            elif isinstance(item, ThinkingChunk):
+                yield sse("thinking", {"text": item.text})
             elif isinstance(item, TokenChunk):
                 yield sse("token", {"text": item.text})
             elif isinstance(item, AnswerResult):
