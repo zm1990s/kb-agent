@@ -31,9 +31,9 @@ KB-Agent 是一个团队知识平台。管理员将文档上传至平台后，AI
 >
 > 如果提示「该邮箱域名不在允许范围内」，说明你的邮箱域名尚未加入白名单，请联系管理员添加。
 
-<img src="./images/register1.png" alt="register1" style="zoom:50%;" />
+<img src="./Images/register1.png" alt="register1" style="zoom:50%;" />
 
-<img src="./images/register2.png" alt="register2" style="zoom:50%;" />
+<img src="./Images/register2.png" alt="register2" style="zoom:50%;" />
 
 ### 1.2 登录
 
@@ -48,7 +48,7 @@ KB-Agent 是一个团队知识平台。管理员将文档上传至平台后，AI
 
 > 每个邮箱每分钟只能发送一次验证码；连续 5 次输入错误验证码后需重新发送。
 
-<img src="./images/register3.png" alt="register3" style="zoom:50%;" />
+<img src="./Images/register3.png" alt="register3" style="zoom:50%;" />
 
 ---
 
@@ -65,7 +65,7 @@ KB-Agent 是一个团队知识平台。管理员将文档上传至平台后，AI
 
 右上角可以切换界面语言和进入账户设置。
 
-<img src="./images/ui1.png" alt="ui1" style="zoom:50%;" />
+<img src="./Images/ui1.png" alt="ui1" style="zoom:50%;" />
 
 ---
 
@@ -90,7 +90,7 @@ AI 回答由两部分组成：
 
 **来源文档**：答案下方会列出 AI 参考的文档，每个来源显示文档标题。点击「下载」可以获取原始文件。
 
-<img src="./images/ui2.png" alt="ui2" style="zoom:50%;" />
+<img src="./Images/ui2.png" alt="ui2" style="zoom:50%;" />
 
 
 
@@ -103,7 +103,7 @@ AI 回答由两部分组成：
 1. 页面顶部选择空间。
 2. 左侧「目录树」显示该空间的文件夹结构，点击文件夹展开/折叠，点击文件夹名称过滤右侧列表。
 
-<img src="./images/ui3.png" alt="ui3" style="zoom:50%;" />
+<img src="./Images/ui3.png" alt="ui3" style="zoom:50%;" />
 
 ### 4.2 预览及下载文档
 
@@ -129,7 +129,7 @@ AI 回答由两部分组成：
 
 报告按时间倒序排列，最新的报告在最上方。
 
-<img src="./images/ui4.png" alt="ui4" style="zoom:50%;" />
+<img src="./Images/ui4.png" alt="ui4" style="zoom:50%;" />
 
 ### 5.2 订阅邮件推送
 
@@ -145,7 +145,7 @@ AI 回答由两部分组成：
 
 订阅生效后，系统将按你选择的频率把更新摘要发送到你的注册邮箱。
 
-<img src="./images/ui5.png" alt="ui5" style="zoom:50%;" />
+<img src="./Images/ui5.png" alt="ui5" style="zoom:50%;" />
 
 ### 5.3 取消订阅
 
