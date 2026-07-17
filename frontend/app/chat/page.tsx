@@ -22,6 +22,7 @@ interface Turn {
   content: string;
   sources?: SourceRef[];
   error_key?: string;
+  thinking?: string;
 }
 
 interface DonePayload {
@@ -197,12 +198,13 @@ export default function ChatPage() {
             setStreamingText((prev) => prev + (data as { text: string }).text);
           } else if (event === "done") {
             setStreamingText("");
+            const savedThinking = streamingThinking || undefined;
             setStreamingThinking("");
             const d = data as DonePayload;
             setConversationId(d.conversation_id);
             setTurns((t) => [
               ...t,
-              { role: "assistant", content: d.answer, sources: d.sources, error_key: d.error_key },
+              { role: "assistant", content: d.answer, sources: d.sources, error_key: d.error_key, thinking: savedThinking },
             ]);
           }
         },
@@ -327,17 +329,28 @@ export default function ChatPage() {
                 )}
               </div>
             )}
-            {turns.map((t, i) => (
-              <MessageBubble
-                key={i}
-                role={t.role}
-                content={t.content}
-                sources={t.sources}
-                errorKey={t.error_key}
-                onDownload={download}
-                onEdit={t.role === "user" && !busy ? (newContent) => handleEdit(i, newContent) : undefined}
-                onResend={interrupted && !busy && t.role === "user" && i === turns.length - 1 ? () => sendMessage(t.content) : undefined}
-              />
+            {turns.map((turn, i) => (
+              <div key={i}>
+                {turn.role === "assistant" && turn.thinking && (
+                  <details className="mb-1 ml-11">
+                    <summary className="cursor-pointer select-none text-xs text-gray-400 hover:text-gray-600">
+                      {t("thinking_label")}
+                    </summary>
+                    <div className="mt-1 rounded-xl border border-gray-100 bg-gray-50 px-3 py-2">
+                      <p className="whitespace-pre-wrap text-xs leading-relaxed text-gray-500">{turn.thinking}</p>
+                    </div>
+                  </details>
+                )}
+                <MessageBubble
+                  role={turn.role}
+                  content={turn.content}
+                  sources={turn.sources}
+                  errorKey={turn.error_key}
+                  onDownload={download}
+                  onEdit={turn.role === "user" && !busy ? (newContent) => handleEdit(i, newContent) : undefined}
+                  onResend={interrupted && !busy && turn.role === "user" && i === turns.length - 1 ? () => sendMessage(turn.content) : undefined}
+                />
+              </div>
             ))}
 {busy && (streamingThinking || streamingText) ? (
               <div className="flex gap-3">
