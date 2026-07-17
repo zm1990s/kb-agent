@@ -20,6 +20,7 @@ from app.models.auth import AllowedDomain, User
 logger = logging.getLogger(__name__)
 
 _VERIFICATION_TOKEN_EXPIRE_HOURS = 24
+_VERIFICATION_PIN_EXPIRE_MINUTES = 10
 _MAX_LOGIN_ATTEMPTS = 5
 _LOCKOUT_DURATION_MINUTES = 15
 
@@ -200,18 +201,16 @@ async def register_user(
     if await get_user_by_email(session, email) is not None:
         raise EmailExistsError(email)
 
-    from app.services.settings_service import (
-        get_require_email_verification,
-        get_site_base_url,
-    )
+    from app.services.settings_service import get_require_email_verification
     require_verification = await get_require_email_verification(session)
 
     token: str | None = None
     token_exp: datetime | None = None
     email_verified = True
     if require_verification:
-        token = secrets.token_urlsafe(32)
-        token_exp = datetime.now(UTC) + timedelta(hours=_VERIFICATION_TOKEN_EXPIRE_HOURS)
+        # 使用 6 位数字 PIN（10 分钟有效），代替链接方式，避免邮件系统拦截含链接的验证邮件
+        token = f"{secrets.randbelow(1_000_000):06d}"
+        token_exp = datetime.now(UTC) + timedelta(minutes=_VERIFICATION_PIN_EXPIRE_MINUTES)
         email_verified = False
 
     user = User(
@@ -237,11 +236,9 @@ async def register_user(
     await sync_user_groups(session, user=user)
 
     if require_verification and token:
-        site_url = await get_site_base_url(session)
-        verify_url = f"{site_url}/verify-email?token={token}"
-        from app.services.email_service import send_verification_email
-        await send_verification_email(email, verify_url)
-        logger.info("register: 验证邮件已发送 email=%s", email)
+        from app.services.email_service import send_verification_pin
+        await send_verification_pin(email, token)
+        logger.info("register: 验证 PIN 已发送 email=%s", email)
 
     return user, require_verification
 
@@ -261,6 +258,25 @@ async def verify_email_token(session: AsyncSession, *, token: str) -> bool:
     user.verification_token_exp = None
     await session.commit()
     logger.info("verify_email: 邮箱验证成功 user_id=%s", user.id)
+    return True
+
+
+async def verify_email_pin(session: AsyncSession, *, email: str, pin: str) -> bool:
+    """用 6 位 PIN 完成邮箱验证。PIN 无效、过期或邮箱不匹配返回 False，成功返回 True。"""
+    user = await get_user_by_email(session, email)
+    if user is None:
+        return False
+    if user.email_verified:
+        return True
+    if user.verification_token is None or user.verification_token != pin:
+        return False
+    if user.verification_token_exp is None or user.verification_token_exp < datetime.now(UTC):
+        return False
+    user.email_verified = True
+    user.verification_token = None
+    user.verification_token_exp = None
+    await session.commit()
+    logger.info("verify_email_pin: 邮箱验证成功 user_id=%s", user.id)
     return True
 
 

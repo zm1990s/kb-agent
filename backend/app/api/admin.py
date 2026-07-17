@@ -94,6 +94,25 @@ async def set_role(
     return user
 
 
+@router.patch("/users/{user_id}/verify-email", response_model=UserAdminView)
+async def set_email_verified(
+    user_id: uuid.UUID,
+    current_admin: User = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+):
+    """管理员手动将用户标记为邮箱已验证。"""
+    user = await session.get(User, user_id)
+    if user is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "用户不存在")
+    user.email_verified = True
+    user.verification_token = None
+    user.verification_token_exp = None
+    await session.commit()
+    await session.refresh(user)
+    logger.info("audit admin set_email_verified admin=%s target=%s", current_admin.id, user_id)
+    return user
+
+
 @router.post("/users/{user_id}/reset-password", status_code=status.HTTP_204_NO_CONTENT)
 async def reset_password(
     user_id: uuid.UUID,

@@ -540,6 +540,18 @@ async def update_email_verification_config(
             "audit admin set_require_email_verification admin=%s enabled=%s",
             admin.id, body.require_email_verification,
         )
+        if body.require_email_verification:
+            # 开启验证时，将历史存量未验证用户全部标记为已验证（豁免），
+            # 避免他们在重新开启后被拦住登录
+            from sqlalchemy import update as sa_update  # noqa: I001
+            from app.models.auth import User as UserModel
+            await session.execute(
+                sa_update(UserModel)
+                .where(UserModel.email_verified == False)  # noqa: E712
+                .values(email_verified=True)
+            )
+            await session.commit()
+            logger.info("audit admin email_verification_grandfathered admin=%s", admin.id)
     if body.site_base_url is not None:
         await set_site_base_url(session, body.site_base_url)
     return EmailVerificationOut(

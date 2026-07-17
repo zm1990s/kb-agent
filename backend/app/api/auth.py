@@ -4,6 +4,7 @@ import logging
 import uuid
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import SessionLocal, get_session
@@ -38,6 +39,7 @@ from app.services.user_service import (
     remove_allowed_domain,
     request_password_reset,
     reset_password_with_code,
+    verify_email_pin,
     verify_email_token,
 )
 
@@ -79,12 +81,32 @@ async def verify_email(
     token: str,
     session: AsyncSession = Depends(get_session),
 ) -> dict:
-    """验证邮箱 token；无效或过期返回 400。"""
+    """验证邮箱 token（旧链接方式，保持兼容）；无效或过期返回 400。"""
     ok = await verify_email_token(session, token=token)
     if not ok:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="验证链接无效或已过期",
+        )
+    return {"message": "ok"}
+
+
+class VerifyPinRequest(BaseModel):
+    email: EmailStr
+    pin: str = Field(min_length=6, max_length=6)
+
+
+@router.post("/verify-email-pin", status_code=status.HTTP_200_OK)
+async def verify_email_by_pin(
+    body: VerifyPinRequest,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """用 6 位 PIN 完成邮箱验证；无效或过期返回 400。"""
+    ok = await verify_email_pin(session, email=body.email, pin=body.pin)
+    if not ok:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="invalid_or_expired",
         )
     return {"message": "ok"}
 

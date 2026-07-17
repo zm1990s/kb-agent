@@ -10,6 +10,7 @@ interface UserRow {
   email: string;
   role: string;
   is_active: boolean;
+  email_verified: boolean;
   created_at: string;
 }
 interface Group {
@@ -138,9 +139,13 @@ function UsersTab({
                 </select>
               </td>
               <td className="px-4 py-2">
-                <span className={u.is_active ? "text-green-700" : "text-gray-400"}>
-                  {u.is_active ? t("user_active") : t("user_inactive")}
-                </span>
+                {!u.is_active ? (
+                  <span className="text-gray-400">{t("user_inactive")}</span>
+                ) : !u.email_verified ? (
+                  <span className="text-yellow-600">{t("user_unverified")}</span>
+                ) : (
+                  <span className="text-green-700">{t("user_active")}</span>
+                )}
               </td>
               <td className="whitespace-nowrap px-4 py-2">
                 <button
@@ -153,6 +158,14 @@ function UsersTab({
                 >
                   {u.is_active ? t("user_disable") : t("user_enable")}
                 </button>
+                {u.is_active && !u.email_verified && (
+                  <button
+                    onClick={() => act(() => api.patch(`/admin/users/${u.id}/verify-email`, {}))}
+                    className="mr-1 rounded bg-yellow-50 px-2 py-1 text-xs text-yellow-700 hover:bg-yellow-100"
+                  >
+                    {t("user_mark_verified")}
+                  </button>
+                )}
                 <button
                   onClick={async () => {
                     const pw = await showPrompt(t("user_reset_password_prompt"));

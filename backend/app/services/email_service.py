@@ -153,6 +153,57 @@ def _build_plaintext(reports: list[dict]) -> str:
     return "\n".join(lines)
 
 
+async def send_verification_pin(to_email: str, pin: str) -> None:
+    """发送邮箱验证 PIN 邮件（6 位数字，10 分钟有效）。SMTP_HOST 未配置时记录警告并跳过。"""
+    cfg = get_settings()
+    if not cfg.smtp_host:
+        logger.warning("email_service: SMTP_HOST 未配置，跳过发送验证 PIN to=%s", to_email)
+        return
+
+    plain = (
+        f"您的邮箱验证码为：{pin}\n\n"
+        "验证码 10 分钟内有效，请勿转发给他人。\n\n"
+        "如非本人操作，请忽略此邮件。"
+    )
+    html_body = (
+        f"<html><body style='max-width:480px;margin:0 auto;padding:24px;{_STYLE}'>"
+        "<h2 style='color:#1d4ed8;margin-bottom:4px'>邮箱验证</h2>"
+        "<hr style='border:none;border-top:1px solid #e5e7eb;margin-bottom:20px'>"
+        "<p>感谢注册！请使用以下验证码完成邮箱验证（<strong>10 分钟内有效</strong>）：</p>"
+        "<p style='font-size:36px;font-weight:700;letter-spacing:0.3em;"
+        "color:#1d4ed8;margin:24px 0;text-align:center'>"
+        f"{html.escape(pin)}</p>"
+        "<p style='font-size:12px;color:#6b7280'>请勿将验证码转发给任何人。</p>"
+        "<p style='font-size:12px;color:#9ca3af;margin-top:32px;border-top:1px solid #e5e7eb;"
+        "padding-top:12px'>如非本人操作，请忽略此邮件，您的账号仍然安全。</p>"
+        "</body></html>"
+    )
+
+    try:
+        import aiosmtplib
+
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = Header("您的邮箱验证码", "utf-8").encode()
+        raw_from = cfg.smtp_from or cfg.smtp_user or ""
+        name, addr = parseaddr(raw_from)
+        msg["From"] = formataddr((str(Header(name, "utf-8")) if name else "", addr))
+        msg["To"] = to_email
+        msg.attach(MIMEText(plain, "plain", "utf-8"))
+        msg.attach(MIMEText(html_body, "html", "utf-8"))
+
+        await aiosmtplib.send(
+            msg,
+            hostname=cfg.smtp_host,
+            port=cfg.smtp_port,
+            username=cfg.smtp_user or None,
+            password=cfg.smtp_password or None,
+            start_tls=cfg.smtp_tls,
+        )
+        logger.info("email_service: 已发送验证 PIN 邮件 to=%s", to_email)
+    except Exception:
+        logger.exception("email_service: 验证 PIN 邮件发送失败 to=%s", to_email)
+
+
 async def send_verification_email(to_email: str, verify_url: str) -> None:
     """发送邮箱验证邮件。SMTP_HOST 未配置时记录警告并跳过。"""
     cfg = get_settings()

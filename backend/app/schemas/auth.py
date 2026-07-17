@@ -56,6 +56,8 @@ class UserPublic(BaseModel):
     id: uuid.UUID
     email: EmailStr
     role: str
+    is_active: bool = True
+    email_verified: bool = True
     created_at: datetime
 
 

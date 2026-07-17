@@ -18,15 +18,15 @@ interface RegisterResponse {
 export default function LoginPage() {
   const router = useRouter();
   const t = useTranslations("login");
-  const [mode, setMode] = useState<"login" | "register" | "forgot" | "reset">("login");
+  const [mode, setMode] = useState<"login" | "register" | "forgot" | "reset" | "verify-pin">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [resetCode, setResetCode] = useState("");
   const [resetNewPassword, setResetNewPassword] = useState("");
+  const [verifyPin, setVerifyPin] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [pendingVerification, setPendingVerification] = useState(false);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -37,7 +37,7 @@ export default function LoginPage() {
       if (mode === "register") {
         const reg = await api.post<RegisterResponse>("/auth/register", { email, password });
         if (reg.email_verification_pending) {
-          setPendingVerification(true);
+          setMode("verify-pin");
           setBusy(false);
           return;
         }
@@ -111,32 +111,31 @@ export default function LoginPage() {
     }
   }
 
-  function switchMode(next: "login" | "register" | "forgot" | "reset") {
+  async function onVerifyPin(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setBusy(true);
+    try {
+      await api.post("/auth/verify-email-pin", { email, pin: verifyPin });
+      // 验证成功，自动登录
+      const tok = await api.post<TokenResponse>("/auth/login", { email, password });
+      setAuth(tok.access_token, tok.role, email);
+      router.replace("/chat");
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 400) {
+        setError(t("err_pin_invalid"));
+      } else {
+        setError(t("err_pin_invalid"));
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function switchMode(next: "login" | "register" | "forgot" | "reset" | "verify-pin") {
     setMode(next);
     setError(null);
     setInfo(null);
-  }
-
-  if (pendingVerification) {
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-gray-50 p-6">
-        <div className="w-full max-w-sm rounded-xl border border-gray-200 bg-white p-8 shadow-sm text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-blue-50 text-blue-600">
-            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
-            </svg>
-          </div>
-          <h2 className="mb-2 text-lg font-semibold text-gray-900">{t("pending_verification_title")}</h2>
-          <p className="mb-6 text-sm text-gray-500">{t("pending_verification_desc", { email })}</p>
-          <button
-            onClick={() => { setPendingVerification(false); switchMode("login"); }}
-            className="w-full rounded-lg border border-gray-300 py-2 text-sm text-gray-700 hover:bg-gray-50"
-          >
-            {t("switch_to_login")}
-          </button>
-        </div>
-      </main>
-    );
   }
 
   return (
@@ -157,6 +156,8 @@ export default function LoginPage() {
               ? t("subtitle_register")
               : mode === "forgot"
               ? t("forgot_title")
+              : mode === "verify-pin"
+              ? t("verify_pin_title")
               : t("reset_title")}
           </p>
         </div>
@@ -216,6 +217,39 @@ export default function LoginPage() {
                   </button>
                 </p>
               )}
+            </form>
+          )}
+
+          {/* ── 邮箱 PIN 验证 ── */}
+          {mode === "verify-pin" && (
+            <form onSubmit={onVerifyPin} className="space-y-4">
+              <p className="text-sm text-gray-500">{t("verify_pin_desc", { email })}</p>
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-gray-700">{t("verify_pin_label")}</label>
+                <input
+                  type="text"
+                  required
+                  maxLength={6}
+                  minLength={6}
+                  autoFocus
+                  value={verifyPin}
+                  onChange={(e) => setVerifyPin(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all tracking-widest text-center text-lg"
+                  placeholder="000000"
+                />
+              </div>
+              {error && (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                  {error}
+                </div>
+              )}
+              <button
+                type="submit"
+                disabled={busy || verifyPin.length !== 6}
+                className="w-full rounded-lg bg-blue-600 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              >
+                {busy ? t("processing") : t("verify_pin_submit")}
+              </button>
             </form>
           )}
 
@@ -326,7 +360,7 @@ export default function LoginPage() {
                 {mode === "login" ? t("switch_to_register") : t("switch_to_login")}
               </button>
             )}
-            {(mode === "forgot" || mode === "reset") && (
+            {(mode === "forgot" || mode === "reset" || mode === "verify-pin") && (
               <button
                 onClick={() => switchMode("login")}
                 className="w-full text-center text-sm text-blue-600 hover:text-blue-700 hover:underline transition-colors"
