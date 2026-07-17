@@ -8,17 +8,16 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
-from app.engine.base import get_engine
-from app.engine.claude_cli import EngineError
+from app.engine.base import EngineError, get_chat_engine
 from app.models.auth import Workspace
 from app.models.document import Category, Document
 from app.models.whatsnew import WhatsNewReport
 from app.services.settings_service import (
     MODEL_WHATSNEW_KEY,
+    TASK_HEADERS_WHATSNEW_KEY,
     WHATSNEW_PROMPT_KEY,
-    get_engine_backend,
     get_prompt,
-    get_task_model,
+    get_task_headers,
 )
 from app.services.workspace_service import list_my_workspaces
 from app.storage.base import get_storage
@@ -83,8 +82,11 @@ async def generate_for_workspace(
         timestamp=timestamp,
     )
 
-    backend = await get_engine_backend(session)
-    engine = get_engine(backend, model=await get_task_model(session, MODEL_WHATSNEW_KEY))
+    engine = await get_chat_engine(
+        session,
+        extra_headers=await get_task_headers(session, TASK_HEADERS_WHATSNEW_KEY),
+        model_key=MODEL_WHATSNEW_KEY,
+    )
     try:
         result = await engine.complete(prompt)
     except EngineError as exc:

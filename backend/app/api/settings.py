@@ -17,10 +17,10 @@ from app.services.settings_service import (
     MODEL_TITLE_KEY,
     MODEL_WHATSNEW_KEY,
     PROMPT_CATALOG,
-    TASK_HEADERS_CHAT_ANSWER_KEY,
-    TASK_HEADERS_CHAT_ROUTE_KEY,
+    TASK_HEADERS_CHAT_KEY,
     TASK_HEADERS_CLASSIFY_KEY,
     TASK_HEADERS_TITLE_KEY,
+    TASK_HEADERS_WHATSNEW_KEY,
     WHATSNEW_FREQ_DAYS,
     EngineNotAvailableError,
     InvalidPromptError,
@@ -616,18 +616,18 @@ async def update_chat_engine_config(
 # ── 任务级请求 Headers ────────────────────────────────────────────────────────
 
 _TASK_KEY_MAP = {
-    "classify":    TASK_HEADERS_CLASSIFY_KEY,
-    "title":       TASK_HEADERS_TITLE_KEY,
-    "chat_route":  TASK_HEADERS_CHAT_ROUTE_KEY,
-    "chat_answer": TASK_HEADERS_CHAT_ANSWER_KEY,
+    "classify": TASK_HEADERS_CLASSIFY_KEY,
+    "title":    TASK_HEADERS_TITLE_KEY,
+    "chat":     TASK_HEADERS_CHAT_KEY,
+    "whatsnew": TASK_HEADERS_WHATSNEW_KEY,
 }
 
 
 class TaskHeadersOut(BaseModel):
-    classify:    dict[str, str]
-    title:       dict[str, str]
-    chat_route:  dict[str, str]
-    chat_answer: dict[str, str]
+    classify: dict[str, str]
+    title:    dict[str, str]
+    chat:     dict[str, str]
+    whatsnew: dict[str, str]
 
 
 class TaskHeadersUpdateIn(BaseModel):
@@ -642,8 +642,8 @@ async def get_task_headers_config(
     return TaskHeadersOut(
         classify=await get_task_headers(session, TASK_HEADERS_CLASSIFY_KEY),
         title=await get_task_headers(session, TASK_HEADERS_TITLE_KEY),
-        chat_route=await get_task_headers(session, TASK_HEADERS_CHAT_ROUTE_KEY),
-        chat_answer=await get_task_headers(session, TASK_HEADERS_CHAT_ANSWER_KEY),
+        chat=await get_task_headers(session, TASK_HEADERS_CHAT_KEY),
+        whatsnew=await get_task_headers(session, TASK_HEADERS_WHATSNEW_KEY),
     )
 
 
@@ -667,6 +667,6 @@ async def update_task_headers(
     return TaskHeadersOut(
         classify=await get_task_headers(session, TASK_HEADERS_CLASSIFY_KEY),
         title=await get_task_headers(session, TASK_HEADERS_TITLE_KEY),
-        chat_route=await get_task_headers(session, TASK_HEADERS_CHAT_ROUTE_KEY),
-        chat_answer=await get_task_headers(session, TASK_HEADERS_CHAT_ANSWER_KEY),
+        chat=await get_task_headers(session, TASK_HEADERS_CHAT_KEY),
+        whatsnew=await get_task_headers(session, TASK_HEADERS_WHATSNEW_KEY),
     )

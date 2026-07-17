@@ -468,23 +468,23 @@ async def set_openai_model(session: AsyncSession, model: str) -> None:
 
 # ── 任务级请求 Headers ────────────────────────────────────────────────────────
 
-TASK_HEADERS_CLASSIFY_KEY   = "task_headers::classify"
-TASK_HEADERS_TITLE_KEY      = "task_headers::title"
-TASK_HEADERS_CHAT_ROUTE_KEY = "task_headers::chat_route"
-TASK_HEADERS_CHAT_ANSWER_KEY = "task_headers::chat_answer"
+TASK_HEADERS_CLASSIFY_KEY  = "task_headers::classify"
+TASK_HEADERS_TITLE_KEY     = "task_headers::title"
+TASK_HEADERS_CHAT_KEY      = "task_headers::chat"
+TASK_HEADERS_WHATSNEW_KEY  = "task_headers::whatsnew"
 
 _TASK_HEADERS_DEFAULTS: dict[str, str] = {
-    TASK_HEADERS_CLASSIFY_KEY:    '{"x-task": "classify"}',
-    TASK_HEADERS_TITLE_KEY:       '{"x-task": "title"}',
-    TASK_HEADERS_CHAT_ROUTE_KEY:  '{"x-task": "chat_route"}',
-    TASK_HEADERS_CHAT_ANSWER_KEY: '{"x-task": "chat_answer"}',
+    TASK_HEADERS_CLASSIFY_KEY: '{"x-portkey-metadata": "{\"x-task\": \"classify\"}"}',
+    TASK_HEADERS_TITLE_KEY:    '{"x-portkey-metadata": "{\"x-task\": \"title\"}"}',
+    TASK_HEADERS_CHAT_KEY:     '{"x-portkey-metadata": "{\"x-task\": \"chat\"}"}',
+    TASK_HEADERS_WHATSNEW_KEY: '{"x-portkey-metadata": "{\"x-task\": \"whatsnew\"}"}',
 }
 
 ALL_TASK_HEADER_KEYS = [
     TASK_HEADERS_CLASSIFY_KEY,
     TASK_HEADERS_TITLE_KEY,
-    TASK_HEADERS_CHAT_ROUTE_KEY,
-    TASK_HEADERS_CHAT_ANSWER_KEY,
+    TASK_HEADERS_CHAT_KEY,
+    TASK_HEADERS_WHATSNEW_KEY,
 ]
 
 

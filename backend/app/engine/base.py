@@ -62,11 +62,15 @@ def get_engine(backend: str | None = None, model: str | None = None) -> EnginePr
 
 
 async def get_chat_engine(
-    session, *, extra_headers: dict[str, str] | None = None
+    session,
+    *,
+    extra_headers: dict[str, str] | None = None,
+    model_key: str | None = None,
 ) -> "EngineProtocol":
     """对话引擎工厂：读 chat_engine_backend 配置，返回相应引擎实例。
 
     extra_headers 仅对 OpenAICompatEngine 生效（ClaudeCliEngine 静默忽略）。
+    model_key 指定从 app_settings 读取模型的 key，默认 MODEL_CHAT_KEY。
     文档归类请直接用 get_engine("claude_cli", model=...)，不要用此函数。
     """
     from app.services.settings_service import (
@@ -93,5 +97,5 @@ async def get_chat_engine(
         )
 
     # 默认 claude_cli（extra_headers 静默忽略）
-    model = await get_task_model(session, MODEL_CHAT_KEY)
+    model = await get_task_model(session, model_key or MODEL_CHAT_KEY)
     return get_engine("claude_cli", model=model)

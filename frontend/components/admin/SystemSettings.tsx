@@ -96,13 +96,13 @@ export default function SystemSettings({ perms }: Props) {
   });
   const [chatEngineMsg, setChatEngineMsg] = useState<string | null>(null);
 
-  type TaskHeadersConfig = Record<"classify" | "title" | "chat_route" | "chat_answer", Record<string, string>>;
-  const TASK_KEYS = ["classify", "title", "chat_route", "chat_answer"] as const;
+  type TaskHeadersConfig = Record<"classify" | "title" | "chat" | "whatsnew", Record<string, string>>;
+  const TASK_KEYS = ["classify", "title", "chat", "whatsnew"] as const;
   const [taskHeaders, setTaskHeaders] = useState<TaskHeadersConfig>({
-    classify: { "x-task": "classify" },
-    title: { "x-task": "title" },
-    chat_route: { "x-task": "chat_route" },
-    chat_answer: { "x-task": "chat_answer" },
+    classify: { "x-portkey-metadata": '{"x-task": "classify"}' },
+    title:    { "x-portkey-metadata": '{"x-task": "title"}' },
+    chat:     { "x-portkey-metadata": '{"x-task": "chat"}' },
+    whatsnew: { "x-portkey-metadata": '{"x-task": "whatsnew"}' },
   });
   const [taskHeadersMsg, setTaskHeadersMsg] = useState<string | null>(null);
 
