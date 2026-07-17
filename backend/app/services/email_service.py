@@ -12,6 +12,15 @@ from app.core.config import get_settings
 
 logger = logging.getLogger(__name__)
 
+
+def _smtp_tls_kwargs(port: int, smtp_tls: bool) -> dict:
+    """返回 aiosmtplib.send() 所需的 TLS 参数。
+    端口 465 → 隐式 TLS（use_tls=True），其余端口 → STARTTLS（start_tls=smtp_tls）。
+    """
+    if port == 465:
+        return {"use_tls": True}
+    return {"start_tls": smtp_tls}
+
 _STYLE = (
     "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;"
     "font-size:14px;line-height:1.6;color:#1f2937"
@@ -197,7 +206,7 @@ async def send_verification_pin(to_email: str, pin: str) -> None:
             port=cfg.smtp_port,
             username=cfg.smtp_user or None,
             password=cfg.smtp_password or None,
-            start_tls=cfg.smtp_tls,
+            **_smtp_tls_kwargs(cfg.smtp_port, cfg.smtp_tls),
         )
         logger.info("email_service: 已发送验证 PIN 邮件 to=%s", to_email)
     except Exception:
@@ -249,7 +258,7 @@ async def send_verification_email(to_email: str, verify_url: str) -> None:
             port=cfg.smtp_port,
             username=cfg.smtp_user or None,
             password=cfg.smtp_password or None,
-            start_tls=cfg.smtp_tls,
+            **_smtp_tls_kwargs(cfg.smtp_port, cfg.smtp_tls),
         )
         logger.info("email_service: 已发送验证邮件 to=%s", to_email)
     except Exception:
@@ -285,7 +294,7 @@ async def send_whatsnew_digest(to_email: str, reports: list[dict]) -> None:
             port=cfg.smtp_port,
             username=cfg.smtp_user or None,
             password=cfg.smtp_password or None,
-            start_tls=cfg.smtp_tls,
+            **_smtp_tls_kwargs(cfg.smtp_port, cfg.smtp_tls),
         )
         logger.info("email_service: 已发送新动态邮件 to=%s", to_email)
     except Exception:
@@ -336,7 +345,7 @@ async def send_reset_code_email(to_email: str, code: str) -> None:
             port=cfg.smtp_port,
             username=cfg.smtp_user or None,
             password=cfg.smtp_password or None,
-            start_tls=cfg.smtp_tls,
+            **_smtp_tls_kwargs(cfg.smtp_port, cfg.smtp_tls),
         )
         logger.info("email_service: 已发送重置码邮件 to=%s", to_email)
     except Exception:
