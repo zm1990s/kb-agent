@@ -68,7 +68,7 @@
     "verify_pin_desc": "6桁のコードを {email} に送信しました。10分以内に有効です。",
     "verify_pin_label": "確認コード（6桁）",
     "verify_pin_submit": "確認してログイン",
-    "err_pin_invalid": "コードが無効または期限切れです。再登録するか管理者にお問い合わせください。",
+    "err_pin_invalid": "コードが無効または期限切れです。再送信するか管理者にお問い合わせください。",
     "forgot_password_link": "パスワードをお忘れですか？",
     "forgot_title": "パスワードの再設定",
     "forgot_desc": "登録済みのメールアドレスを入力してください。6桁の確認コードをお送りします",
@@ -79,7 +79,11 @@
     "reset_new_password": "新しいパスワード",
     "reset_submit": "リセットを確認",
     "reset_success": "パスワードをリセットしました。新しいパスワードでログインしてください。",
-    "err_reset_invalid": "コードが無効または期限切れです。再送信してください。"
+    "err_reset_invalid": "コードが無効または期限切れです。再送信してください。",
+    "resend_pin_hint": "コードが届きませんでしたか？",
+    "resend_pin": "再送信",
+    "resend_pin_sent": "新しいコードを送信しました。メールをご確認ください。",
+    "err_resend_too_fast": "送信が頻繁すぎます。しばらくしてからお試しください。"
   },
   "chat": {
     "workspace_label": "ワークスペース：",

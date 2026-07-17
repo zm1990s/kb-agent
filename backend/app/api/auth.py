@@ -39,6 +39,7 @@ from app.services.user_service import (
     remove_allowed_domain,
     request_password_reset,
     reset_password_with_code,
+    resend_verification_pin,
     verify_email_pin,
     verify_email_token,
 )
@@ -108,6 +109,32 @@ async def verify_email_by_pin(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="invalid_or_expired",
         )
+    return {"message": "ok"}
+
+
+class ResendPinRequest(BaseModel):
+    email: EmailStr
+
+
+@router.post("/resend-verification-pin", status_code=status.HTTP_200_OK)
+async def resend_verification_pin_endpoint(
+    body: ResendPinRequest,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """为未验证用户重新发送 PIN 码（60 秒 rate limit）。
+    无论邮箱是否存在均返回 200，避免泄露用户存在性。
+    rate limit 触发时返回 429。
+    """
+    ok = await resend_verification_pin(session, email=body.email)
+    if ok is False:
+        # 区分"不存在/已验证"与"rate limit"：两者都静默，但 rate limit 给 429 供前端提示
+        from app.services.user_service import get_user_by_email  # noqa: PLC0415
+        user = await get_user_by_email(session, body.email)
+        if user is not None and not user.email_verified:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="resend_too_fast",
+            )
     return {"message": "ok"}
 
 

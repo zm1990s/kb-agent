@@ -68,7 +68,7 @@
     "verify_pin_desc": "6 位验证码已发送至 {email}，10 分钟内有效",
     "verify_pin_label": "验证码（6位）",
     "verify_pin_submit": "验证并登录",
-    "err_pin_invalid": "验证码无效或已过期，请重新注册或联系管理员",
+    "err_pin_invalid": "验证码无效或已过期，请重新发送或联系管理员",
     "forgot_password_link": "忘记密码？",
     "forgot_title": "找回密码",
     "forgot_desc": "输入注册邮箱，我们会发送 6 位验证码",
@@ -79,7 +79,11 @@
     "reset_new_password": "新密码",
     "reset_submit": "确认重置",
     "reset_success": "密码已重置，请使用新密码登录",
-    "err_reset_invalid": "验证码无效或已过期，请重新发送"
+    "err_reset_invalid": "验证码无效或已过期，请重新发送",
+    "resend_pin_hint": "没有收到验证码？",
+    "resend_pin": "重新发送",
+    "resend_pin_sent": "新验证码已发送，请查收邮件",
+    "err_resend_too_fast": "发送太频繁，请稍后再试"
   },
   "chat": {
     "workspace_label": "空间：",

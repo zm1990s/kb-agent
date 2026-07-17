@@ -261,6 +261,38 @@ async def verify_email_token(session: AsyncSession, *, token: str) -> bool:
     return True
 
 
+async def resend_verification_pin(session: AsyncSession, *, email: str) -> bool:
+    """为未验证用户重新生成并发送 PIN 码。
+    - 邮箱不存在或已验证：静默返回 False（不泄露用户存在性）
+    - rate limit：PIN 发出后 60 秒内拒绝再次请求，返回 False
+    - 成功：更新 token + exp，发邮件，返回 True
+    """
+    from app.services.email_service import send_verification_pin  # noqa: PLC0415
+
+    email = email.strip().lower()
+    user = await get_user_by_email(session, email)
+    if user is None or user.email_verified:
+        return False
+
+    now = datetime.now(UTC)
+    # rate limit：如果上次发出不足 60 秒（exp 还剩 9 分钟以上），拒绝
+    _RATE_LIMIT_SECONDS = 60
+    if (
+        user.verification_token_exp is not None
+        and user.verification_token_exp > now + timedelta(minutes=_VERIFICATION_PIN_EXPIRE_MINUTES - 1)
+    ):
+        return False  # 发出未满 60 秒
+
+    token = f"{secrets.randbelow(1_000_000):06d}"
+    user.verification_token = token
+    user.verification_token_exp = now + timedelta(minutes=_VERIFICATION_PIN_EXPIRE_MINUTES)
+    await session.commit()
+
+    await send_verification_pin(email, token)
+    logger.info("resend_verification_pin: PIN 重发 user_id=%s", user.id)
+    return True
+
+
 async def verify_email_pin(session: AsyncSession, *, email: str, pin: str) -> bool:
     """用 6 位 PIN 完成邮箱验证。PIN 无效、过期或邮箱不匹配返回 False，成功返回 True。"""
     user = await get_user_by_email(session, email)

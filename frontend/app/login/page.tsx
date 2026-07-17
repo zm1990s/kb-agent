@@ -51,8 +51,17 @@ export default function LoginPage() {
           const d = err.detail as { remaining_seconds?: number } | null;
           const minutes = Math.ceil((d?.remaining_seconds ?? 900) / 60);
           setError(t("err_account_locked", { minutes }));
-        } else if (err.status === 403 && err.message === "email_not_verified")
-          setError(t("err_email_not_verified"));
+        } else if (err.status === 403 && err.message === "email_not_verified") {
+          // 跳到 PIN 验证页，同时触发重发（用户可能首次 PIN 已过期）
+          setMode("verify-pin");
+          setBusy(false);
+          try {
+            await api.post("/auth/resend-verification-pin", { email });
+            setInfo(t("resend_pin_sent"));
+          } catch {
+            // rate limit 或其他，忽略——用户可手动点重发
+          }
+          return;
         else if (err.status === 403) setError(t("err_domain"));
         else if (err.status === 409) setError(t("err_duplicate"));
         else if (err.status === 401) setError(t("err_credentials"));
@@ -106,6 +115,21 @@ export default function LoginPage() {
       } else {
         setError(t("err_reset_invalid"));
       }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onResendPin() {
+    setError(null);
+    setInfo(null);
+    setBusy(true);
+    try {
+      await api.post("/auth/resend-verification-pin", { email });
+      setInfo(t("resend_pin_sent"));
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 429) setError(t("err_resend_too_fast"));
+      else setError(t("err_resend_too_fast"));
     } finally {
       setBusy(false);
     }
@@ -243,6 +267,11 @@ export default function LoginPage() {
                   {error}
                 </div>
               )}
+              {info && (
+                <div className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">
+                  {info}
+                </div>
+              )}
               <button
                 type="submit"
                 disabled={busy || verifyPin.length !== 6}
@@ -250,6 +279,17 @@ export default function LoginPage() {
               >
                 {busy ? t("processing") : t("verify_pin_submit")}
               </button>
+              <p className="text-center text-xs text-gray-500">
+                {t("resend_pin_hint")}{" "}
+                <button
+                  type="button"
+                  onClick={onResendPin}
+                  disabled={busy}
+                  className="font-medium text-blue-600 hover:underline disabled:opacity-50"
+                >
+                  {t("resend_pin")}
+                </button>
+              </p>
             </form>
           )}
 

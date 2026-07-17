@@ -68,7 +68,7 @@
     "verify_pin_desc": "6 位驗證碼已發送至 {email}，10 分鐘內有效",
     "verify_pin_label": "驗證碼（6位）",
     "verify_pin_submit": "驗證並登入",
-    "err_pin_invalid": "驗證碼無效或已過期，請重新註冊或聯絡管理員",
+    "err_pin_invalid": "驗證碼無效或已過期，請重新發送或聯絡管理員",
     "forgot_password_link": "忘記密碼？",
     "forgot_title": "找回密碼",
     "forgot_desc": "輸入註冊信箱，我們會發送 6 位驗證碼",
@@ -79,7 +79,11 @@
     "reset_new_password": "新密碼",
     "reset_submit": "確認重設",
     "reset_success": "密碼已重設，請使用新密碼登入",
-    "err_reset_invalid": "驗證碼無效或已過期，請重新發送"
+    "err_reset_invalid": "驗證碼無效或已過期，請重新發送",
+    "resend_pin_hint": "沒有收到驗證碼？",
+    "resend_pin": "重新發送",
+    "resend_pin_sent": "新驗證碼已發送，請查收信箱",
+    "err_resend_too_fast": "發送太頻繁，請稍後再試"
   },
   "chat": {
     "workspace_label": "空間：",

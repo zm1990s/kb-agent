@@ -68,7 +68,7 @@
     "verify_pin_desc": "A 6-digit code has been sent to {email}. Valid for 10 minutes.",
     "verify_pin_label": "Verification code (6 digits)",
     "verify_pin_submit": "Verify & sign in",
-    "err_pin_invalid": "Code is invalid or expired. Please re-register or contact an admin.",
+    "err_pin_invalid": "Code is invalid or expired. Please resend or contact an admin.",
     "forgot_password_link": "Forgot password?",
     "forgot_title": "Recover Password",
     "forgot_desc": "Enter your registered email and we'll send a 6-digit code",
@@ -79,7 +79,11 @@
     "reset_new_password": "New Password",
     "reset_submit": "Confirm Reset",
     "reset_success": "Password reset successfully. Please log in with your new password.",
-    "err_reset_invalid": "Code is invalid or expired. Please request a new one."
+    "err_reset_invalid": "Code is invalid or expired. Please request a new one.",
+    "resend_pin_hint": "Didn't receive the code?",
+    "resend_pin": "Resend",
+    "resend_pin_sent": "A new code has been sent. Please check your email.",
+    "err_resend_too_fast": "Too many requests. Please wait before trying again."
   },
   "chat": {
     "workspace_label": "Workspace:",
