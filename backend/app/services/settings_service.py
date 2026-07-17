@@ -473,11 +473,14 @@ TASK_HEADERS_TITLE_KEY     = "task_headers::title"
 TASK_HEADERS_CHAT_KEY      = "task_headers::chat"
 TASK_HEADERS_WHATSNEW_KEY  = "task_headers::whatsnew"
 
+def _make_portkey_default(task: str) -> str:
+    return json.dumps({"x-portkey-metadata": json.dumps({"x-task": task})})
+
 _TASK_HEADERS_DEFAULTS: dict[str, str] = {
-    TASK_HEADERS_CLASSIFY_KEY: '{"x-portkey-metadata": "{\"x-task\": \"classify\"}"}',
-    TASK_HEADERS_TITLE_KEY:    '{"x-portkey-metadata": "{\"x-task\": \"title\"}"}',
-    TASK_HEADERS_CHAT_KEY:     '{"x-portkey-metadata": "{\"x-task\": \"chat\"}"}',
-    TASK_HEADERS_WHATSNEW_KEY: '{"x-portkey-metadata": "{\"x-task\": \"whatsnew\"}"}',
+    TASK_HEADERS_CLASSIFY_KEY: _make_portkey_default("classify"),
+    TASK_HEADERS_TITLE_KEY:    _make_portkey_default("title"),
+    TASK_HEADERS_CHAT_KEY:     _make_portkey_default("chat"),
+    TASK_HEADERS_WHATSNEW_KEY: _make_portkey_default("whatsnew"),
 }
 
 ALL_TASK_HEADER_KEYS = [
