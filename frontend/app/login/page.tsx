@@ -62,7 +62,7 @@ export default function LoginPage() {
             // rate limit 或其他，忽略——用户可手动点重发
           }
           return;
-        else if (err.status === 403) setError(t("err_domain"));
+        } else if (err.status === 403) setError(t("err_domain"));
         else if (err.status === 409) setError(t("err_duplicate"));
         else if (err.status === 401) setError(t("err_credentials"));
         else setError(err.message);
