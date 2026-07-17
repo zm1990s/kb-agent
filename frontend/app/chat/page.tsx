@@ -214,8 +214,19 @@ export default function ChatPage() {
             setBusy(false);
             setStage(null);
             setStageKey(null);
-            // 侧边栏在后台静默刷新，不阻塞 UI
-            loadConversations();
+            // 新会话先加一条占位记录，等 title 事件到来再更新
+            setConversations((prev) => {
+              if (prev.some((c) => c.id === d.conversation_id)) return prev;
+              return [
+                { id: d.conversation_id, workspace_id: workspaceId ?? "", title: null, pinned: false, created_at: new Date().toISOString() },
+                ...prev,
+              ];
+            });
+          } else if (event === "title") {
+            const d = data as { conversation_id: string; title: string };
+            setConversations((prev) =>
+              prev.map((c) => (c.id === d.conversation_id ? { ...c, title: d.title } : c))
+            );
           }
         },
         ac.signal,

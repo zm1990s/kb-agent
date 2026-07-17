@@ -207,14 +207,16 @@ async def chat_stream(
                     "answer": final.answer,
                 },
             )
-        # 新会话：后台生成标题
+        # 新会话：生成标题，写入 DB 后推送 title 事件让前端直接更新侧边栏
         if is_new_conv:
             async with SessionLocal() as bg_session:
-                await generate_conversation_title(
+                title = await generate_conversation_title(
                     bg_session,
                     conversation_id=conv.id,
                     first_message=body.message,
                 )
+            if title:
+                yield sse("title", {"conversation_id": str(conv.id), "title": title})
 
     return StreamingResponse(
         gen(),

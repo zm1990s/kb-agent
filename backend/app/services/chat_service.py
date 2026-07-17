@@ -3,6 +3,7 @@
 隔离：会话归属 workspace + user；取会话时校验归属，跨空间/跨用户不可见。
 """
 
+import logging
 import uuid
 
 from fastapi import HTTPException, status
@@ -11,6 +12,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.auth import Workspace
 from app.models.chat import Conversation, Message
+
+logger = logging.getLogger(__name__)
 
 
 async def get_or_create_conversation(
@@ -170,8 +173,8 @@ async def generate_conversation_title(
     *,
     conversation_id: uuid.UUID,
     first_message: str,
-) -> None:
-    """用 LLM 为会话生成简短标题（后台任务，失败静默）。"""
+) -> str | None:
+    """用 LLM 为会话生成简短标题（失败静默，返回生成的标题或 None）。"""
     from app.engine.base import get_chat_engine
     from app.services.settings_service import (
         TASK_HEADERS_TITLE_KEY,
@@ -192,5 +195,7 @@ async def generate_conversation_title(
             if conv is not None and not conv.title:
                 conv.title = title
                 await session.commit()
+                return title
     except Exception:
-        pass  # 标题生成失败不影响对话
+        logger.exception("generate_conversation_title failed conversation=%s", conversation_id)
+    return None
