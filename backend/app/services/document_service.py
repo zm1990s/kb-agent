@@ -5,6 +5,7 @@
 """
 
 import uuid
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -85,7 +86,10 @@ async def list_documents(
     offset: int = 0,
 ) -> list[Document]:
     """列出空间内文档，可按分类/目录/标签过滤。强制 workspace 过滤（SECURITY #4）。"""
-    stmt = select(Document).where(Document.workspace_id == workspace_id)
+    stmt = select(Document).where(
+        Document.workspace_id == workspace_id,
+        Document.deleted_at.is_(None),
+    )
     if category_id is not None:
         stmt = stmt.where(Document.category_id == category_id)
     if folder_id is not None:
@@ -116,14 +120,57 @@ async def rename_document(session: AsyncSession, *, doc: Document, title: str) -
 
 
 async def delete_document(session: AsyncSession, *, doc: Document) -> None:
-    """删除文档：先提交 DB 删除，再删存储文件，避免文件删后 DB 回滚造成僵尸记录。"""
-    storage_key = doc.storage_key
-    await session.delete(doc)
+    """软删除：打上 deleted_at 时间戳，进入回收站；存储文件保留至清理任务执行。"""
+    doc.deleted_at = datetime.now(UTC)
     await session.commit()
-    try:
-        await get_storage().delete(storage_key)
-    except FileNotFoundError:
-        pass  # 原文已不在也不阻断删除
+
+
+async def restore_document(session: AsyncSession, *, doc: Document) -> None:
+    """从回收站恢复：清除 deleted_at。"""
+    doc.deleted_at = None
+    await session.commit()
+
+
+async def list_trashed_documents(
+    session: AsyncSession,
+    *,
+    workspace_id: uuid.UUID,
+    limit: int = 50,
+    offset: int = 0,
+) -> list[Document]:
+    """列出回收站中的文档（已软删除，按删除时间倒序）。"""
+    stmt = (
+        select(Document)
+        .where(
+            Document.workspace_id == workspace_id,
+            Document.deleted_at.is_not(None),
+        )
+        .order_by(Document.deleted_at.desc())
+        .limit(limit)
+        .offset(offset)
+    )
+    result = await session.execute(stmt)
+    return list(result.scalars().all())
+
+
+async def purge_expired_trash(
+    session: AsyncSession, *, retention_days: int = 30
+) -> int:
+    """物理删除超过保留期的回收站文档（DB 行 + 存储文件）。返回清理数量。"""
+    cutoff = datetime.now(UTC) - timedelta(days=retention_days)
+    stmt = select(Document).where(Document.deleted_at < cutoff)
+    docs = list((await session.execute(stmt)).scalars().all())
+    storage = get_storage()
+    for doc in docs:
+        key = doc.storage_key
+        await session.delete(doc)
+        await session.flush()
+        try:
+            await storage.delete(key)
+        except FileNotFoundError:
+            pass
+    await session.commit()
+    return len(docs)
 
 
 async def replace_document_content(

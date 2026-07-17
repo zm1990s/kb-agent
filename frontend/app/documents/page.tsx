@@ -60,6 +60,9 @@ export default function DocumentsPage() {
   const [query, setQuery] = useState("");
   // 点击标签快速过滤
   const [tagFilter, setTagFilter] = useState<string | null>(null);
+  // 回收站视图
+  const [showTrash, setShowTrash] = useState(false);
+  const [trashDocs, setTrashDocs] = useState<DocumentPublic[]>([]);
   // 自定义展示列
   const [cols, setCols] = useState<Record<string, boolean>>({
     folder: true,
@@ -70,6 +73,15 @@ export default function DocumentsPage() {
     summary: true,
     created: false,
   });
+
+  const loadTrash = useCallback(async () => {
+    if (!workspaceId) return;
+    try {
+      setTrashDocs(await api.get<DocumentPublic[]>(`/workspaces/${workspaceId}/trash`));
+    } catch {
+      setTrashDocs([]);
+    }
+  }, [workspaceId]);
 
   const loadFolders = useCallback(async () => {
     if (!workspaceId) return;
@@ -102,6 +114,7 @@ export default function DocumentsPage() {
 
   useEffect(() => {
     setActiveFolder(ALL);
+    setShowTrash(false);
     loadFolders();
   }, [workspaceId, loadFolders]);
 
@@ -295,7 +308,7 @@ export default function DocumentsPage() {
   }
 
   async function deleteDoc(doc: DocumentPublic) {
-    if (!await showConfirm(t("delete_confirm", { title: doc.title }))) return;
+    if (!await showConfirm(t("delete_to_trash_confirm", { title: doc.title }))) return;
     setError(null);
     try {
       await api.del(`/documents/${doc.id}`);
@@ -303,6 +316,23 @@ export default function DocumentsPage() {
     } catch (err) {
       setError(err instanceof ApiError ? err.message : t("load_failed"));
     }
+  }
+
+  async function restoreDoc(doc: DocumentPublic) {
+    setError(null);
+    try {
+      await api.post(`/documents/${doc.id}/restore`);
+      await loadTrash();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : t("load_failed"));
+    }
+  }
+
+  function daysUntilExpiry(deletedAt: string): number {
+    const deleted = new Date(deletedAt).getTime();
+    const now = Date.now();
+    const elapsed = Math.floor((now - deleted) / 86400000);
+    return Math.max(0, 30 - elapsed);
   }
 
   async function reprocessDoc(doc: DocumentPublic) {
@@ -437,11 +467,82 @@ export default function DocumentsPage() {
                 {t("drop_here")}
               </div>
             )}
+            {admin && (
+              <>
+                <div className="my-2 border-t" />
+                <button
+                  onClick={() => { setShowTrash(true); loadTrash(); }}
+                  className={`block w-full rounded px-3 py-2 text-left text-sm ${
+                    showTrash
+                      ? "bg-red-50 text-red-700"
+                      : "text-gray-500 hover:bg-gray-100"
+                  }`}
+                >
+                  🗑 {t("trash_title")}
+                </button>
+              </>
+            )}
           </div>
         </aside>
 
         <main className="flex-1 overflow-auto p-4">
-          {admin && (
+          {showTrash ? (
+            <div>
+              <div className="mb-4 flex items-center gap-3">
+                <button
+                  onClick={() => setShowTrash(false)}
+                  className="rounded border px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100"
+                >
+                  ← {t("all_docs")}
+                </button>
+                <h2 className="text-base font-semibold text-gray-700">🗑 {t("trash_title")}</h2>
+              </div>
+              {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
+              <div className="overflow-auto rounded border bg-white">
+                <table className="min-w-full text-sm">
+                  <thead className="bg-gray-50 text-left text-gray-500">
+                    <tr>
+                      <th className="px-4 py-2">{t("col_title")}</th>
+                      <th className="px-4 py-2">{t("col_status")}</th>
+                      <th className="px-4 py-2">{t("col_created")}</th>
+                      <th className="px-4 py-2">{t("col_actions")}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {trashDocs.length === 0 && (
+                      <tr>
+                        <td colSpan={4} className="px-4 py-6 text-center text-gray-400">
+                          {t("trash_empty")}
+                        </td>
+                      </tr>
+                    )}
+                    {trashDocs.map((d) => (
+                      <tr key={d.id} className="border-t align-top">
+                        <td className="px-4 py-2 font-medium">{d.title}</td>
+                        <td className="px-4 py-2 text-xs text-red-500">
+                          {d.deleted_at
+                            ? t("trash_expires_in", { days: daysUntilExpiry(d.deleted_at) })
+                            : "—"}
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-2 text-xs text-gray-500">
+                          {new Date(d.created_at).toLocaleDateString()}
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-2">
+                          <button
+                            onClick={() => restoreDoc(d)}
+                            className="rounded bg-green-100 px-2 py-1 text-xs text-green-700 hover:bg-green-200"
+                          >
+                            {t("action_restore")}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : null}
+          {!showTrash && admin && (
             <div className="mb-4 flex flex-wrap items-center gap-3 rounded border bg-white p-4">
               {/* 批量多文件 */}
               <input
@@ -484,7 +585,7 @@ export default function DocumentsPage() {
             </div>
           )}
 
-          {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
+          {!showTrash && error && <p className="mb-3 text-sm text-red-600">{error}</p>}
 
           {/* 隐藏的替换文件选择器 */}
           <input
@@ -494,6 +595,7 @@ export default function DocumentsPage() {
             onChange={onReplacePicked}
           />
 
+          {!showTrash && (<div>
           {/* 工具栏：搜索 + 自定义列 */}
           <div className="mb-3 flex flex-wrap items-center gap-3">
             <input
@@ -737,6 +839,7 @@ export default function DocumentsPage() {
               </tbody>
             </table>
           </div>
+          </div>)}
         </main>
       </div>
 

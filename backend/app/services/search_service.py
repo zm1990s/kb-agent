@@ -38,6 +38,7 @@ async def search_documents(
         .where(
             Document.workspace_id == workspace_id,
             Document.status == "ready",
+            Document.deleted_at.is_(None),
             Document.search_tsv.op("@@")(tsquery),
         )
         .order_by(rank.desc(), Document.created_at.desc())

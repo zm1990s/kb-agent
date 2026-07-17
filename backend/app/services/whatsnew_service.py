@@ -45,6 +45,7 @@ async def generate_for_workspace(
         .where(
             Document.workspace_id == workspace.id,
             Document.status == "ready",
+            Document.deleted_at.is_(None),
             Document.created_at >= period_start_naive,
         )
         .order_by(Document.created_at.desc())

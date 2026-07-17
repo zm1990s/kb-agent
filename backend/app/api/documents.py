@@ -36,9 +36,11 @@ from app.services.document_service import (
     delete_document,
     list_document_tasks,
     list_documents,
+    list_trashed_documents,
     move_document,
     rename_document,
     replace_document_content,
+    restore_document,
     upload_document,
 )
 from app.services.folder_service import get_folder_in_workspace
@@ -185,6 +187,47 @@ async def delete_doc(
     if current_user.role != "admin":
         raise HTTPException(status.HTTP_403_FORBIDDEN, "需要管理员权限")
     await delete_document(session, doc=doc)
+
+
+@router.get(
+    "/workspaces/{workspace_id}/trash", response_model=list[DocumentPublic]
+)
+async def list_trash(
+    workspace_id: uuid.UUID,
+    page: int = 1,
+    size: int = 50,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> list[DocumentPublic]:
+    """列出回收站文档（仅管理员）。"""
+    await _ensure_member(session, workspace_id, current_user)
+    if current_user.role != "admin":
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "需要管理员权限")
+    docs = await list_trashed_documents(
+        session,
+        workspace_id=workspace_id,
+        limit=size,
+        offset=(max(page, 1) - 1) * size,
+    )
+    return [DocumentPublic.model_validate(d) for d in docs]
+
+
+@router.post(
+    "/documents/{document_id}/restore",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def restore_doc(
+    document_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> None:
+    """从回收站恢复文档（仅管理员）。"""
+    doc = await _get_doc_for_member(session, document_id, current_user)
+    if current_user.role != "admin":
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "需要管理员权限")
+    if doc.deleted_at is None:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "文档不在回收站")
+    await restore_document(session, doc=doc)
 
 
 @router.patch("/documents/{document_id}/move", response_model=DocumentPublic)

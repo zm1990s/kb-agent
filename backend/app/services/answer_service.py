@@ -65,7 +65,11 @@ async def _load_index(
     stmt = (
         select(Document, Category.name)
         .outerjoin(Category, Category.id == Document.category_id)
-        .where(Document.workspace_id == workspace_id, Document.status == "ready")
+        .where(
+            Document.workspace_id == workspace_id,
+            Document.status == "ready",
+            Document.deleted_at.is_(None),
+        )
         .order_by(Document.created_at.desc())
         .limit(MAX_INDEX_DOCS + 1)
     )

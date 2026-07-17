@@ -45,6 +45,7 @@ class DocumentPublic(BaseModel):
     tags: list[str]
     status: str
     created_at: datetime
+    deleted_at: datetime | None = None
     content_text: str | None = None
 
 

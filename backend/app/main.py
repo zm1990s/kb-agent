@@ -21,6 +21,7 @@ from app.api import (
 from app.core.db import SessionLocal
 from app.core.logging_setup import configure_logging
 from app.services.user_service import seed_admin
+from app.tasks.trash_cleanup import start_trash_cleanup_loop
 from app.tasks.whatsnew_worker import start_mail_loop, start_whatsnew_loop
 
 _bg_tasks: set = set()
@@ -41,6 +42,10 @@ async def lifespan(_app: FastAPI):
     t2 = asyncio.create_task(start_mail_loop())
     _bg_tasks.add(t2)
     t2.add_done_callback(_bg_tasks.discard)
+    # 启动回收站清理任务
+    t3 = asyncio.create_task(start_trash_cleanup_loop())
+    _bg_tasks.add(t3)
+    t3.add_done_callback(_bg_tasks.discard)
     yield
 
 

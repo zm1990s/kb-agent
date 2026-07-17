@@ -45,6 +45,7 @@ export interface DocumentPublic {
   tags: string[];
   status: string;
   created_at: string;
+  deleted_at?: string | null;
   content_text: string | null;
 }
 
