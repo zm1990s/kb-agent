@@ -82,17 +82,17 @@ export default function ConversationSidebar({
 
   if (collapsed) {
     return (
-      <aside className="flex w-10 shrink-0 flex-col items-center border-r border-gray-200 bg-white py-2">
+      <div className="relative w-0 shrink-0">
         <button
           onClick={() => setCollapsed(false)}
           title={t("expand")}
-          className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+          className="absolute left-0 top-4 z-10 flex h-8 w-5 items-center justify-center rounded-r-lg border border-l-0 border-gray-200 bg-white text-gray-400 shadow-sm hover:bg-gray-50 hover:text-gray-600"
         >
-          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+          <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
           </svg>
         </button>
-      </aside>
+      </div>
     );
   }
 
