@@ -18,6 +18,11 @@
 | F17 | 国际化（i18n） | next-intl 客户端 i18n；5 语言（zh/zh-TW/en/ja/ko）；NavBar 切换器；localStorage 持久化；DialogProvider 替换 window.confirm/prompt | ✅ 已交付 |
 | F18 | 自助找回密码 | 邮箱 6 位验证码（10 分钟有效）；1 分钟发送限速；5 次错误锁定；uniform 响应防枚举；前端 forgot/reset 流程；migration 019 新增 4 列 | ✅ 已交付 |
 | F19 | 任务级 HTTP Header 配置 | 4 类 LLM 任务（归类/标题/对话路由/对话回答）各自可配 HTTP Header，供 Portkey 等网关路由；`task_headers::*` 持久化；OpenAI 兼容引擎透传，ClaudeCliEngine 静默忽略；系统设置 key-value 编辑器 UI | ✅ 已交付 |
+| F20 | Claude CLI 流式 thinking | SSE 流式输出 thinking 过程（event: thinking / token）；前端 ThinkingBubble 组件；thinking 持久化到 sessionStorage，刷新后可折叠查看 | ✅ 已交付 |
+| F21 | 系统设置 AI 引擎 tab | 引擎选择/按任务模型/按任务 Header 三块合并为独立 AI 引擎 tab；修复 workspace 404 返回 400 的问题 | ✅ 已交付 |
+| F22 | 文档回收站 | 删除改为软删除（`deleted_at`，migration 020）；后台 24h 清理循环（30 天保留期）；`GET /workspaces/{ws}/trash` + `POST /documents/{id}/restore` 端点；前端回收站视图（含剩余天数/恢复按钮）；所有检索/问答查询补 `deleted_at IS NULL` 过滤 | ✅ 已交付 |
+| F23 | 文档写权限开放给空间 owner/editor | `get_ws_role()` 解析有效角色（admin → owner；个人成员；组授权取最高）；`_require_ws_write()` 辅助替换全局 admin 校验；WorkspacePicker `onWorkspaceChange` 回调传出角色；前端按 `wsRole` 显隐写操作按钮 | ✅ 已交付 |
+| F24 | 会话标题实时推送 | `generate_conversation_title` 改为返回生成标题；写入 DB 后推 `title` SSE 事件；前端收到后直接更新侧边栏，消除竞态；聊天侧边栏折叠改为零宽度悬浮按钮 | ✅ 已交付 |
 | M4 | Skill 插拔框架 | SkillBase 抽象、registry、invoke、审批契约 | 预留（未实现） |
 | M5 | SCM 示范 skill | PANW 配置生成，pending_approval→approve→下发 | 预留（未实现） |
 
@@ -156,6 +161,7 @@
 - **Phase 6**：增强批次 F1–F11（拖拽/批量上传/全字段/用户管理/组/RBAC/空间组授权/分类迁移/体验优化/功能扩展/Agent 增强）✅
 - **Phase 6b**：收尾与生产部署 F12–F13（NavBar/管理入口/引导问题/角色合并/生产 Docker）✅
 - **Phase 6c**：功能完善 F14–F17（Next.js 16 升级、文档重命名、上传 200MB 限制、按任务模型配置、5 语言 i18n）✅
+- **Phase 6d**：体验与权限 F18–F24（找回密码、任务 Header、thinking 流式、AI 引擎 tab、回收站、空间写权限、title 实时推送）✅
 - **Phase 7（未来）**：M4 Skill 框架 → M5 SCM skill
 
 每完成一个 Unit，建议 `git tag M<N>-U<N>-done`，方便回退。

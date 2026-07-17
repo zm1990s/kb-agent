@@ -54,7 +54,7 @@ class EngineProtocol(Protocol):
 
 - **单端口**：用户只与 Next.js 交互；所有后端调用走相对路径 `/api/*`，由 rewrites 反代到 FastAPI。规避 CORS，收敛公网暴露面（SECURITY #8）。
 - **鉴权**：登录拿 JWT，前端 `lib/auth` 存取；`lib/api` 统一在请求头注入 `Authorization: Bearer`。路由守卫拦截未登录访问。
-- **角色显隐**：上传/建空间/建分类/reprocess 等管理功能仅对 admin 显示（仅体验层；后端仍是强制防线）。
+- **角色显隐**：建空间/建分类等全局管理功能仅对全局 admin 显示；文档写操作（上传/删除/重命名/替换/reprocess/回收站/恢复）对空间 **owner / editor** 也显示（`get_ws_role()` 解析有效角色：全局 admin → owner；个人 WorkspaceMember 角色；组 WorkspaceGroupGrant 角色取最高）。仅体验层，后端通过 `_require_ws_write()` 强制校验。
 - **页面**：①登录/注册 ②对话查询（答案 + 每条来源的原文下载链接）③文档管理（上传、归类状态、列表、下载）④管理后台（空间授权及配置/用户管理）⑤系统设置（通用/提示词/空间管理/用户管理）⑥数据统计 ⑦新动态 ⑧账户设置。
 - **引擎选择**：管理员在系统设置切换 Agent 引擎，选择持久化于 `app_settings`（键 `engine_backend`），归类/问答运行时按此解析。Claude CLI 可用；Codex / OpenClaw 前端灰显、后端拒绝（`available=false`），为未来预留。
 - **按任务模型配置**：系统设置独立配置归类/对话/新动态/会话标题所用模型，持久化于 `app_settings`（键 `model::classify` / `model::chat` / `model::whatsnew` / `model::title`），engine 调用时按 key 读取；未设则使用引擎默认模型。
@@ -106,7 +106,7 @@ class StorageProtocol(Protocol):
 | 方法 | 路径 | 说明 | 请求体关键字段 | 返回关键字段 |
 |------|------|------|--------------|-------------|
 | POST | /chat | 对话式检索取件（非流式） | {workspace_id, message, [conversation_id]} | {answer, sources:[{doc_id, title, download_url}], conversation_id} |
-| POST | /chat/stream | SSE 流式：先推工作阶段，再推答案 | 同上 | event: stage / done |
+| POST | /chat/stream | SSE 流式：先推工作阶段，再推答案，新会话生成标题后推 title 事件 | 同上 | event: stage / thinking / token / done / title |
 | GET  | /conversations | 我的会话列表 | ?workspace_id | [{id, workspace_id, created_at}] |
 | POST | /conversations | 新建空会话 | {workspace_id} | {id, ...} |
 | GET  | /conversations/{id} | 会话历史 | - | {messages:[...]} |
@@ -120,8 +120,10 @@ class StorageProtocol(Protocol):
 | DELETE | /folders/{id} | 删目录（子级级联，文档移出不删） |
 | PATCH | /documents/{id}/move | 移动文档到目录 |
 | PATCH | /documents/{id}/rename | 重命名文档标题（管理员） |
-| DELETE | /documents/{id} | 删除文档（存储+DB+任务+索引） |
+| DELETE | /documents/{id} | 软删除（放入回收站，设 deleted_at） |
 | POST | /documents/{id}/replace | 替换原文并重新归类 |
+| GET | /workspaces/{ws}/trash | 回收站文档列表（空间 owner/editor） |
+| POST | /documents/{id}/restore | 从回收站恢复（空间 owner/editor） |
 
 ### 用户管理 / 组 / RBAC（F4/F5/F6，均 admin-only）
 | 方法 | 路径 | 说明 |
@@ -261,8 +263,11 @@ class StorageProtocol(Protocol):
 | status | TEXT | NOT NULL default 'processing' | processing / ready / failed |
 | uploaded_by | UUID | FK users | |
 | created_at | TIMESTAMPTZ | NOT NULL default now() | |
+| deleted_at | TIMESTAMPTZ | NULL | 软删除时间戳；非 NULL 表示在回收站（migration 020） |
 
-索引：`GIN(search_tsv)`；`(workspace_id, category_id)`；`(workspace_id, status)`。
+索引：`GIN(search_tsv)`；`(workspace_id, category_id)`；`(workspace_id, status)`；partial index `(deleted_at) WHERE deleted_at IS NOT NULL`。
+
+> **回收站（软删除）**：`DELETE /documents/{id}` 仅设置 `deleted_at`，不立即删文件。30 天后后台任务（`trash_cleanup.py`，每 24 小时运行）物理清除文件与 DB 行。期间可通过 `POST /documents/{id}/restore` 恢复。所有文档列表/检索/问答查询均追加 `deleted_at IS NULL` 过滤，已删文档不参与知识检索。
 
 ### processing_tasks（后台归类任务，可查进度/可重试）
 | 字段 | 类型 | 约束 | 说明 |
@@ -297,7 +302,7 @@ class StorageProtocol(Protocol):
 | sources | JSONB | 引用的 doc_id 列表 |
 | created_at | TIMESTAMPTZ | default now() |
 
-### 增强批次新增表（migration 005–016）
+### 增强批次新增表（migration 005–020）
 - **folders**（F1/F2）：`id, workspace_id(FK), name, parent_id(FK self, ON DELETE CASCADE), created_at`；`documents.folder_id`（FK, ON DELETE SET NULL）。用户手动目录树，与分类/标签解耦。
 - **allowed_domains**（M1-U9）：`id, domain(UNIQUE), created_at`。注册白名单迁到 DB。
 - **app_settings**（MF-U7）：`key(PK), value, updated_at`。如 `engine_backend`。
@@ -316,6 +321,7 @@ class StorageProtocol(Protocol):
 - **whatsnew_reports**（migration 014）：新动态报告表（workspace 级，定时生成）。
 - **whatsnew_subscriptions**（migration 015）：用户订阅频率表（weekly/biweekly/monthly）。
 - **constraints**（migration 016）：补全约束与索引。
+- **documents**（migration 020）：新增 `deleted_at TIMESTAMPTZ NULL` + partial index，实现回收站软删除。
 
 ## 关键技术选型的“为什么”
 - **不上向量库 / Agent 式索引问答**：以原文为准、减少幻觉。对话不做关键词硬匹配，而是把**整个空间的结构化索引**（标题/分类/标签/摘要）喂给 Claude，由它理解意图、组织答案、按编号挑相关文档（服务端映射回真实文档，防 ID 幻觉）。文档量上千后再评估 pgvector。

@@ -38,6 +38,7 @@ Partner 场景下的主数据泄漏路径。
 - workspace 过滤下沉 SQL（`WHERE workspace_id IN (:my_ws)`），不查全量再应用层过滤。
 - 非成员返 403/404，不泄漏存在性。普通用户/Partner 不能调管理员端点。
 - 每端点配越权测试（成员可访问 + 非成员被拒 + Partner 跨空间）。
+- **文档写操作权限**（F23 新增）：上传/删除/重命名/替换/reprocess/回收站/恢复 7 个端点改为 `_require_ws_write()`，校验用户在该空间的有效角色（`get_ws_role()`：全局 admin → owner；个人 WorkspaceMember.role_in_ws；所属组 WorkspaceGroupGrant.role_in_ws 取最高）；owner/editor 通过，viewer 返 403，非成员返 404。后端强制，前端仅做显隐。
 - **状态**：🔒 已固化（CLAUDE.md / DESIGN.md / step-3 / Review 红线）。
 
 ### 5. 文件上传 / 本地存储 🔒（部分 ⏳）
