@@ -428,7 +428,12 @@
     "task_headers_saved": "Saved",
     "task_headers_key_placeholder": "Header name (e.g. x-portkey-virtual-key)",
     "task_headers_value_placeholder": "Header value",
-    "tab_ai_engine": "AI Engine"
+    "tab_ai_engine": "AI Engine",
+    "setting_branding": "Branding",
+    "setting_domains": "Domain Allowlist",
+    "setting_whatsnew": "What's New Schedule",
+    "setting_suggested": "Suggested Questions",
+    "setting_email_verification": "Email Verification"
   },
   "admin": {
     "user_tab_users": "Users",
@@ -558,11 +563,6 @@
     "ws_rename_cancel": "Cancel",
     "group_list_title": "Groups",
     "group_no_groups": "No groups yet",
-    "setting_branding": "Branding",
-    "setting_domains": "Domain Allowlist",
-    "setting_whatsnew": "What's New Schedule",
-    "setting_suggested": "Suggested Questions",
-    "setting_email_verification": "Email Verification",
     "ai_section_agent": "Agent Engine",
     "ai_section_chat_engine": "Chat Engine",
     "ai_section_task_headers": "Task Request Headers"

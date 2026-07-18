@@ -428,7 +428,12 @@
     "task_headers_saved": "保存しました",
     "task_headers_key_placeholder": "Header 名（例: x-portkey-virtual-key）",
     "task_headers_value_placeholder": "Header 値",
-    "tab_ai_engine": "AIエンジン"
+    "tab_ai_engine": "AIエンジン",
+    "setting_branding": "ブランド設定",
+    "setting_domains": "ドメイン許可リスト",
+    "setting_whatsnew": "新着情報スケジュール",
+    "setting_suggested": "おすすめの質問",
+    "setting_email_verification": "メール認証"
   },
   "admin": {
     "user_tab_users": "ユーザー",
@@ -558,11 +563,6 @@
     "ws_rename_cancel": "キャンセル",
     "group_list_title": "グループ",
     "group_no_groups": "グループがありません",
-    "setting_branding": "ブランド設定",
-    "setting_domains": "ドメイン許可リスト",
-    "setting_whatsnew": "新着情報スケジュール",
-    "setting_suggested": "おすすめの質問",
-    "setting_email_verification": "メール認証",
     "ai_section_agent": "Agent エンジン",
     "ai_section_chat_engine": "チャットエンジン",
     "ai_section_task_headers": "タスクリクエストヘッダー"

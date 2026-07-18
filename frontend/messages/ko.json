@@ -428,7 +428,12 @@
     "task_headers_saved": "저장됨",
     "task_headers_key_placeholder": "Header 이름（예: x-portkey-virtual-key）",
     "task_headers_value_placeholder": "Header 값",
-    "tab_ai_engine": "AI 엔진"
+    "tab_ai_engine": "AI 엔진",
+    "setting_branding": "브랜딩",
+    "setting_domains": "도메인 허용 목록",
+    "setting_whatsnew": "새 소식 일정",
+    "setting_suggested": "추천 질문",
+    "setting_email_verification": "이메일 인증"
   },
   "admin": {
     "user_tab_users": "사용자",
@@ -558,11 +563,6 @@
     "ws_rename_cancel": "취소",
     "group_list_title": "그룹 목록",
     "group_no_groups": "그룹 없음",
-    "setting_branding": "브랜딩",
-    "setting_domains": "도메인 허용 목록",
-    "setting_whatsnew": "새 소식 일정",
-    "setting_suggested": "추천 질문",
-    "setting_email_verification": "이메일 인증",
     "ai_section_agent": "Agent 엔진",
     "ai_section_chat_engine": "채팅 엔진",
     "ai_section_task_headers": "작업 요청 헤더"

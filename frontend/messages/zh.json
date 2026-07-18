@@ -428,7 +428,12 @@
     "task_headers_saved": "已保存",
     "task_headers_key_placeholder": "Header 名（如 x-portkey-virtual-key）",
     "task_headers_value_placeholder": "Header 值",
-    "tab_ai_engine": "AI 引擎"
+    "tab_ai_engine": "AI 引擎",
+    "setting_branding": "品牌配置",
+    "setting_domains": "域名白名单",
+    "setting_whatsnew": "新动态定时",
+    "setting_suggested": "引导问题",
+    "setting_email_verification": "邮箱验证"
   },
   "admin": {
     "user_tab_users": "用户",
@@ -558,11 +563,6 @@
     "ws_rename_cancel": "取消",
     "group_list_title": "用户组",
     "group_no_groups": "暂无用户组",
-    "setting_branding": "品牌配置",
-    "setting_domains": "域名白名单",
-    "setting_whatsnew": "新动态定时",
-    "setting_suggested": "引导问题",
-    "setting_email_verification": "邮箱验证",
     "ai_section_agent": "Agent 引擎",
     "ai_section_chat_engine": "对话引擎",
     "ai_section_task_headers": "任务请求头"
