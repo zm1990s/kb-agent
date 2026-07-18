@@ -9,7 +9,7 @@ import { useAuthGuard } from "@/lib/useAuthGuard";
 
 export default function StatsPage() {
   const t = useTranslations("stats");
-  const ready = useAuthGuard();
+  const ready = useAuthGuard("stats");
   const router = useRouter();
 
   if (!ready) return null;

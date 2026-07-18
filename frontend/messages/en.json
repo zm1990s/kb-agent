@@ -227,7 +227,8 @@
     "delete": "Delete conversation",
     "delete_confirm": "Delete conversation \"{title}\"?",
     "collapse": "Collapse sidebar",
-    "expand": "Expand sidebar"
+    "expand": "Expand sidebar",
+    "generating": "Generating…"
   },
   "account": {
     "title": "Account",

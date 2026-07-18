@@ -227,7 +227,8 @@
     "delete": "刪除對話",
     "delete_confirm": "刪除對話「{title}」？",
     "collapse": "收起側邊欄",
-    "expand": "展開側邊欄"
+    "expand": "展開側邊欄",
+    "generating": "生成中…"
   },
   "account": {
     "title": "帳戶管理",

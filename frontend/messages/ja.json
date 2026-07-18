@@ -227,7 +227,8 @@
     "delete": "会話を削除",
     "delete_confirm": "会話「{title}」を削除しますか？",
     "collapse": "サイドバーを閉じる",
-    "expand": "サイドバーを開く"
+    "expand": "サイドバーを開く",
+    "generating": "生成中…"
   },
   "account": {
     "title": "アカウント",

@@ -27,6 +27,8 @@ class ClaudeCliEngine:
         # model 参数优先；均为空时回退到环境变量 CLAUDE_MODEL
         self._model = model or settings.claude_model
         self._idle_timeout = settings.engine_idle_timeout_sec
+        # 调大子进程 stdout 行缓冲上限，避免大单行 JSON 事件触发 LimitOverrunError
+        self._stream_limit = settings.engine_stream_limit_bytes
 
     def _build_argv(
         self, prompt: str, files: list[Path] | None, cwd: Path | None = None
@@ -87,6 +89,7 @@ class ClaudeCliEngine:
                 cwd=str(cwd) if cwd is not None else None,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
+                limit=self._stream_limit,
             )
         except FileNotFoundError as exc:
             raise EngineError(f"找不到 Claude CLI: {self._cli_path!r}") from exc
@@ -161,6 +164,7 @@ class ClaudeCliEngine:
                 cwd=str(cwd) if cwd is not None else None,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
+                limit=self._stream_limit,
             )
         except FileNotFoundError as exc:
             raise EngineError(f"找不到 Claude CLI: {self._cli_path!r}") from exc

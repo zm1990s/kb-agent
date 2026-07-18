@@ -41,7 +41,7 @@ function formatDate(iso: string) {
 
 export default function WhatsNewPage() {
   const t = useTranslations("whatsnew");
-  const ready = useAuthGuard();
+  const ready = useAuthGuard("whatsnew");
   const admin = isAdmin();
   const myEmail = getEmail() ?? "";
 

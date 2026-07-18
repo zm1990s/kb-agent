@@ -24,7 +24,7 @@ interface Skill {
 
 export default function SkillsPage() {
   const t = useTranslations("skillsHub");
-  const ready = useAuthGuard();
+  const ready = useAuthGuard("skills");
   const admin = isAdmin();
   const [canWrite, setCanWrite] = useState(false);
   const [skills, setSkills] = useState<Skill[]>([]);

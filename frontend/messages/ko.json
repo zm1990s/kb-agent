@@ -227,7 +227,8 @@
     "delete": "대화 삭제",
     "delete_confirm": "대화 \"{title}\"을(를) 삭제하시겠습니까?",
     "collapse": "사이드바 접기",
-    "expand": "사이드바 펼치기"
+    "expand": "사이드바 펼치기",
+    "generating": "생성 중…"
   },
   "account": {
     "title": "계정",

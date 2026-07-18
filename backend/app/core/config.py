@@ -30,6 +30,11 @@ class Settings(BaseSettings):
     claude_cli_path: str = Field("claude", alias="CLAUDE_CLI_PATH")
     claude_model: str = Field("", alias="CLAUDE_MODEL")
     engine_idle_timeout_sec: int = Field(300, alias="ENGINE_IDLE_TIMEOUT_SEC")
+    # 子进程 stdout 单行缓冲上限（字节）。stream-json 每行一个 JSON 事件，
+    # 大文件工具结果/整条消息快照可能超 asyncio 默认 64KB → LimitOverrunError。
+    engine_stream_limit_bytes: int = Field(
+        16 * 1024 * 1024, alias="ENGINE_STREAM_LIMIT_BYTES"
+    )
 
     # ── 存储（MVP 本地文件系统）──────────────────────────
     storage_backend: str = Field("local", alias="STORAGE_BACKEND")

@@ -30,9 +30,16 @@ from app.services.answer_service import (
     answer_question,
     answer_question_streamed,
 )
-from app.services.answer_service_plus import (
-    OutputFilesResult,
-    answer_question_plus_streamed,
+from app.services.chat_generation import (
+    _END as _GEN_END,
+)
+from app.services.chat_generation import (
+    GenerationInProgress,
+    list_active,
+    request_cancel,
+    start_generation,
+    subscribe,
+    unsubscribe,
 )
 from app.services.chat_service import (
     add_message,
@@ -52,6 +59,30 @@ from app.services.workspace_service import is_member
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["chat"])
+
+
+def _sse(event: str, data: dict) -> str:
+    return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
+
+
+async def _relay(sub):
+    """把订阅到的生成事件转发为 SSE；断连只退订，不动生成任务。
+
+    sub = (state, queue, catchup)：先补发 catchup（已累积答案 + 终态事件），
+    再从队列读实时事件，直到 _END。
+    """
+    state, queue, catchup = sub
+    try:
+        for event, data in catchup:
+            yield _sse(event, data)
+        while True:
+            item = await queue.get()
+            if item is _GEN_END:
+                break
+            event, data = item
+            yield _sse(event, data)
+    finally:
+        unsubscribe(state, queue)
 
 
 async def _require_module(session: AsyncSession, user: User, module: str) -> None:
@@ -379,6 +410,8 @@ class ChatPlusRequest(BaseModel):
     skill_ids: list[uuid.UUID] | None = None
     doc_ids: list[uuid.UUID] | None = None
     all_docs: bool = False
+    # 交互模式：开时向 system 注入 ask-user 协议，让模型可弹选项让用户澄清（瞬时，不落库）
+    interactive: bool = False
     # 附件：携带展示元数据（filename/size）；引擎侧只用 storage_key
     attachments: list[ChatPlusAttachment] | None = None
 
@@ -429,87 +462,76 @@ async def chat_plus_stream(
         attachments=attachments,
     )
 
-    def sse(event: str, data: dict) -> str:
-        return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
+    # 生成跑在 detached 任务里（断连不中止）；本请求只订阅并转发其事件。
+    try:
+        start_generation(
+            conversation_id=conv.id,
+            user_id=current_user.id,
+            is_new_conv=is_new_conv,
+            question=body.message,
+            history=history,
+            workspace_id=body.workspace_id,
+            doc_ids=body.doc_ids,
+            all_docs=body.all_docs,
+            skill_ids=body.skill_ids,
+            attachment_keys=attachment_keys or None,
+            interactive=body.interactive,
+        )
+    except GenerationInProgress:
+        raise HTTPException(status.HTTP_409_CONFLICT, "该会话正在生成中") from None
 
-    async def gen():
-        final: AnswerResult | None = None
-        output_files: list[dict] = []
-
-        try:
-            async for item in answer_question_plus_streamed(
-                session,
-                workspace_id=body.workspace_id,
-                conversation_id=conv.id,
-                user=current_user,
-                question=body.message,
-                history=history,
-                doc_ids=body.doc_ids,
-                all_docs=body.all_docs,
-                skill_ids=body.skill_ids,
-                attachment_keys=attachment_keys or None,
-            ):
-                if isinstance(item, Stage):
-                    yield sse("stage", {
-                        "stage": item.stage,
-                        "message_key": item.message_key,
-                        "message_params": item.message_params,
-                    })
-                elif isinstance(item, ThinkingChunk):
-                    yield sse("thinking", {"text": item.text})
-                elif isinstance(item, TokenChunk):
-                    yield sse("token", {"text": item.text})
-                elif isinstance(item, AnswerResult):
-                    final = item
-                elif isinstance(item, OutputFilesResult):
-                    output_files = item.files
-
-            if final is None:
-                final = AnswerResult(answer="", sources=[], error_key="no_answer")
-
-            done_payload: dict = {
-                "answer": final.answer,
-                "sources": final.sources,
-                "conversation_id": str(conv.id),
-            }
-            if final.error_key:
-                done_payload["error_key"] = final.error_key
-            yield sse("done", done_payload)
-
-            if output_files:
-                yield sse("output_files", {"files": output_files})
-
-            await add_message(
-                session,
-                conversation_id=conv.id,
-                role="assistant",
-                content=final.answer,
-                sources=final.sources,
-                output_files=output_files,
-            )
-
-            if is_new_conv:
-                async with SessionLocal() as bg_session:
-                    title = await generate_conversation_title(
-                        bg_session, conversation_id=conv.id, first_message=body.message
-                    )
-                if title:
-                    yield sse("title", {"conversation_id": str(conv.id), "title": title})
-
-        except Exception:
-            logger.exception("plus/stream gen() 内部异常 conv=%s", conv.id)
-            yield sse("done", {
-                "answer": "",
-                "sources": [],
-                "conversation_id": str(conv.id),
-                "error_key": "engine_unavailable",
-            })
-
+    sub = subscribe(conv.id, current_user.id)
+    if sub is None:  # 理论上不会发生（刚 start）；兜底
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "生成任务不存在")
     return StreamingResponse(
-        gen(),
+        _relay(sub),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+@router.get("/chat/plus/stream/{conversation_id}")
+async def chat_plus_reconnect(
+    conversation_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> StreamingResponse:
+    """重连正在跑（或刚跑完、处于终态保留窗口）的生成流。
+
+    先补发已累积答案，再接实时增量。非 owner / 不存在 → 404。
+    """
+    await _require_module(session, current_user, "chatplus")
+    sub = subscribe(conversation_id, current_user.id)
+    if sub is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "没有进行中的生成")
+    return StreamingResponse(
+        _relay(sub),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@router.get("/chat/plus/active")
+async def chat_plus_active(
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """当前用户正在生成中的会话 id 列表（侧边栏指示器轮询用）。"""
+    await _require_module(session, current_user, "chatplus")
+    return {"conversation_ids": [str(cid) for cid in list_active(current_user.id)]}
+
+
+@router.post("/chat/plus/stop/{conversation_id}")
+async def chat_plus_stop(
+    conversation_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """停止按钮：取消该会话的生成；不在跑 / 非 owner → 404。"""
+    await _require_module(session, current_user, "chatplus")
+    if not request_cancel(conversation_id, current_user.id):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "没有进行中的生成")
+    return {"ok": True}
 
 
 @router.post("/chat/plus/upload")

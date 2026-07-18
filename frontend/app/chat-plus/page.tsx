@@ -6,6 +6,7 @@ import ConversationSidebar from "@/components/ConversationSidebar";
 import Markdown from "@/components/Markdown";
 import MessageBubble from "@/components/MessageBubble";
 import NavBar from "@/components/NavBar";
+import AskUserOptions from "@/components/chat-plus/AskUserOptions";
 import FileAttachPanel from "@/components/chat-plus/FileAttachPanel";
 import OutputFileChip from "@/components/chat-plus/OutputFileChip";
 import SessionFilesPanel, {
@@ -14,6 +15,7 @@ import SessionFilesPanel, {
 import SkillPicker from "@/components/chat-plus/SkillPicker";
 import WorkspaceDocPicker from "@/components/chat-plus/WorkspaceDocPicker";
 import { api, ApiError } from "@/lib/api";
+import { parseAskUser } from "@/lib/askUser";
 import { isAdmin } from "@/lib/auth";
 import { useAuthGuard } from "@/lib/useAuthGuard";
 import type { ConversationHistory, ConversationSummary, SourceRef } from "@/lib/types";
@@ -57,7 +59,7 @@ const SESSION_KEY = "chat_plus_state";
 
 export default function ChatPlusPage() {
   const t = useTranslations("chatPlus");
-  const ready = useAuthGuard();
+  const ready = useAuthGuard("chatplus");
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
@@ -67,6 +69,8 @@ export default function ChatPlusPage() {
   const [elapsed, setElapsed] = useState(0);
   const [streamingBlocks, setStreamingBlocks] = useState<StreamBlock[]>([]);
   const [error, setError] = useState<string | null>(null);
+  // 正在后台生成的会话 id 集合（侧边栏指示器；后端 /chat/plus/active 轮询）
+  const [activeIds, setActiveIds] = useState<Set<string>>(new Set());
 
   // 是否有 skills:write（控制「存为 Skill」显隐；后端仍是唯一防线）
   const [canWriteSkill, setCanWriteSkill] = useState(false);
@@ -75,6 +79,8 @@ export default function ChatPlusPage() {
   const [activeSkillIds, setActiveSkillIds] = useState<string[]>([]);
   const [docFilterIds, setDocFilterIds] = useState<string[]>([]);
   const [allDocs, setAllDocs] = useState(false);
+  // 交互模式：开时后端注入 ask-user 协议，模型可弹选项让用户澄清（瞬时，不持久化）
+  const [interactive, setInteractive] = useState(false);
   const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
   // 记录最后一次发送，供出错重试
   const [lastSent, setLastSent] = useState<
@@ -88,6 +94,8 @@ export default function ChatPlusPage() {
   const abortRef = useRef<AbortController | null>(null);
   const streamingBlocksRef = useRef<StreamBlock[]>([]);
   const sessionFilesRef = useRef<SessionFilesHandle>(null);
+  // 保证「挂载后自动重连」只触发一次（同标签页返回场景）
+  const mountReconnectDoneRef = useRef(false);
 
   useEffect(() => {
     // 会话不分空间：仅从 sessionStorage 恢复该窗口的当前对话/消息。
@@ -105,6 +113,7 @@ export default function ChatPlusPage() {
     } catch {}
   }, []);
 
+  // unmount：仅断开本地 SSE 订阅（后端生成继续跑）。取消生成只走「停止」按钮。
   useEffect(() => { return () => { abortRef.current?.abort(); }; }, []);
 
   // 拉取权限，决定是否显示「存为 Skill」（admin 恒可）
@@ -134,11 +143,38 @@ export default function ChatPlusPage() {
     loadConversations();
   }, [loadConversations]);
 
+  // 轮询「正在生成中的会话」，驱动侧边栏指示器（~5s）
+  useEffect(() => {
+    let cancelled = false;
+    async function poll() {
+      try {
+        const r = await api.get<{ conversation_ids: string[] }>("/chat/plus/active");
+        if (!cancelled) setActiveIds(new Set(r.conversation_ids));
+      } catch {
+        /* 忽略瞬时失败 */
+      }
+    }
+    poll();
+    const id = setInterval(poll, 5000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, []);
+
   useEffect(() => {
     try {
       sessionStorage.setItem(SESSION_KEY, JSON.stringify({ conversationId, turns }));
     } catch {}
   }, [conversationId, turns]);
+
+  // 同标签页返回：从 sessionStorage 恢复的会话若仍在后台生成，自动重连一次
+  useEffect(() => {
+    if (mountReconnectDoneRef.current) return;
+    if (activeIds.size === 0) return;
+    mountReconnectDoneRef.current = true;
+    if (conversationId && activeIds.has(conversationId) && !busy) {
+      reconnectStream(conversationId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeIds]);
 
   // Skill 是全局的、与空间无关 → 持久化到会话；文档选择随工作区瞬时，不持久化。
   function handleSkillChange(ids: string[]) {
@@ -204,6 +240,10 @@ export default function ChatPlusPage() {
     } catch {
       setActiveSkillIds([]);
     }
+    // 若该会话仍在后台生成，重连实时流续看答案
+    if (activeIds.has(id)) {
+      reconnectStream(id);
+    }
   }
 
   function newConversation() {
@@ -216,10 +256,15 @@ export default function ChatPlusPage() {
     setWorkspaceId(null);
     setDocFilterIds([]);
     setAllDocs(false);
+    setInteractive(false);
     setLastSent(null);
   }
 
   function stopGeneration() {
+    // 只有显式停止才取消后端生成；断连（切页面）不取消（见 unmount 注释）
+    if (conversationId) {
+      api.post(`/chat/plus/stop/${conversationId}`).catch(() => {});
+    }
     abortRef.current?.abort();
   }
 
@@ -232,6 +277,122 @@ export default function ChatPlusPage() {
   }
 
   if (!ready) return null;
+
+  // 共享的 SSE 事件处理器：POST 首发与 GET 重连走同一套逻辑。
+  // isNew 仅在首发新会话时用于保存 Skill 选择。
+  function makeStreamHandler(isNew: boolean) {
+    return (event: string, data: unknown) => {
+      // 聊天+ 不再展示三步动画，忽略 stage 事件
+      if (event === "thinking") {
+        const text = (data as { text: string }).text;
+        setStreamingBlocks((prev) => {
+          const last = prev[prev.length - 1];
+          const next = last?.type === "thinking"
+            ? [...prev.slice(0, -1), { type: "thinking" as const, text: last.text + text }]
+            : [...prev, { type: "thinking" as const, text }];
+          streamingBlocksRef.current = next;
+          return next;
+        });
+      } else if (event === "token") {
+        const text = (data as { text: string }).text;
+        setStreamingBlocks((prev) => {
+          const last = prev[prev.length - 1];
+          const next = last?.type === "text"
+            ? [...prev.slice(0, -1), { type: "text" as const, text: last.text + text }]
+            : [...prev, { type: "text" as const, text }];
+          streamingBlocksRef.current = next;
+          return next;
+        });
+      } else if (event === "done") {
+        const thinkingText = streamingBlocksRef.current
+          .filter((b) => b.type === "thinking")
+          .map((b) => b.text)
+          .join("") || undefined;
+        streamingBlocksRef.current = [];
+        setStreamingBlocks([]);
+        const d = data as DonePayload;
+        setTurns((t) => [
+          ...t,
+          {
+            role: "assistant",
+            content: d.answer,
+            sources: d.sources,
+            error_key: d.error_key,
+            thinking: thinkingText,
+          },
+        ]);
+        setLastSent(null);
+        setConversationId(d.conversation_id);
+        // 新对话：把本次使用的 Skill 选择保存到该对话（文档随空间瞬时，不持久化）
+        if (isNew && activeSkillIds.length > 0) {
+          api
+            .patch(`/conversations/${d.conversation_id}/settings`, {
+              active_skill_ids: activeSkillIds,
+            })
+            .catch(() => {});
+        }
+        setBusy(false);
+        setConversations((prev) => {
+          if (prev.some((c) => c.id === d.conversation_id)) return prev;
+          return [
+            { id: d.conversation_id, workspace_id: null, title: null, pinned: false, created_at: new Date().toISOString() },
+            ...prev,
+          ];
+        });
+      } else if (event === "output_files") {
+        const d = data as { files: OutputFile[] };
+        setPendingOutputFiles(d.files);
+        setTurns((prev) => {
+          const last = prev[prev.length - 1];
+          if (last?.role === "assistant") {
+            return [
+              ...prev.slice(0, -1),
+              { ...last, output_files: d.files },
+            ];
+          }
+          return prev;
+        });
+        // 刷新「本会话文件」面板
+        sessionFilesRef.current?.refresh();
+      } else if (event === "title") {
+        const d = data as { conversation_id: string; title: string };
+        setConversations((prev) =>
+          prev.map((c) => (c.id === d.conversation_id ? { ...c, title: d.title } : c))
+        );
+      }
+    };
+  }
+
+  // 重连正在后台运行的生成流（切回会话 / 首发 409 时）。
+  async function reconnectStream(convId: string) {
+    setError(null);
+    setBusy(true);
+    setPendingOutputFiles([]);
+    streamingBlocksRef.current = [];
+    setStreamingBlocks([]);
+    const ac = new AbortController();
+    abortRef.current = ac;
+    try {
+      await api.streamGet(
+        `/chat/plus/stream/${convId}`,
+        makeStreamHandler(false),
+        ac.signal,
+      );
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") {
+        // 切走/停止：不报错
+      } else if (err instanceof ApiError && err.status === 404) {
+        // 生成已结束且过了保留窗口——历史里已有结果，静默
+      } else {
+        setError(err instanceof ApiError ? err.message : t("requestFailed"));
+      }
+    } finally {
+      setBusy(false);
+      setStreamingBlocks([]);
+      streamingBlocksRef.current = [];
+      abortRef.current = null;
+    }
+  }
 
   async function sendMessage(message: string, currentAttachments?: AttachedFile[]) {
     if (!message || busy) return;
@@ -256,93 +417,21 @@ export default function ChatPlusPage() {
           skill_ids: activeSkillIds.length > 0 ? activeSkillIds : null,
           doc_ids: docFilterIds.length > 0 ? docFilterIds : null,
           all_docs: allDocs,
+          interactive,
           attachments: filesToSend.length > 0 ? filesToSend : null,
         },
-        (event, data) => {
-          // 聊天+ 不再展示三步动画，忽略 stage 事件
-          if (event === "thinking") {
-            const text = (data as { text: string }).text;
-            setStreamingBlocks((prev) => {
-              const last = prev[prev.length - 1];
-              const next = last?.type === "thinking"
-                ? [...prev.slice(0, -1), { type: "thinking" as const, text: last.text + text }]
-                : [...prev, { type: "thinking" as const, text }];
-              streamingBlocksRef.current = next;
-              return next;
-            });
-          } else if (event === "token") {
-            const text = (data as { text: string }).text;
-            setStreamingBlocks((prev) => {
-              const last = prev[prev.length - 1];
-              const next = last?.type === "text"
-                ? [...prev.slice(0, -1), { type: "text" as const, text: last.text + text }]
-                : [...prev, { type: "text" as const, text }];
-              streamingBlocksRef.current = next;
-              return next;
-            });
-          } else if (event === "done") {
-            const thinkingText = streamingBlocksRef.current
-              .filter((b) => b.type === "thinking")
-              .map((b) => b.text)
-              .join("") || undefined;
-            streamingBlocksRef.current = [];
-            setStreamingBlocks([]);
-            const d = data as DonePayload;
-            setTurns((t) => [
-              ...t,
-              {
-                role: "assistant",
-                content: d.answer,
-                sources: d.sources,
-                error_key: d.error_key,
-                thinking: thinkingText,
-              },
-            ]);
-            setLastSent(null);
-            setConversationId(d.conversation_id);
-            // 新对话：把本次使用的 Skill 选择保存到该对话（文档随空间瞬时，不持久化）
-            if (isNew && activeSkillIds.length > 0) {
-              api
-                .patch(`/conversations/${d.conversation_id}/settings`, {
-                  active_skill_ids: activeSkillIds,
-                })
-                .catch(() => {});
-            }
-            setBusy(false);
-            setConversations((prev) => {
-              if (prev.some((c) => c.id === d.conversation_id)) return prev;
-              return [
-                { id: d.conversation_id, workspace_id: null, title: null, pinned: false, created_at: new Date().toISOString() },
-                ...prev,
-              ];
-            });
-          } else if (event === "output_files") {
-            const d = data as { files: OutputFile[] };
-            setPendingOutputFiles(d.files);
-            setTurns((prev) => {
-              const last = prev[prev.length - 1];
-              if (last?.role === "assistant") {
-                return [
-                  ...prev.slice(0, -1),
-                  { ...last, output_files: d.files },
-                ];
-              }
-              return prev;
-            });
-            // 刷新「本会话文件」面板
-            sessionFilesRef.current?.refresh();
-          } else if (event === "title") {
-            const d = data as { conversation_id: string; title: string };
-            setConversations((prev) =>
-              prev.map((c) => (c.id === d.conversation_id ? { ...c, title: d.title } : c))
-            );
-          }
-        },
+        makeStreamHandler(isNew),
         ac.signal,
       );
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") {
         // user stopped
+      } else if (err instanceof ApiError && err.status === 409 && conversationId) {
+        // 该会话已有生成在跑（重复发送）：透明切换为订阅同一路流
+        setAttachedFiles([]);
+        abortRef.current = null;
+        await reconnectStream(conversationId);
+        return;
       } else {
         setError(err instanceof ApiError ? err.message : t("requestFailed"));
       }
@@ -381,6 +470,7 @@ export default function ChatPlusPage() {
         <ConversationSidebar
           conversations={conversations}
           activeId={conversationId}
+          generatingIds={activeIds}
           onSelect={selectConversation}
           onNew={newConversation}
           onUpdated={(updated) =>
@@ -414,7 +504,13 @@ export default function ChatPlusPage() {
               </div>
             )}
 
-            {turns.map((turn, i) => (
+            {turns.map((turn, i) => {
+              // assistant 消息：解析 ask-user 块，正文剥离后渲染，选项单独渲染成按钮
+              const parsed =
+                turn.role === "assistant" ? parseAskUser(turn.content) : null;
+              const displayContent = parsed ? parsed.clean : turn.content;
+              const askDisabled = busy || i !== turns.length - 1;
+              return (
               <div key={i}>
                 {turn.role === "assistant" && turn.thinking && (
                   <details className="mb-1 ml-11">
@@ -426,14 +522,26 @@ export default function ChatPlusPage() {
                     </div>
                   </details>
                 )}
-                <MessageBubble
-                  role={turn.role}
-                  content={turn.content}
-                  sources={turn.sources}
-                  errorKey={turn.error_key}
-                  onDownload={async () => {}}
-                  onEdit={turn.role === "user" && !busy ? (newContent) => handleEdit(i, newContent) : undefined}
-                />
+                {(displayContent || turn.role === "user") && (
+                  <MessageBubble
+                    role={turn.role}
+                    content={displayContent}
+                    sources={turn.sources}
+                    errorKey={turn.error_key}
+                    onDownload={async () => {}}
+                    onEdit={turn.role === "user" && !busy ? (newContent) => handleEdit(i, newContent) : undefined}
+                  />
+                )}
+                {parsed?.ask && (
+                  <AskUserOptions
+                    payload={parsed.ask}
+                    onPick={(text) => {
+                      setTurns((t) => [...t, { role: "user", content: text }]);
+                      sendMessage(text);
+                    }}
+                    disabled={askDisabled}
+                  />
+                )}
                 {turn.role === "user" && turn.attachments && turn.attachments.length > 0 && (
                   <div className="ml-11 mt-1 flex flex-wrap gap-1">
                     {turn.attachments.map((f) => (
@@ -452,7 +560,8 @@ export default function ChatPlusPage() {
                   </div>
                 )}
               </div>
-            ))}
+              );
+            })}
 
             {busy && streamingBlocks.length > 0 ? (
               <div className="flex gap-3">
@@ -521,6 +630,21 @@ export default function ChatPlusPage() {
               />
               <FileAttachPanel files={attachedFiles} onChange={setAttachedFiles} />
               <SessionFilesPanel ref={sessionFilesRef} conversationId={conversationId} canWriteSkill={canWriteSkill} />
+              <button
+                type="button"
+                onClick={() => setInteractive((v) => !v)}
+                title="交互模式：需要澄清时弹出选项让你选择"
+                className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-sm transition-colors ${
+                  interactive
+                    ? "border-purple-400 bg-purple-50 text-purple-700"
+                    : "border-gray-300 bg-white text-gray-600 hover:bg-gray-50"
+                }`}
+              >
+                <span
+                  className={`h-2 w-2 rounded-full ${interactive ? "bg-purple-500" : "bg-gray-300"}`}
+                />
+                交互模式
+              </button>
             </div>
 
             <form onSubmit={send}>

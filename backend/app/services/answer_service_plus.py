@@ -43,6 +43,32 @@ _DOC_CONTEXT_CHARS = 8000
 _BUNDLE_MAX_TOTAL_BYTES = 50 * 1024 * 1024
 _BUNDLE_MAX_FILES = 500
 
+# 交互模式协议：仅当 interactive=True 时注入 system，让模型可弹选项向用户澄清。
+# 模型输出 ```ask-user 围栏 JSON 块并结束本轮；前端解析成可点选项 + 「其他」自由输入框。
+ASK_USER_PROTOCOL = """## 交互提问能力（已启用）
+
+当你需要用户澄清关键信息（如目标、格式、语言、范围等）才能继续时，不要自行假设，\
+而应向用户提问并给出候选选项。提问时输出一个如下格式的围栏代码块，然后**立即结束本轮回复**，\
+等待用户选择后再继续：
+
+```ask-user
+{
+  "question": "你的问题（简洁明确）",
+  "options": [
+    {"label": "选项一", "description": "可选的简短说明"},
+    {"label": "选项二", "description": "可选的简短说明"}
+  ],
+  "multiSelect": false
+}
+```
+
+规则：
+- `question` 必填；`options` 给 2~4 个最可能的候选，每项 `label` 必填、`description` 可选。
+- `multiSelect` 为 true 时表示用户可多选（默认 false 单选）。
+- 前端会自动在选项之外附加一个「其他」自由输入框，你**无需**在 options 里加「其他/自定义」项。
+- 仅在确有必要澄清时使用；信息已足够时正常作答，不要滥用。
+- 输出该块后就停止，不要在同一轮里替用户假设答案继续往下做。"""
+
 
 def _slug(name: str) -> str:
     import re
@@ -169,6 +195,7 @@ async def answer_question_plus_streamed(
     all_docs: bool = False,
     skill_ids: list[uuid.UUID] | None = None,
     attachment_keys: list[str] | None = None,
+    interactive: bool = False,
 ):
     """聊天+ 流式问答生成器：复刻 Claude Desktop 直连体验。
 
@@ -215,6 +242,14 @@ async def answer_question_plus_streamed(
 
     # 注：「Skill 制作器」等内置能力改用 Claude CLI 原生 Skills 机制
     # （镜像内预置 ~/.claude/skills/skill-writer/SKILL.md），此处不再注入。
+
+    # ── 交互模式：仅开关开时注入 ask-user 协议（协议打底，Skill 追加其后）──
+    if interactive:
+        skill_system = (
+            ASK_USER_PROTOCOL
+            if skill_system is None
+            else f"{ASK_USER_PROTOCOL}\n\n---\n\n{skill_system}"
+        )
 
     # ── 可选：注入文档正文作为上下文（需选定工作区 + 勾选文档/所有文件，均限量）──
     context_block = ""

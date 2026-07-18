@@ -11,7 +11,7 @@ import { useAuthGuard } from "@/lib/useAuthGuard";
 
 export default function SettingsPage() {
   const t = useTranslations("settings");
-  const ready = useAuthGuard();
+  const ready = useAuthGuard(["settings", "workspaces", "users"]);
   const router = useRouter();
   const [perms, setPerms] = useState<Record<string, string> | null>(null);
 
