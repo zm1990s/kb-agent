@@ -49,6 +49,10 @@ interface DonePayload {
   error_key?: string;
 }
 
+type StreamBlock =
+  | { type: "thinking"; text: string }
+  | { type: "text"; text: string };
+
 const SESSION_KEY = "chat_plus_state";
 
 export default function ChatPlusPage() {
@@ -60,8 +64,8 @@ export default function ChatPlusPage() {
   const [turns, setTurns] = useState<Turn[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
-  const [streamingText, setStreamingText] = useState("");
-  const [streamingThinking, setStreamingThinking] = useState("");
+  const [elapsed, setElapsed] = useState(0);
+  const [streamingBlocks, setStreamingBlocks] = useState<StreamBlock[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   // 是否有 skills:write（控制「存为 Skill」显隐；后端仍是唯一防线）
@@ -82,7 +86,7 @@ export default function ChatPlusPage() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
-  const thinkingAccRef = useRef("");
+  const streamingBlocksRef = useRef<StreamBlock[]>([]);
   const sessionFilesRef = useRef<SessionFilesHandle>(null);
 
   useEffect(() => {
@@ -155,6 +159,14 @@ export default function ChatPlusPage() {
   }, [turns, busy]);
 
   useEffect(() => {
+    if (!busy) { setElapsed(0); return; }
+    setElapsed(0);
+    const start = Date.now();
+    const id = setInterval(() => setElapsed(Math.floor((Date.now() - start) / 1000)), 1000);
+    return () => clearInterval(id);
+  }, [busy]);
+
+  useEffect(() => {
     const el = textareaRef.current;
     if (!el) return;
     el.style.height = "auto";
@@ -211,6 +223,14 @@ export default function ChatPlusPage() {
     abortRef.current?.abort();
   }
 
+  async function handleEdit(turnIndex: number, newContent: string) {
+    const newTurns = turns.slice(0, turnIndex);
+    const originalAttachments = turns[turnIndex]?.attachments ?? [];
+    newTurns.push({ role: "user", content: newContent, attachments: originalAttachments });
+    setTurns(newTurns);
+    await sendMessage(newContent, originalAttachments);
+  }
+
   if (!ready) return null;
 
   async function sendMessage(message: string, currentAttachments?: AttachedFile[]) {
@@ -241,17 +261,44 @@ export default function ChatPlusPage() {
         (event, data) => {
           // 聊天+ 不再展示三步动画，忽略 stage 事件
           if (event === "thinking") {
-            thinkingAccRef.current += (data as { text: string }).text;
-            setStreamingThinking(thinkingAccRef.current);
+            const text = (data as { text: string }).text;
+            setStreamingBlocks((prev) => {
+              const last = prev[prev.length - 1];
+              const next = last?.type === "thinking"
+                ? [...prev.slice(0, -1), { type: "thinking" as const, text: last.text + text }]
+                : [...prev, { type: "thinking" as const, text }];
+              streamingBlocksRef.current = next;
+              return next;
+            });
           } else if (event === "token") {
-            setStreamingText((prev) => prev + (data as { text: string }).text);
+            const text = (data as { text: string }).text;
+            setStreamingBlocks((prev) => {
+              const last = prev[prev.length - 1];
+              const next = last?.type === "text"
+                ? [...prev.slice(0, -1), { type: "text" as const, text: last.text + text }]
+                : [...prev, { type: "text" as const, text }];
+              streamingBlocksRef.current = next;
+              return next;
+            });
           } else if (event === "done") {
-            setStreamingText("");
-            setStreamingThinking("");
-            setLastSent(null);
-            const savedThinking = thinkingAccRef.current || undefined;
-            thinkingAccRef.current = "";
+            const thinkingText = streamingBlocksRef.current
+              .filter((b) => b.type === "thinking")
+              .map((b) => b.text)
+              .join("") || undefined;
+            streamingBlocksRef.current = [];
+            setStreamingBlocks([]);
             const d = data as DonePayload;
+            setTurns((t) => [
+              ...t,
+              {
+                role: "assistant",
+                content: d.answer,
+                sources: d.sources,
+                error_key: d.error_key,
+                thinking: thinkingText,
+              },
+            ]);
+            setLastSent(null);
             setConversationId(d.conversation_id);
             // 新对话：把本次使用的 Skill 选择保存到该对话（文档随空间瞬时，不持久化）
             if (isNew && activeSkillIds.length > 0) {
@@ -261,16 +308,6 @@ export default function ChatPlusPage() {
                 })
                 .catch(() => {});
             }
-            setTurns((t) => [
-              ...t,
-              {
-                role: "assistant",
-                content: d.answer,
-                sources: d.sources,
-                error_key: d.error_key,
-                thinking: savedThinking,
-              },
-            ]);
             setBusy(false);
             setConversations((prev) => {
               if (prev.some((c) => c.id === d.conversation_id)) return prev;
@@ -311,9 +348,8 @@ export default function ChatPlusPage() {
       }
     } finally {
       setBusy(false);
-      setStreamingText("");
-      setStreamingThinking("");
-      thinkingAccRef.current = "";
+      setStreamingBlocks([]);
+      streamingBlocksRef.current = [];
       abortRef.current = null;
       // clear attachments after send
       setAttachedFiles([]);
@@ -396,6 +432,7 @@ export default function ChatPlusPage() {
                   sources={turn.sources}
                   errorKey={turn.error_key}
                   onDownload={async () => {}}
+                  onEdit={turn.role === "user" && !busy ? (newContent) => handleEdit(i, newContent) : undefined}
                 />
                 {turn.role === "user" && turn.attachments && turn.attachments.length > 0 && (
                   <div className="ml-11 mt-1 flex flex-wrap gap-1">
@@ -417,22 +454,26 @@ export default function ChatPlusPage() {
               </div>
             ))}
 
-            {busy && (streamingThinking || streamingText) ? (
+            {busy && streamingBlocks.length > 0 ? (
               <div className="flex gap-3">
                 <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-gray-200 bg-white text-xs font-semibold text-gray-700 shadow-sm">
                   AI
                 </div>
                 <div className="max-w-[75%] space-y-2">
-                  {streamingThinking && (
-                    <div className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-2">
-                      <p className="mb-1 text-xs font-medium text-gray-400">{t("thinking")}</p>
-                      <p className="whitespace-pre-wrap text-xs leading-relaxed text-gray-500">{streamingThinking}</p>
-                    </div>
-                  )}
-                  {streamingText && (
-                    <div className="rounded-2xl rounded-tl-sm border border-gray-200 bg-white px-4 py-3 text-sm leading-relaxed text-gray-900 shadow-sm">
-                      <Markdown content={streamingText} />
-                    </div>
+                  {streamingBlocks.map((block, idx) =>
+                    block.type === "thinking" ? (
+                      <div key={idx} className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-2">
+                        <p className="mb-1 flex items-center gap-2 text-xs font-medium text-gray-400">
+                          {t("thinking")}
+                          <span className="font-mono tabular-nums">{elapsed}s</span>
+                        </p>
+                        <p className="whitespace-pre-wrap text-xs leading-relaxed text-gray-500">{block.text}</p>
+                      </div>
+                    ) : (
+                      <div key={idx} className="rounded-2xl rounded-tl-sm border border-gray-200 bg-white px-4 py-3 text-sm leading-relaxed text-gray-900 shadow-sm">
+                        <Markdown content={block.text} />
+                      </div>
+                    )
                   )}
                 </div>
               </div>
@@ -444,6 +485,7 @@ export default function ChatPlusPage() {
                 <div className="flex items-center gap-2 rounded-2xl rounded-tl-sm border border-gray-200 bg-white px-4 py-3 shadow-sm">
                   <span className="h-2 w-2 animate-pulse rounded-full bg-purple-400" />
                   <span className="text-sm text-gray-400">{t("thinkingDots")}</span>
+                  <span className="font-mono tabular-nums text-xs text-gray-400">{elapsed}s</span>
                 </div>
               </div>
             ) : null}

@@ -436,64 +436,74 @@ async def chat_plus_stream(
         final: AnswerResult | None = None
         output_files: list[dict] = []
 
-        async for item in answer_question_plus_streamed(
-            session,
-            workspace_id=body.workspace_id,
-            conversation_id=conv.id,
-            user=current_user,
-            question=body.message,
-            history=history,
-            doc_ids=body.doc_ids,
-            all_docs=body.all_docs,
-            skill_ids=body.skill_ids,
-            attachment_keys=attachment_keys or None,
-        ):
-            if isinstance(item, Stage):
-                yield sse("stage", {
-                    "stage": item.stage,
-                    "message_key": item.message_key,
-                    "message_params": item.message_params,
-                })
-            elif isinstance(item, ThinkingChunk):
-                yield sse("thinking", {"text": item.text})
-            elif isinstance(item, TokenChunk):
-                yield sse("token", {"text": item.text})
-            elif isinstance(item, AnswerResult):
-                final = item
-            elif isinstance(item, OutputFilesResult):
-                output_files = item.files
+        try:
+            async for item in answer_question_plus_streamed(
+                session,
+                workspace_id=body.workspace_id,
+                conversation_id=conv.id,
+                user=current_user,
+                question=body.message,
+                history=history,
+                doc_ids=body.doc_ids,
+                all_docs=body.all_docs,
+                skill_ids=body.skill_ids,
+                attachment_keys=attachment_keys or None,
+            ):
+                if isinstance(item, Stage):
+                    yield sse("stage", {
+                        "stage": item.stage,
+                        "message_key": item.message_key,
+                        "message_params": item.message_params,
+                    })
+                elif isinstance(item, ThinkingChunk):
+                    yield sse("thinking", {"text": item.text})
+                elif isinstance(item, TokenChunk):
+                    yield sse("token", {"text": item.text})
+                elif isinstance(item, AnswerResult):
+                    final = item
+                elif isinstance(item, OutputFilesResult):
+                    output_files = item.files
 
-        if final is None:
-            final = AnswerResult(answer="", sources=[], error_key="no_answer")
+            if final is None:
+                final = AnswerResult(answer="", sources=[], error_key="no_answer")
 
-        done_payload: dict = {
-            "answer": final.answer,
-            "sources": final.sources,
-            "conversation_id": str(conv.id),
-        }
-        if final.error_key:
-            done_payload["error_key"] = final.error_key
-        yield sse("done", done_payload)
+            done_payload: dict = {
+                "answer": final.answer,
+                "sources": final.sources,
+                "conversation_id": str(conv.id),
+            }
+            if final.error_key:
+                done_payload["error_key"] = final.error_key
+            yield sse("done", done_payload)
 
-        if output_files:
-            yield sse("output_files", {"files": output_files})
+            if output_files:
+                yield sse("output_files", {"files": output_files})
 
-        await add_message(
-            session,
-            conversation_id=conv.id,
-            role="assistant",
-            content=final.answer,
-            sources=final.sources,
-            output_files=output_files,
-        )
+            await add_message(
+                session,
+                conversation_id=conv.id,
+                role="assistant",
+                content=final.answer,
+                sources=final.sources,
+                output_files=output_files,
+            )
 
-        if is_new_conv:
-            async with SessionLocal() as bg_session:
-                title = await generate_conversation_title(
-                    bg_session, conversation_id=conv.id, first_message=body.message
-                )
-            if title:
-                yield sse("title", {"conversation_id": str(conv.id), "title": title})
+            if is_new_conv:
+                async with SessionLocal() as bg_session:
+                    title = await generate_conversation_title(
+                        bg_session, conversation_id=conv.id, first_message=body.message
+                    )
+                if title:
+                    yield sse("title", {"conversation_id": str(conv.id), "title": title})
+
+        except Exception:
+            logger.exception("plus/stream gen() 内部异常 conv=%s", conv.id)
+            yield sse("done", {
+                "answer": "",
+                "sources": [],
+                "conversation_id": str(conv.id),
+                "error_key": "engine_unavailable",
+            })
 
     return StreamingResponse(
         gen(),
