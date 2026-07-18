@@ -63,8 +63,13 @@ _bg_tasks: set[asyncio.Task] = set()  # 持有任务引用，防被 GC
 
 
 def is_active(conversation_id: uuid.UUID) -> bool:
-    """该会话是否有生成任务在注册表内（running 或处于终态保留窗口）。"""
-    return conversation_id in _registry
+    """该会话是否有生成任务【正在 running】。
+
+    注意：终态（done/error/cancelled）保留窗口内的任务不算 active——否则上一轮
+    刚结束的窗口期内发新消息会被误判为「生成中」。
+    """
+    st = _registry.get(conversation_id)
+    return st is not None and st.status == "running"
 
 
 def list_active(user_id: uuid.UUID) -> list[uuid.UUID]:
@@ -141,9 +146,19 @@ def request_cancel(conversation_id: uuid.UUID, user_id: uuid.UUID) -> bool:
 
 
 def _schedule_removal(conversation_id: uuid.UUID) -> None:
-    """终态保留窗口结束后，把该会话清出注册表。"""
+    """终态保留窗口结束后，把该会话清出注册表。
+
+    只删「仍是当前这个 state」的条目：若窗口内已有新一轮生成覆盖了同一
+    conversation_id，则新 state 不应被这个旧定时器误删。
+    """
+    state = _registry.get(conversation_id)
+
+    def _remove() -> None:
+        if _registry.get(conversation_id) is state:
+            _registry.pop(conversation_id, None)
+
     loop = asyncio.get_running_loop()
-    loop.call_later(_GRACE_SEC, _registry.pop, conversation_id, None)
+    loop.call_later(_GRACE_SEC, _remove)
 
 
 async def _persist_and_finalize(
@@ -305,6 +320,9 @@ def start_generation(
 
     检查 + 登记之间无 await，单线程 asyncio 下原子。
     """
+    # 仅当确有任务在 running 时才拒绝；终态（done/error/cancelled）保留窗口内的
+    # 旧任务不应阻挡新一轮——否则上一轮刚结束的 _GRACE_SEC 秒内点选项/发消息会被
+    # 误判为「生成中」而 409，前端退化成订阅旧的已结束流，表现为「点了没反应」。
     if is_active(conversation_id):
         raise GenerationInProgress()
 
