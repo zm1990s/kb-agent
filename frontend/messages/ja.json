@@ -557,7 +557,15 @@
     "ws_rename_save": "保存",
     "ws_rename_cancel": "キャンセル",
     "group_list_title": "グループ",
-    "group_no_groups": "グループがありません"
+    "group_no_groups": "グループがありません",
+    "setting_branding": "ブランド設定",
+    "setting_domains": "ドメイン許可リスト",
+    "setting_whatsnew": "新着情報スケジュール",
+    "setting_suggested": "おすすめの質問",
+    "setting_email_verification": "メール認証",
+    "ai_section_agent": "Agent エンジン",
+    "ai_section_chat_engine": "チャットエンジン",
+    "ai_section_task_headers": "タスクリクエストヘッダー"
   },
   "verifyEmail": {
     "verifying": "確認中、しばらくお待ちください…",

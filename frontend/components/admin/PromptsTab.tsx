@@ -372,22 +372,51 @@ function PromptCard({ prompt, onSaved }: { prompt: PromptItem; onSaved: (p: Prom
 export default function PromptsTab() {
   const t = useTranslations("admin");
   const [prompts, setPrompts] = useState<PromptItem[]>([]);
+  const [activeKey, setActiveKey] = useState<string | null>(null);
 
   useEffect(() => {
-    api.get<PromptItem[]>("/settings/prompts").then(setPrompts).catch(() => {});
+    api.get<PromptItem[]>("/settings/prompts").then((ps) => {
+      setPrompts(ps);
+      if (ps.length > 0) setActiveKey((k) => k ?? ps[0].key);
+    }).catch(() => {});
   }, []);
 
   function handleSaved(updated: PromptItem) {
     setPrompts((ps) => ps.map((p) => (p.key === updated.key ? updated : p)));
   }
 
+  const LABEL_MAP: Record<string, string> = {
+    answer_fetch_prompt: t("prompts_label_answer_fetch_prompt"),
+    answer_prompt: t("prompts_label_answer_prompt"),
+    classify_prompt: t("prompts_label_classify_prompt"),
+    title_prompt: t("prompts_label_title_prompt"),
+    whatsnew_prompt: t("prompts_label_whatsnew_prompt"),
+  };
+
   if (prompts.length === 0) return <p className="text-sm text-gray-400">{t("prompts_loading")}</p>;
 
+  const active = prompts.find((p) => p.key === activeKey) ?? prompts[0];
+
   return (
-    <div className="space-y-5">
-      {prompts.map((p) => (
-        <PromptCard key={p.key} prompt={p} onSaved={handleSaved} />
-      ))}
+    <div className="flex gap-6">
+      <aside className="w-40 shrink-0 flex flex-col gap-0.5">
+        {prompts.map((p) => (
+          <button
+            key={p.key}
+            onClick={() => setActiveKey(p.key)}
+            className={`w-full rounded-lg px-3 py-2 text-left text-sm transition-colors ${
+              (activeKey ?? prompts[0]?.key) === p.key
+                ? "bg-blue-50 text-blue-700 font-medium"
+                : "text-gray-700 hover:bg-gray-100"
+            }`}
+          >
+            {LABEL_MAP[p.key] ?? p.label}
+          </button>
+        ))}
+      </aside>
+      <div className="flex-1 min-w-0">
+        {active && <PromptCard key={active.key} prompt={active} onSaved={handleSaved} />}
+      </div>
     </div>
   );
 }

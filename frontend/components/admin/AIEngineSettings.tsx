@@ -32,8 +32,12 @@ type TaskHeadersConfig = Record<"classify" | "title" | "chat" | "whatsnew", Reco
 
 const TASK_KEYS = ["classify", "title", "chat", "whatsnew"] as const;
 
+type AISec = "agent" | "chat_engine" | "task_headers";
+
 export default function AIEngineSettings() {
   const t = useTranslations("settings");
+  const ta = useTranslations("admin");
+  const [activeSec, setActiveSec] = useState<AISec>("agent");
 
   const [error, setError] = useState<string | null>(null);
 
@@ -189,10 +193,35 @@ export default function AIEngineSettings() {
     });
   }
 
+  const AI_SECTIONS: [AISec, string][] = [
+    ["agent", ta("ai_section_agent")],
+    ["chat_engine", ta("ai_section_chat_engine")],
+    ["task_headers", ta("ai_section_task_headers")],
+  ];
+
   return (
-    <div className="space-y-6">
+    <div className="flex gap-6">
+      {/* 左侧菜单 */}
+      <aside className="w-40 shrink-0 flex flex-col gap-0.5">
+        {AI_SECTIONS.map(([key, label]) => (
+          <button
+            key={key}
+            onClick={() => setActiveSec(key)}
+            className={`w-full rounded-lg px-3 py-2 text-left text-sm transition-colors ${
+              activeSec === key
+                ? "bg-blue-50 text-blue-700 font-medium"
+                : "text-gray-700 hover:bg-gray-100"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </aside>
+
+      {/* 右侧内容 */}
+      <div className="flex-1 min-w-0 space-y-6">
       {/* 默认 Agent 引擎 */}
-      <section className="rounded border bg-white p-4">
+      {activeSec === "agent" && <section className="rounded border bg-white p-4">
         <h2 className="mb-1 text-sm font-medium">{t("engine_title")}</h2>
         <p className="mb-3 text-xs text-gray-400">{t("engine_desc")}</p>
         <div className="space-y-2">
@@ -255,10 +284,10 @@ export default function AIEngineSettings() {
           )}
           {taskModelMsg && <p className="mt-2 text-xs text-green-600">{taskModelMsg}</p>}
         </div>
-      </section>
+      </section>}
 
       {/* 对话引擎 */}
-      <section className="rounded border bg-white p-4">
+      {activeSec === "chat_engine" && <section className="rounded border bg-white p-4">
         <h2 className="mb-1 text-sm font-medium">{t("chat_engine_title")}</h2>
         <p className="mb-3 text-xs text-gray-400">{t("chat_engine_desc")}</p>
         <form onSubmit={saveChatEngine} className="space-y-3">
@@ -318,10 +347,10 @@ export default function AIEngineSettings() {
           </button>
         </form>
         {chatEngineMsg && <p className="mt-2 text-xs text-green-600">{chatEngineMsg}</p>}
-      </section>
+      </section>}
 
       {/* 任务请求 Headers */}
-      <section className="rounded border bg-white p-4">
+      {activeSec === "task_headers" && <section className="rounded border bg-white p-4">
         <h2 className="mb-1 text-sm font-medium">{t("task_headers_title")}</h2>
         <p className="mb-4 text-xs text-gray-400">{t("task_headers_desc")}</p>
         <div className="space-y-5">
@@ -375,9 +404,10 @@ export default function AIEngineSettings() {
           ))}
         </div>
         {taskHeadersMsg && <p className="mt-3 text-xs text-green-600">{taskHeadersMsg}</p>}
-      </section>
+      </section>}
 
       {error && <p className="text-sm text-red-600">{error}</p>}
+      </div>
     </div>
   );
 }

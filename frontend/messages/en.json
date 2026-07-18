@@ -557,7 +557,15 @@
     "ws_rename_save": "Save",
     "ws_rename_cancel": "Cancel",
     "group_list_title": "Groups",
-    "group_no_groups": "No groups yet"
+    "group_no_groups": "No groups yet",
+    "setting_branding": "Branding",
+    "setting_domains": "Domain Allowlist",
+    "setting_whatsnew": "What's New Schedule",
+    "setting_suggested": "Suggested Questions",
+    "setting_email_verification": "Email Verification",
+    "ai_section_agent": "Agent Engine",
+    "ai_section_chat_engine": "Chat Engine",
+    "ai_section_task_headers": "Task Request Headers"
   },
   "verifyEmail": {
     "verifying": "Verifying, please wait…",

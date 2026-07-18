@@ -16,6 +16,7 @@ interface Branding {
 }
 
 type Tab = "workspaces" | "users" | "general" | "prompts" | "ai_engine";
+type GeneralSection = "branding" | "domains" | "whatsnew" | "suggested" | "email_verification";
 
 interface Props {
   // null = admin（全部可见）；Record = 普通用户权限表
@@ -33,6 +34,7 @@ export default function SystemSettings({ perms }: Props) {
     : "general";
 
   const [tab, setTab] = useState<Tab>(defaultTab);
+  const [activeSetting, setActiveSetting] = useState<GeneralSection>("branding");
   const [domains, setDomains] = useState<AllowedDomain[]>([]);
   const [domainName, setDomainName] = useState("");
   const [branding, setBranding] = useState<Branding>({ name: "", logo_url: "" });
@@ -264,9 +266,36 @@ export default function SystemSettings({ perms }: Props) {
       {tab === "ai_engine" && <AIEngineSettings />}
 
       {tab === "general" && (
-        <div className="space-y-6">
+        <div className="flex gap-6">
+          {/* 左侧菜单 */}
+          <aside className="w-40 shrink-0 flex flex-col gap-0.5">
+            {(
+              [
+                ["branding", t("setting_branding")],
+                ["domains", t("setting_domains")],
+                ["whatsnew", t("setting_whatsnew")],
+                ["suggested", t("setting_suggested")],
+                ["email_verification", t("setting_email_verification")],
+              ] as [GeneralSection, string][]
+            ).map(([key, label]) => (
+              <button
+                key={key}
+                onClick={() => setActiveSetting(key)}
+                className={`w-full rounded-lg px-3 py-2 text-left text-sm transition-colors ${
+                  activeSetting === key
+                    ? "bg-blue-50 text-blue-700 font-medium"
+                    : "text-gray-700 hover:bg-gray-100"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </aside>
+
+          {/* 右侧内容 */}
+          <div className="flex-1 min-w-0 space-y-6">
           {/* 平台品牌配置 */}
-          <section className="rounded border bg-white p-4">
+          {activeSetting === "branding" && <section className="rounded border bg-white p-4">
             <h2 className="mb-1 text-sm font-medium">{t("branding_title")}</h2>
             <p className="mb-3 text-xs text-gray-400">{t("branding_desc")}</p>
             <form onSubmit={saveBranding} className="space-y-3">
@@ -306,9 +335,10 @@ export default function SystemSettings({ perms }: Props) {
               </button>
             </form>
             {brandingMsg && <p className="mt-2 text-xs text-green-600">{brandingMsg}</p>}
-          </section>
+          </section>}
 
           {/* 域名白名单 */}
+          {activeSetting === "domains" && (
           <section className="rounded border bg-white p-4">
             <h2 className="mb-1 text-sm font-medium">{t("domain_title")}</h2>
             <p className="mb-3 text-xs text-gray-400">{t("domain_desc")}</p>
@@ -344,8 +374,10 @@ export default function SystemSettings({ perms }: Props) {
               )}
             </ul>
           </section>
+          )}
 
           {/* 新动态定时 */}
+          {activeSetting === "whatsnew" && (
           <section className="rounded border bg-white p-4">
             <h2 className="mb-1 text-sm font-medium">{t("whatsnew_title")}</h2>
             <p className="mb-3 text-xs text-gray-400">
@@ -394,8 +426,10 @@ export default function SystemSettings({ perms }: Props) {
               {wnMsg && <p className="mt-2 text-xs text-green-600">{wnMsg}</p>}
             </div>
           </section>
+          )}
 
           {/* 引导问题 */}
+          {activeSetting === "suggested" && (
           <section className="rounded border bg-white p-4">
             <h2 className="mb-1 text-sm font-medium">{t("suggested_title")}</h2>
             <p className="mb-3 text-xs text-gray-400">{t("suggested_desc")}</p>
@@ -416,8 +450,10 @@ export default function SystemSettings({ perms }: Props) {
             </form>
             {sqMsg && <p className="mt-2 text-xs text-green-600">{sqMsg}</p>}
           </section>
+          )}
 
           {/* 邮箱验证开关（含站点基础 URL 子菜单） */}
+          {activeSetting === "email_verification" && (
           <section className="rounded border bg-white p-4">
             <h2 className="mb-1 text-sm font-medium">{t("email_verification_title")}</h2>
             <p className="mb-3 text-xs text-gray-400">{t("email_verification_desc")}</p>
@@ -461,8 +497,10 @@ export default function SystemSettings({ perms }: Props) {
               {siteBaseUrlMsg && <p className="mt-2 text-xs text-green-600">{siteBaseUrlMsg}</p>}
             </div>
           </section>
+          )}
 
           {error && <p className="text-sm text-red-600">{error}</p>}
+          </div>
         </div>
       )}
     </div>

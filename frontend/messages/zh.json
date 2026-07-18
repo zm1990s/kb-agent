@@ -557,7 +557,15 @@
     "ws_rename_save": "保存",
     "ws_rename_cancel": "取消",
     "group_list_title": "用户组",
-    "group_no_groups": "暂无用户组"
+    "group_no_groups": "暂无用户组",
+    "setting_branding": "品牌配置",
+    "setting_domains": "域名白名单",
+    "setting_whatsnew": "新动态定时",
+    "setting_suggested": "引导问题",
+    "setting_email_verification": "邮箱验证",
+    "ai_section_agent": "Agent 引擎",
+    "ai_section_chat_engine": "对话引擎",
+    "ai_section_task_headers": "任务请求头"
   },
   "verifyEmail": {
     "verifying": "正在验证，请稍候…",

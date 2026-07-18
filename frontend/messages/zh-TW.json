@@ -557,7 +557,15 @@
     "ws_rename_save": "儲存",
     "ws_rename_cancel": "取消",
     "group_list_title": "使用者群組",
-    "group_no_groups": "暫無使用者群組"
+    "group_no_groups": "暫無使用者群組",
+    "setting_branding": "品牌設定",
+    "setting_domains": "網域白名單",
+    "setting_whatsnew": "最新消息排程",
+    "setting_suggested": "引導問題",
+    "setting_email_verification": "電子郵件驗證",
+    "ai_section_agent": "Agent 引擎",
+    "ai_section_chat_engine": "對話引擎",
+    "ai_section_task_headers": "任務請求標頭"
   },
   "verifyEmail": {
     "verifying": "正在驗證，請稍候…",
