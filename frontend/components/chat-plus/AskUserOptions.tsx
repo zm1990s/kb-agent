@@ -56,8 +56,8 @@ export default function AskUserOptions({ payload, onPick, disabled }: Props) {
   const multiCanSubmit = checked.size > 0 || other.trim().length > 0;
 
   return (
-    <div className="ml-11 mt-2 w-full max-w-md">
-      <p className="mb-2 text-sm font-medium text-gray-700">{payload.question}</p>
+    <div className="ml-11 mt-4 mb-4 w-full max-w-md rounded-2xl border border-purple-100 bg-purple-50/40 p-4 shadow-sm">
+      <p className="mb-3 text-sm font-medium text-gray-700">{payload.question}</p>
       <div className="flex flex-col gap-2">
         {payload.options.map((o) =>
           multi ? (
