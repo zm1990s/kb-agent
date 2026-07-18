@@ -548,7 +548,14 @@
     "prompts_label_title_prompt": "会话标题提示词",
     "prompts_desc_title_prompt": "用户发出第一条消息后，Agent 自动生成会话标题时使用的提示词。必须包含 '{message}' 占位符（运行时替换为用户的第一条消息）。",
     "prompts_label_whatsnew_prompt": "新动态摘要提示词",
-    "prompts_desc_whatsnew_prompt": "定时任务为每个空间生成「新动态」摘要时使用的提示词。必须包含 '{workspace_name}'、'{period}'、'{doc_count}'、'{documents}'、'{timestamp}' 五个占位符。"
+    "prompts_desc_whatsnew_prompt": "定时任务为每个空间生成「新动态」摘要时使用的提示词。必须包含 '{workspace_name}'、'{period}'、'{doc_count}'、'{documents}'、'{timestamp}' 五个占位符。",
+    "ws_list_title": "空间列表",
+    "ws_no_workspaces": "暂无空间",
+    "ws_select_hint": "请从左侧选择一个空间",
+    "ws_cancel_create": "取消",
+    "ws_rename_btn": "重命名",
+    "ws_rename_save": "保存",
+    "ws_rename_cancel": "取消"
   },
   "verifyEmail": {
     "verifying": "正在验证，请稍候…",

@@ -20,6 +20,7 @@ from app.schemas.auth import (
     MemberAddRequest,
     WorkspaceCreate,
     WorkspacePublic,
+    WorkspaceUpdate,
     WorkspaceWithRole,
 )
 from app.services.usage_service import record_event
@@ -32,6 +33,7 @@ from app.services.workspace_service import (
     grant_group,
     list_group_grants,
     list_my_workspaces,
+    rename_workspace,
     revoke_group,
 )
 from app.storage.base import get_storage
@@ -73,6 +75,25 @@ async def list_workspaces(
         )
         for ws, role in rows
     ]
+
+
+@router.patch("/{workspace_id}", response_model=WorkspacePublic)
+async def update_workspace(
+    workspace_id: uuid.UUID,
+    body: WorkspaceUpdate,
+    admin: User = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+) -> WorkspacePublic:
+    """重命名空间（仅管理员）。"""
+    try:
+        ws = await rename_workspace(session, ws_id=workspace_id, name=body.name)
+    except WorkspaceNotFoundError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "空间不存在") from exc
+    logger.info("audit admin rename_workspace admin=%s workspace=%s name=%s",
+                admin.id, workspace_id, ws.name)
+    await record_event(session, action="admin_rename_workspace", user_id=admin.id,
+                       meta={"workspace_id": str(workspace_id), "name": ws.name})
+    return WorkspacePublic.model_validate(ws)
 
 
 @router.post("/{workspace_id}/members", status_code=status.HTTP_201_CREATED)

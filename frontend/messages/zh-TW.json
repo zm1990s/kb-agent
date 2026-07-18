@@ -548,7 +548,14 @@
     "prompts_label_title_prompt": "對話標題提示詞",
     "prompts_desc_title_prompt": "使用者發出第一條訊息後，Agent 自動生成對話標題時使用的提示詞。必須包含 '{message}' 佔位符（執行時替換為使用者的第一條訊息）。",
     "prompts_label_whatsnew_prompt": "最新動態摘要提示詞",
-    "prompts_desc_whatsnew_prompt": "定時任務為每個空間生成「最新動態」摘要時使用的提示詞。必須包含 '{workspace_name}'、'{period}'、'{doc_count}'、'{documents}'、'{timestamp}' 五個佔位符。"
+    "prompts_desc_whatsnew_prompt": "定時任務為每個空間生成「最新動態」摘要時使用的提示詞。必須包含 '{workspace_name}'、'{period}'、'{doc_count}'、'{documents}'、'{timestamp}' 五個佔位符。",
+    "ws_list_title": "空間列表",
+    "ws_no_workspaces": "暫無空間",
+    "ws_select_hint": "請從左側選擇一個空間",
+    "ws_cancel_create": "取消",
+    "ws_rename_btn": "重新命名",
+    "ws_rename_save": "儲存",
+    "ws_rename_cancel": "取消"
   },
   "verifyEmail": {
     "verifying": "正在驗證，請稍候…",

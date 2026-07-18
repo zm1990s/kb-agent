@@ -115,6 +115,22 @@ async def list_my_workspaces(
     return list(seen.values())
 
 
+async def rename_workspace(
+    session: AsyncSession,
+    *,
+    ws_id: uuid.UUID,
+    name: str,
+) -> Workspace:
+    """重命名空间。空间不存在抛 WorkspaceNotFoundError。"""
+    ws = await session.get(Workspace, ws_id)
+    if ws is None:
+        raise WorkspaceNotFoundError(str(ws_id))
+    ws.name = name.strip()
+    await session.commit()
+    await session.refresh(ws)
+    return ws
+
+
 async def grant_group(
     session: AsyncSession,
     *,

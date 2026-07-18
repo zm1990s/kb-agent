@@ -548,7 +548,14 @@
     "prompts_label_title_prompt": "Conversation Title Prompt",
     "prompts_desc_title_prompt": "Used to auto-generate a conversation title after the user sends the first message. Must include the '{message}' placeholder (replaced at runtime with the first user message).",
     "prompts_label_whatsnew_prompt": "What's New Summary Prompt",
-    "prompts_desc_whatsnew_prompt": "Used by the scheduled task to generate the What's New summary for each workspace. Must include '{workspace_name}', '{period}', '{doc_count}', '{documents}', '{timestamp}'."
+    "prompts_desc_whatsnew_prompt": "Used by the scheduled task to generate the What's New summary for each workspace. Must include '{workspace_name}', '{period}', '{doc_count}', '{documents}', '{timestamp}'.",
+    "ws_list_title": "Workspaces",
+    "ws_no_workspaces": "No workspaces yet",
+    "ws_select_hint": "Select a workspace from the left",
+    "ws_cancel_create": "Cancel",
+    "ws_rename_btn": "Rename",
+    "ws_rename_save": "Save",
+    "ws_rename_cancel": "Cancel"
   },
   "verifyEmail": {
     "verifying": "Verifying, please wait…",

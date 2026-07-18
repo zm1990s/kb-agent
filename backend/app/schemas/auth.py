@@ -84,6 +84,10 @@ class WorkspaceWithRole(WorkspacePublic):
     role_in_ws: str
 
 
+class WorkspaceUpdate(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+
+
 class MemberAddRequest(BaseModel):
     user_id: uuid.UUID | None = None
     email: str | None = None
