@@ -49,6 +49,21 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["chat"])
 
 
+async def _require_chat(session: AsyncSession, user: User) -> None:
+    """要求用户有 chat 模块权限（≥read）；admin 绕过。否则 403。
+
+    注意：这是「能否使用聊天功能」的准入门闸，与「能否访问某空间数据」
+    （is_member）正交——两者都要过。
+    """
+    if user.role == "admin":
+        return
+    from app.services.rbac_service import effective_permissions
+
+    perms = await effective_permissions(session, user=user)
+    if perms.get("chat", "none") == "none":
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "无聊天功能权限")
+
+
 @router.post("/chat", response_model=ChatResponse)
 async def chat(
     body: ChatRequest,
@@ -56,7 +71,8 @@ async def chat(
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> ChatResponse:
-    # 仅限所属空间（越权校验 SECURITY #4）
+    # 聊天功能准入（chat 模块权限）+ 空间成员资格（越权校验 SECURITY #4）
+    await _require_chat(session, current_user)
     if not await is_member(
         session, workspace_id=body.workspace_id, user_id=current_user.id
     ):
@@ -128,6 +144,7 @@ async def chat_stream(
     session: AsyncSession = Depends(get_session),
 ) -> StreamingResponse:
     """SSE 流式对话：先推送 Agent 工作阶段，最后推送答案+来源。"""
+    await _require_chat(session, current_user)
     if not await is_member(
         session, workspace_id=body.workspace_id, user_id=current_user.id
     ):
@@ -231,6 +248,7 @@ async def get_conversations(
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> list[ConversationSummary]:
+    await _require_chat(session, current_user)
     if not await is_member(
         session, workspace_id=workspace_id, user_id=current_user.id
     ):
@@ -251,6 +269,7 @@ async def new_conversation(
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> ConversationSummary:
+    await _require_chat(session, current_user)
     if not await is_member(
         session, workspace_id=body.workspace_id, user_id=current_user.id
     ):
@@ -267,6 +286,7 @@ async def get_conversation(
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> ConversationHistory:
+    await _require_chat(session, current_user)
     conv = await get_conversation_for_user(
         session, conversation_id=conversation_id, user_id=current_user.id
     )
@@ -286,6 +306,7 @@ async def delete_conversation_endpoint(
     session: AsyncSession = Depends(get_session),
 ) -> None:
     """删除会话及其所有消息（仅限归属本人）。"""
+    await _require_chat(session, current_user)
     ok = await delete_conversation(
         session, conversation_id=conversation_id, user_id=current_user.id
     )
@@ -301,6 +322,7 @@ async def patch_conversation(
     session: AsyncSession = Depends(get_session),
 ) -> ConversationSummary:
     """更新会话标题或置顶状态。"""
+    await _require_chat(session, current_user)
     conv = await update_conversation(
         session,
         conversation_id=conversation_id,
