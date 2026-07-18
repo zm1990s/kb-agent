@@ -54,6 +54,26 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["chat"])
 
 
+async def _require_module(session: AsyncSession, user: User, module: str) -> None:
+    """要求用户对指定模块有权限（≥read）；admin 绕过。否则 403。
+
+    聊天准入门闸：chat 端点用 "chat"，聊天+ 端点用 "chatplus"。
+    与「能否访问某空间数据」（is_member）正交——两者都要过。
+    """
+    if user.role == "admin":
+        return
+    from app.services.rbac_service import effective_permissions
+
+    perms = await effective_permissions(session, user=user)
+    if perms.get(module, "none") == "none":
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "无该功能权限")
+
+
+def _module_for_source(source: str) -> str:
+    """会话来源 → RBAC 模块名。"""
+    return "chatplus" if source == "chatplus" else "chat"
+
+
 @router.post("/chat", response_model=ChatResponse)
 async def chat(
     body: ChatRequest,
@@ -61,7 +81,8 @@ async def chat(
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> ChatResponse:
-    # 仅限所属空间（越权校验 SECURITY #4）
+    # 聊天功能准入（chat 模块权限）+ 空间成员资格（越权校验 SECURITY #4）
+    await _require_module(session, current_user, "chat")
     if not await is_member(
         session, workspace_id=body.workspace_id, user_id=current_user.id
     ):
@@ -133,6 +154,7 @@ async def chat_stream(
     session: AsyncSession = Depends(get_session),
 ) -> StreamingResponse:
     """SSE 流式对话：先推送 Agent 工作阶段，最后推送答案+来源。"""
+    await _require_module(session, current_user, "chat")
     if not await is_member(
         session, workspace_id=body.workspace_id, user_id=current_user.id
     ):
@@ -238,6 +260,8 @@ async def get_conversations(
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> list[ConversationSummary]:
+    # 按会话来源校验对应模块权限（chat / chatplus）
+    await _require_module(session, current_user, _module_for_source(source))
     # workspace_id 为空时不按空间过滤（聊天+ 会话不分空间）；传入时校验成员权限
     if workspace_id is not None and not await is_member(
         session, workspace_id=workspace_id, user_id=current_user.id
@@ -259,6 +283,7 @@ async def new_conversation(
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> ConversationSummary:
+    await _require_module(session, current_user, _module_for_source(body.source))
     if not await is_member(
         session, workspace_id=body.workspace_id, user_id=current_user.id
     ):
@@ -283,6 +308,7 @@ async def get_conversation(
     )
     if conv is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "会话不存在")
+    await _require_module(session, current_user, _module_for_source(conv.source))
     msgs = await list_messages(session, conversation_id=conv.id)
     return ConversationHistory(
         conversation_id=conv.id,
@@ -297,6 +323,12 @@ async def delete_conversation_endpoint(
     session: AsyncSession = Depends(get_session),
 ) -> None:
     """删除会话及其所有消息（仅限归属本人）。"""
+    conv = await get_conversation_for_user(
+        session, conversation_id=conversation_id, user_id=current_user.id
+    )
+    if conv is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "会话不存在")
+    await _require_module(session, current_user, _module_for_source(conv.source))
     ok = await delete_conversation(
         session, conversation_id=conversation_id, user_id=current_user.id
     )
@@ -312,6 +344,12 @@ async def patch_conversation(
     session: AsyncSession = Depends(get_session),
 ) -> ConversationSummary:
     """更新会话标题或置顶状态。"""
+    existing = await get_conversation_for_user(
+        session, conversation_id=conversation_id, user_id=current_user.id
+    )
+    if existing is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "会话不存在")
+    await _require_module(session, current_user, _module_for_source(existing.source))
     conv = await update_conversation(
         session,
         conversation_id=conversation_id,
@@ -366,6 +404,7 @@ async def chat_plus_stream(
 
     会话不绑定工作区；仅当本轮传入 workspace_id（引用其文档）时才校验成员权限。
     """
+    await _require_module(session, current_user, "chatplus")
     if body.workspace_id is not None and not await is_member(
         session, workspace_id=body.workspace_id, user_id=current_user.id
     ):
@@ -467,6 +506,7 @@ async def chat_plus_stream(
 async def upload_attachment(
     file: UploadFile,
     current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
 ) -> dict:
     """用户上传附件，返回 storage_key 供聊天+ 请求使用（与工作区解耦）。
 
@@ -474,6 +514,7 @@ async def upload_attachment(
     """
     import uuid as _uuid
 
+    await _require_module(session, current_user, "chatplus")
     from app.storage.base import get_storage
     data = await file.read()
     key = f"chatplus/uploads/{_uuid.uuid4().hex}"
@@ -497,6 +538,7 @@ async def list_conversation_files(
     )
     if conv is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "会话不存在")
+    await _require_module(session, current_user, _module_for_source(conv.source))
 
     from app.storage.base import get_storage
     storage = get_storage()
@@ -535,6 +577,7 @@ async def download_conversation_file(
     )
     if conv is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "会话不存在")
+    await _require_module(session, current_user, _module_for_source(conv.source))
 
     # 防穿越：规范化后不得为绝对路径 / 含 .. / 逃出会话目录
     rel = PurePosixPath(file_path)
@@ -574,6 +617,7 @@ async def get_conversation_settings(
     )
     if conv is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "会话不存在")
+    await _require_module(session, current_user, _module_for_source(conv.source))
     from app.models.chat import ConversationSettings
     settings_obj = await session.get(ConversationSettings, conversation_id)
     if settings_obj is None:
@@ -604,6 +648,7 @@ async def update_conversation_settings(
     )
     if conv is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "会话不存在")
+    await _require_module(session, current_user, _module_for_source(conv.source))
     from app.models.chat import ConversationSettings
     settings_obj = await session.get(ConversationSettings, conversation_id)
     if settings_obj is None:

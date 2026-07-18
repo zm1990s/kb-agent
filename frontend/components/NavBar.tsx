@@ -86,7 +86,6 @@ export default function NavBar() {
 
   const visible = links.filter((l) => {
     if (admin) return true;
-    if (l.module === "chat") return true;
     if (!perms) return false;
     if (l.href === "/settings") {
       return ["settings", "workspaces", "users"].some(
