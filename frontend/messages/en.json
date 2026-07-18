@@ -555,7 +555,9 @@
     "ws_cancel_create": "Cancel",
     "ws_rename_btn": "Rename",
     "ws_rename_save": "Save",
-    "ws_rename_cancel": "Cancel"
+    "ws_rename_cancel": "Cancel",
+    "group_list_title": "Groups",
+    "group_no_groups": "No groups yet"
   },
   "verifyEmail": {
     "verifying": "Verifying, please wait…",

@@ -198,7 +198,7 @@ export default function WorkspaceAdmin() {
         <p className="px-1 pb-1 text-xs font-medium text-gray-500 uppercase tracking-wide">
           {t("ws_list_title")}
         </p>
-        <ul className="flex-1 space-y-0.5">
+        <ul className="space-y-0.5">
           {workspaces.map((w) => (
             <li key={w.id}>
               <button

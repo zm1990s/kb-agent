@@ -239,48 +239,54 @@ function GroupsTab({
     perms.find((p) => p.module === m)?.level ?? "none";
 
   return (
-    <div className="flex gap-4">
-      <div className="w-56 shrink-0 rounded border bg-white">
+    <div className="flex gap-6">
+      <aside className="w-52 shrink-0 flex flex-col gap-1">
+        <p className="px-1 pb-1 text-xs font-medium text-gray-500 uppercase tracking-wide">
+          {t("group_list_title")}
+        </p>
+        <ul className="space-y-0.5">
+          {groups.map((g) => (
+            <li key={g.id} className="group flex items-center">
+              <button
+                onClick={() => setSelected(g.id)}
+                className={`flex-1 truncate rounded-lg px-3 py-2 text-left text-sm transition-colors ${
+                  selected === g.id
+                    ? "bg-blue-50 text-blue-700 font-medium"
+                    : "text-gray-700 hover:bg-gray-100"
+                }`}
+              >
+                {g.name}
+              </button>
+              <button
+                onClick={async () => {
+                  if (await showConfirm(t("group_delete_confirm", { name: g.name }))) {
+                    act(() => api.del(`/admin/groups/${g.id}`), false);
+                    if (selected === g.id) setSelected(null);
+                  }
+                }}
+                className="hidden px-1 text-xs text-red-400 hover:text-red-600 group-hover:block"
+              >
+                ✕
+              </button>
+            </li>
+          ))}
+          {groups.length === 0 && (
+            <li className="px-3 py-2 text-xs text-gray-400">{t("group_no_groups")}</li>
+          )}
+        </ul>
         <button
           onClick={async () => {
             const name = await showPrompt(t("group_new_prompt"));
             if (name) act(() => api.post("/admin/groups", { name }), false);
           }}
-          className="m-2 rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700"
+          className="mt-2 flex items-center gap-1.5 rounded-lg border border-dashed border-gray-300 px-3 py-2 text-sm text-gray-500 hover:border-blue-400 hover:text-blue-600 transition-colors"
         >
+          <span className="text-base leading-none">+</span>
           {t("group_new")}
         </button>
-        {groups.map((g) => (
-          <div
-            key={g.id}
-            className={`group flex items-center ${
-              selected === g.id ? "bg-blue-50" : "hover:bg-gray-100"
-            }`}
-          >
-            <button
-              onClick={() => setSelected(g.id)}
-              className={`flex-1 truncate px-3 py-2 text-left text-sm ${
-                selected === g.id ? "text-blue-700" : "text-gray-600"
-              }`}
-            >
-              {g.name}
-            </button>
-            <button
-              onClick={async () => {
-                if (await showConfirm(t("group_delete_confirm", { name: g.name }))) {
-                  act(() => api.del(`/admin/groups/${g.id}`), false);
-                  if (selected === g.id) setSelected(null);
-                }
-              }}
-              className="hidden px-2 text-xs text-red-500 group-hover:block"
-            >
-              ✕
-            </button>
-          </div>
-        ))}
-      </div>
+      </aside>
 
-      <div className="flex-1 space-y-4">
+      <div className="flex-1 min-w-0 space-y-4">
         {!selected && (
           <p className="text-sm text-gray-400">{t("group_select_hint")}</p>
         )}

@@ -555,7 +555,9 @@
     "ws_cancel_create": "キャンセル",
     "ws_rename_btn": "名前を変更",
     "ws_rename_save": "保存",
-    "ws_rename_cancel": "キャンセル"
+    "ws_rename_cancel": "キャンセル",
+    "group_list_title": "グループ",
+    "group_no_groups": "グループがありません"
   },
   "verifyEmail": {
     "verifying": "確認中、しばらくお待ちください…",

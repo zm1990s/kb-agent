@@ -555,7 +555,9 @@
     "ws_cancel_create": "취소",
     "ws_rename_btn": "이름 변경",
     "ws_rename_save": "저장",
-    "ws_rename_cancel": "취소"
+    "ws_rename_cancel": "취소",
+    "group_list_title": "그룹 목록",
+    "group_no_groups": "그룹 없음"
   },
   "verifyEmail": {
     "verifying": "인증 중, 잠시만 기다려 주세요…",

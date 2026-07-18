@@ -555,7 +555,9 @@
     "ws_cancel_create": "取消",
     "ws_rename_btn": "重新命名",
     "ws_rename_save": "儲存",
-    "ws_rename_cancel": "取消"
+    "ws_rename_cancel": "取消",
+    "group_list_title": "使用者群組",
+    "group_no_groups": "暫無使用者群組"
   },
   "verifyEmail": {
     "verifying": "正在驗證，請稍候…",
