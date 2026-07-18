@@ -48,18 +48,25 @@ class EngineProtocol(Protocol):
         *,
         files: list[Path] | None = None,
         system: str | None = None,
+        cwd: Path | None = None,
     ) -> EngineResult:
-        """给定 prompt（可附带文件），返回模型输出。"""
+        """给定 prompt（可附带文件），返回模型输出。
+
+        cwd 为可选的工作目录：支持文件工具的引擎（如 Claude CLI）会在此目录下
+        运行子进程，Agent 创建的文件落在这里；不支持的引擎应忽略该参数。
+        """
         ...
 
     async def complete_streaming(
         self,
         prompt: str,
         *,
+        files: list[Path] | None = None,
         system: str | None = None,
+        cwd: Path | None = None,
     ) -> AsyncGenerator["ThinkingChunk | TextChunk", None]:
         """流式调用：逐块 yield ThinkingChunk 或 TextChunk。
-        不支持的引擎可以不实现此方法（用 hasattr 判断）。
+        不支持的引擎可以不实现此方法（用 hasattr 判断）。cwd 语义同 complete。
         """
         ...
 

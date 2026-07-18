@@ -25,6 +25,7 @@ from app.services.settings_service import (
     EngineNotAvailableError,
     InvalidPromptError,
     get_chat_engine_backend,
+    get_chat_file_retention_days,
     get_engine_backend,
     get_openai_api_key,
     get_openai_base_url,
@@ -42,6 +43,7 @@ from app.services.settings_service import (
     list_prompt_history,
     rollback_prompt,
     set_chat_engine_backend,
+    set_chat_file_retention_days,
     set_engine_backend,
     set_openai_api_key,
     set_openai_base_url,
@@ -358,6 +360,45 @@ async def update_whatsnew_schedule(
         meta={"hour": body.hour, "frequency": body.frequency},
     )
     return await _get_schedule_out(session)
+
+
+# ── 聊天+ 文件保留期 ──────────────────────────────────────────
+
+
+class ChatFileRetentionOut(BaseModel):
+    days: int
+
+
+class ChatFileRetentionIn(BaseModel):
+    days: int
+
+
+@router.get("/chat-file-retention", response_model=ChatFileRetentionOut)
+async def get_chat_file_retention(
+    _admin: User = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+) -> ChatFileRetentionOut:
+    return ChatFileRetentionOut(days=await get_chat_file_retention_days(session))
+
+
+@router.put("/chat-file-retention", response_model=ChatFileRetentionOut)
+async def update_chat_file_retention(
+    body: ChatFileRetentionIn,
+    admin: User = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+) -> ChatFileRetentionOut:
+    try:
+        await set_chat_file_retention_days(session, body.days)
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+    logger.info("audit admin set_chat_file_retention admin=%s days=%d", admin.id, body.days)
+    await record_event(
+        session,
+        action="admin_set_chat_file_retention",
+        user_id=admin.id,
+        meta={"days": body.days},
+    )
+    return ChatFileRetentionOut(days=await get_chat_file_retention_days(session))
 
 
 # ── 引导问题 ─────────────────────────────────────────────────

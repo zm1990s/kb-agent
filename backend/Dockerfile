@@ -24,6 +24,12 @@ COPY . .
 RUN useradd -m -u 10001 appuser \
     && mkdir -p /app/local_storage /app/logs \
     && chown -R appuser:appuser /app
+
+# 预置内置 Skill（Claude CLI 原生机制）：启动即自动发现，无需注入提示词。
+# /home/appuser 不被 bind-mount 覆盖，故装在此处对每次 CLI 调用生效。
+RUN mkdir -p /home/appuser/.claude/skills \
+    && cp -r /app/skills/. /home/appuser/.claude/skills/ \
+    && chown -R appuser:appuser /home/appuser/.claude
 # entrypoint 以 root 启动，修复 bind-mount 目录权限后用 gosu 降权到 appuser
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh

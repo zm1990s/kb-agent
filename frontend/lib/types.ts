@@ -89,7 +89,7 @@ export interface ChatResponse {
 
 export interface ConversationSummary {
   id: string;
-  workspace_id: string;
+  workspace_id: string | null;
   title: string | null;
   pinned: boolean;
   created_at: string;
@@ -100,6 +100,8 @@ export interface Message {
   role: "user" | "assistant";
   content: string;
   sources: SourceRef[];
+  attachments?: { storage_key: string; filename: string; size?: number }[];
+  output_files?: { filename: string; storage_key?: string; conversation_id?: string }[];
   created_at: string;
 }
 

@@ -32,15 +32,17 @@ export default function Markdown({ content }: { content: string }) {
           h1: ({ ...props }) => <h1 className="mt-3 mb-1 text-base font-semibold text-gray-900" {...props} />,
           h2: ({ ...props }) => <h2 className="mt-3 mb-1 text-base font-semibold text-gray-900" {...props} />,
           h3: ({ ...props }) => <h3 className="mt-2 mb-1 text-sm font-semibold text-gray-900" {...props} />,
+          // 内联 code 用浅灰 pill；围栏代码块（在 <pre> 内）的 code 由下方 pre 的
+          // 变体样式统一重置背景/内边距/配色，避免嵌套出现深色或粉色小块。
           code: ({ ...props }) => (
             <code
-              className="rounded bg-gray-100 px-1.5 py-0.5 text-xs font-mono text-pink-600"
+              className="rounded bg-gray-100 px-1.5 py-0.5 text-xs font-mono text-amber-700"
               {...props}
             />
           ),
           pre: ({ ...props }) => (
             <pre
-              className="my-2 overflow-x-auto rounded-lg border border-gray-200 bg-gray-900 p-4 text-xs text-gray-100"
+              className="my-2 overflow-x-auto rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs text-gray-800 [&_code]:bg-transparent [&_code]:p-0 [&_code]:text-gray-800"
               {...props}
             />
           ),

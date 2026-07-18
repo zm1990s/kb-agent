@@ -31,6 +31,8 @@ class MessagePublic(BaseModel):
     role: str
     content: str
     sources: list
+    attachments: list = []
+    output_files: list = []
     created_at: datetime
 
 
@@ -41,13 +43,14 @@ class ConversationHistory(BaseModel):
 
 class ConversationCreate(BaseModel):
     workspace_id: uuid.UUID
+    source: str = "chat"
 
 
 class ConversationSummary(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
-    workspace_id: uuid.UUID
+    workspace_id: uuid.UUID | None
     title: str | None
     pinned: bool
     created_at: datetime

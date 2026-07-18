@@ -89,7 +89,7 @@ export default function ChatPage() {
     try {
       setConversations(
         await api.get<ConversationSummary[]>(
-          `/conversations?workspace_id=${workspaceId}`
+          `/conversations?workspace_id=${workspaceId}&source=chat`
         )
       );
     } catch {

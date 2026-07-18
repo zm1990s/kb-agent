@@ -28,12 +28,15 @@ class ClaudeCliEngine:
         self._model = model or settings.claude_model
         self._idle_timeout = settings.engine_idle_timeout_sec
 
-    def _build_argv(self, prompt: str, files: list[Path] | None) -> list[str]:
+    def _build_argv(
+        self, prompt: str, files: list[Path] | None, cwd: Path | None = None
+    ) -> list[str]:
         """构造 argv 列表；参数以独立元素传入，避免 shell 解析。
 
         文件通过"把路径写进 prompt + --add-dir 授权目录"让 CLI 用 Read 工具读原文
         （CLI 的 --file 是 file_id:path 远程资源语义，不适用于本地路径）。
         headless 下用 --permission-mode 跳过交互授权（平台可信，见 SECURITY #2）。
+        cwd 为工作目录：CLI 子进程在此运行，并授权其读写（--add-dir）。
         """
         files = files or []
         full_prompt = prompt
@@ -49,7 +52,10 @@ class ClaudeCliEngine:
         # 授权每个文件所在目录，供工具访问
         for f in files:
             argv += ["--add-dir", str(f.parent)]
-        if files:
+        # 授权工作目录，供 Agent 在其中创建/修改文件
+        if cwd is not None:
+            argv += ["--add-dir", str(cwd)]
+        if files or cwd is not None:
             # 放开全部工具（含 Bash，用于 pdftotext 等抽取大文件）。
             # 按项目决策：工具不做限制、假设平台可信（见 SECURITY.md #2）。
             # 注意：该 flag 拒绝 root 运行，容器以非 root 用户启动。
@@ -62,8 +68,9 @@ class ClaudeCliEngine:
         *,
         files: list[Path] | None = None,
         system: str | None = None,
+        cwd: Path | None = None,
     ) -> EngineResult:
-        argv = self._build_argv(prompt, files)
+        argv = self._build_argv(prompt, files, cwd)
         if system:
             argv += ["--append-system-prompt", system]
 
@@ -77,6 +84,7 @@ class ClaudeCliEngine:
         try:
             proc = await asyncio.create_subprocess_exec(
                 *argv,
+                cwd=str(cwd) if cwd is not None else None,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
@@ -136,9 +144,10 @@ class ClaudeCliEngine:
         *,
         system: str | None = None,
         files: list[Path] | None = None,
+        cwd: Path | None = None,
     ) -> AsyncGenerator[ThinkingChunk | TextChunk, None]:
         """流式调用：解析 CLI stream-json NDJSON，yield ThinkingChunk / TextChunk。"""
-        argv = self._build_argv(prompt, files)
+        argv = self._build_argv(prompt, files, cwd)
         if system:
             argv += ["--append-system-prompt", system]
         argv += ["--output-format", "stream-json", "--verbose", "--include-partial-messages"]
@@ -149,6 +158,7 @@ class ClaudeCliEngine:
         try:
             proc = await asyncio.create_subprocess_exec(
                 *argv,
+                cwd=str(cwd) if cwd is not None else None,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )

@@ -16,7 +16,7 @@ interface Branding {
 }
 
 type Tab = "workspaces" | "users" | "general" | "prompts" | "ai_engine";
-type GeneralSection = "branding" | "domains" | "whatsnew" | "suggested" | "email_verification";
+type GeneralSection = "branding" | "domains" | "whatsnew" | "suggested" | "email_verification" | "chat_retention";
 
 interface Props {
   // null = admin（全部可见）；Record = 普通用户权限表
@@ -56,6 +56,9 @@ export default function SystemSettings({ perms }: Props) {
   const [siteBaseUrlMsg, setSiteBaseUrlMsg] = useState<string | null>(null);
   const [requireEmailVerification, setRequireEmailVerification] = useState(false);
   const [emailVerificationMsg, setEmailVerificationMsg] = useState<string | null>(null);
+  const [retentionDays, setRetentionDays] = useState<number>(30);
+  const [retentionInput, setRetentionInput] = useState<number>(30);
+  const [retentionMsg, setRetentionMsg] = useState<string | null>(null);
 
   const loadDomains = useCallback(async () => {
     try {
@@ -103,13 +106,22 @@ export default function SystemSettings({ perms }: Props) {
     } catch { /* 非 admin 正常 */ }
   }, []);
 
+  const loadRetention = useCallback(async () => {
+    try {
+      const d = await api.get<{ days: number }>("/settings/chat-file-retention");
+      setRetentionDays(d.days);
+      setRetentionInput(d.days);
+    } catch { /* 非 admin 正常 */ }
+  }, []);
+
   useEffect(() => {
     loadDomains();
     loadBranding();
     loadWnSchedule();
     loadSuggestedQuestions();
     loadEmailVerification();
-  }, [loadDomains, loadBranding, loadWnSchedule, loadSuggestedQuestions, loadEmailVerification]);
+    loadRetention();
+  }, [loadDomains, loadBranding, loadWnSchedule, loadSuggestedQuestions, loadEmailVerification, loadRetention]);
 
   async function addDomain(e: React.FormEvent) {
     e.preventDefault();
@@ -168,6 +180,21 @@ export default function SystemSettings({ perms }: Props) {
       setWnHour(d.hour);
       setWnFreq(d.frequency);
       setWnMsg(t("whatsnew_saved", { freq: FREQ_LABELS[d.frequency] ?? d.frequency, hour: d.hour }));
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : t("save_failed"));
+    }
+  }
+
+  async function saveRetention(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setRetentionMsg(null);
+    try {
+      const d = await api.put<{ days: number }>("/settings/chat-file-retention", {
+        days: retentionInput,
+      });
+      setRetentionDays(d.days);
+      setRetentionMsg(t("chat_retention_saved", { days: d.days }));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : t("save_failed"));
     }
@@ -276,6 +303,7 @@ export default function SystemSettings({ perms }: Props) {
                 ["whatsnew", t("setting_whatsnew")],
                 ["suggested", t("setting_suggested")],
                 ["email_verification", t("setting_email_verification")],
+                ["chat_retention", t("setting_chat_retention")],
               ] as [GeneralSection, string][]
             ).map(([key, label]) => (
               <button
@@ -425,6 +453,36 @@ export default function SystemSettings({ perms }: Props) {
               </button>
               {wnMsg && <p className="mt-2 text-xs text-green-600">{wnMsg}</p>}
             </div>
+          </section>
+          )}
+
+          {/* 聊天+ 文件保留期 */}
+          {activeSetting === "chat_retention" && (
+          <section className="rounded border bg-white p-4">
+            <h2 className="mb-1 text-sm font-medium">{t("chat_retention_title")}</h2>
+            <p className="mb-3 text-xs text-gray-400">
+              {t("chat_retention_desc", { days: retentionDays })}
+            </p>
+            <form onSubmit={saveRetention} className="flex flex-wrap items-end gap-3">
+              <div>
+                <label className="mb-1 block text-xs text-gray-500">{t("chat_retention_days_label")}</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={3650}
+                  value={retentionInput}
+                  onChange={(e) => setRetentionInput(Number(e.target.value))}
+                  className="w-28 rounded border px-3 py-2 text-sm"
+                />
+              </div>
+              <button
+                type="submit"
+                className="rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700"
+              >
+                {t("chat_retention_save")}
+              </button>
+            </form>
+            {retentionMsg && <p className="mt-2 text-xs text-green-600">{retentionMsg}</p>}
           </section>
           )}
 

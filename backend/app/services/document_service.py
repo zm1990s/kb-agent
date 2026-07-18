@@ -82,10 +82,11 @@ async def list_documents(
     category_id: uuid.UUID | None = None,
     folder_id: uuid.UUID | None = None,
     tag: str | None = None,
+    search: str | None = None,
     limit: int = 50,
     offset: int = 0,
 ) -> list[Document]:
-    """列出空间内文档，可按分类/目录/标签过滤。强制 workspace 过滤（SECURITY #4）。"""
+    """列出空间内文档，可按分类/目录/标签/标题关键词过滤。强制 workspace 过滤（SECURITY #4）。"""
     stmt = select(Document).where(
         Document.workspace_id == workspace_id,
         Document.deleted_at.is_(None),
@@ -97,6 +98,8 @@ async def list_documents(
     if tag is not None:
         # ARRAY 包含：tags @> ARRAY[tag]
         stmt = stmt.where(Document.tags.contains([tag]))
+    if search:
+        stmt = stmt.where(Document.title.ilike(f"%{search}%"))
     stmt = stmt.order_by(Document.created_at.desc()).limit(limit).offset(offset)
     result = await session.execute(stmt)
     return list(result.scalars().all())

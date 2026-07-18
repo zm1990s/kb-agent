@@ -156,18 +156,22 @@ async def list_ws_documents(
     category: uuid.UUID | None = None,
     folder: uuid.UUID | None = None,
     tag: str | None = None,
+    search: str | None = None,
     page: int = 1,
     size: int = 50,
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> list[DocumentPublic]:
     await _ensure_member(session, workspace_id, current_user)
+    # size 上限保护，避免一次拉取过多
+    size = max(1, min(size, 500))
     docs = await list_documents(
         session,
         workspace_id=workspace_id,
         category_id=category,
         folder_id=folder,
         tag=tag,
+        search=search,
         limit=size,
         offset=(max(page, 1) - 1) * size,
     )

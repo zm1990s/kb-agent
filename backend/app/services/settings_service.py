@@ -319,6 +319,27 @@ async def set_whatsnew_hour(session: AsyncSession, hour: int) -> None:
     await set_setting(session, WHATSNEW_HOUR_KEY, str(hour))
 
 
+# ── 聊天+ 文件保留期 ─────────────────────────────────────────
+
+CHAT_FILE_RETENTION_DAYS_KEY = "chat_file_retention_days"
+CHAT_FILE_RETENTION_DAYS_DEFAULT = 30
+
+
+async def get_chat_file_retention_days(session: AsyncSession) -> int:
+    """返回聊天+ 会话文件保留天数（DB 优先，回退默认 30）。"""
+    stored = await get_setting(session, CHAT_FILE_RETENTION_DAYS_KEY)
+    try:
+        return int(stored) if stored is not None else CHAT_FILE_RETENTION_DAYS_DEFAULT
+    except ValueError:
+        return CHAT_FILE_RETENTION_DAYS_DEFAULT
+
+
+async def set_chat_file_retention_days(session: AsyncSession, days: int) -> None:
+    if not 1 <= days <= 3650:
+        raise ValueError("保留天数须在 1-3650 之间")
+    await set_setting(session, CHAT_FILE_RETENTION_DAYS_KEY, str(days))
+
+
 SUGGESTED_QUESTIONS_KEY = "suggested_questions"
 DEFAULT_SUGGESTED_QUESTIONS = [
     "最近一周有哪些新文档？",

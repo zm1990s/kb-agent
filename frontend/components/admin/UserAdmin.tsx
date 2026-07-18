@@ -32,6 +32,8 @@ interface GroupPerm {
 const MODULE_KEYS = [
   "whatsnew",
   "chat",
+  "chatplus",
+  "skills",
   "documents",
   "workspaces",
   "users",

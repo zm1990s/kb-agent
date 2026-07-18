@@ -43,6 +43,24 @@ class StorageProtocol(Protocol):
         """返回限时下载 URL（本地实现指向受控下载端点）。"""
         ...
 
+    async def resolve_dir(self, key_prefix: str) -> Path:
+        """把 key 前缀解析为一个真实、已创建的目录路径（供 CLI 在其中读写文件）。
+
+        用于「每会话工作目录」等需要给子进程真实路径的场景；实现须做路径穿越校验。
+        """
+        ...
+
+    async def delete_dir(self, key_prefix: str) -> None:
+        """递归删除 key 前缀对应的目录（不存在则静默）；实现须做路径穿越校验。"""
+        ...
+
+    async def stat_files(self, key_prefix: str) -> list[dict]:
+        """列出 key 前缀目录下的文件及元数据 [{key, mtime, size}]（用于按龄清理）。
+
+        mtime 为 Unix 时间戳（float）。实现须做路径穿越校验；目录不存在返回空列表。
+        """
+        ...
+
 
 def get_storage() -> StorageProtocol:
     """存储工厂：按 STORAGE_BACKEND 选择实现。"""
