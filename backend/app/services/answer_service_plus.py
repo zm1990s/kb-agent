@@ -67,7 +67,9 @@ ASK_USER_PROTOCOL = """## 交互提问能力（已启用）
 - `multiSelect` 为 true 时表示用户可多选（默认 false 单选）。
 - 前端会自动在选项之外附加一个「其他」自由输入框，你**无需**在 options 里加「其他/自定义」项。
 - 仅在确有必要澄清时使用；信息已足够时正常作答，不要滥用。
-- 输出该块后就停止，不要在同一轮里替用户假设答案继续往下做。"""
+- 输出该块后就停止，不要在同一轮里替用户假设答案继续往下做。
+- **执行任何 Skill 后**，若结果存在歧义、需要用户确认下一步，或有多种合理后续方向，\
+必须先 ask-user 再继续，不得自行假设。"""
 
 
 def _slug(name: str) -> str:
@@ -298,12 +300,13 @@ async def answer_question_plus_streamed(
     # 注：「Skill 制作器」等内置能力改用 Claude CLI 原生 Skills 机制
     # （镜像内预置 ~/.claude/skills/skill-writer/SKILL.md），此处不再注入。
 
-    # ── 交互模式：仅开关开时注入 ask-user 协议（协议打底，Skill 追加其后）──
+    # ── 交互模式：仅开关开时注入 ask-user 协议（Skill 在前，协议追加在最后）──
+    # 协议放最后确保模型在完成 Skill 执行后仍能回到交互决策流程，不会被 Skill 内容覆盖。
     if interactive:
         skill_system = (
             ASK_USER_PROTOCOL
             if skill_system is None
-            else f"{ASK_USER_PROTOCOL}\n\n---\n\n{skill_system}"
+            else f"{skill_system}\n\n---\n\n{ASK_USER_PROTOCOL}"
         )
 
     # ── 可选：引用工作区文档（需选定工作区 + 勾选文档/所有文件，均限量）──
