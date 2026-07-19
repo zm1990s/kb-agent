@@ -9,6 +9,7 @@ from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import get_settings
 from app.core.db import SessionLocal, get_session
 from app.core.deps import get_current_user
 from app.models.auth import User
@@ -457,6 +458,9 @@ async def chat_plus_stream(
     history = await recent_history(session, conversation_id=conv.id)
     attachments = [a.model_dump() for a in (body.attachments or [])]
     attachment_keys = [a["storage_key"] for a in attachments]
+    for _k in attachment_keys:
+        if not _k.startswith("chatplus/uploads/"):
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "非法附件引用")
     await add_message(
         session,
         conversation_id=conv.id,
@@ -553,6 +557,10 @@ async def upload_attachment(
     await _require_module(session, current_user, "chatplus")
     from app.storage.base import get_storage
     data = await file.read()
+    _limit = get_settings().max_upload_mb * 1024 * 1024
+    if len(data) > _limit:
+        raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                            f"文件超过 {get_settings().max_upload_mb} MB 限制")
     key = f"chatplus/uploads/{_uuid.uuid4().hex}"
     storage = get_storage()
     await storage.save(key, data)

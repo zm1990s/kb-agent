@@ -40,6 +40,8 @@ async def get_current_user(
     user = await get_user_by_id(session, user_id)
     if user is None:
         raise _UNAUTHENTICATED
+    if not user.is_active:
+        raise _UNAUTHENTICATED
     return user
 
 

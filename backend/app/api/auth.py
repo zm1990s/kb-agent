@@ -3,12 +3,13 @@
 import logging
 import uuid
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import SessionLocal, get_session
 from app.core.deps import get_current_user, require_admin
+from app.core.rate_limit import check_rate
 from app.core.security import create_access_token
 from app.models.auth import User
 from app.schemas.auth import (
@@ -55,9 +56,11 @@ router = APIRouter(prefix="/auth", tags=["auth"])
     status_code=status.HTTP_201_CREATED,
 )
 async def register(
+    request: Request,
     body: RegisterRequest,
     session: AsyncSession = Depends(get_session),
 ) -> RegisterResponse:
+    await check_rate(request, limit=10, window_sec=60)
     try:
         user, pending = await register_user(
             session, email=body.email, password=body.password
@@ -99,10 +102,12 @@ class VerifyPinRequest(BaseModel):
 
 @router.post("/verify-email-pin", status_code=status.HTTP_200_OK)
 async def verify_email_by_pin(
+    request: Request,
     body: VerifyPinRequest,
     session: AsyncSession = Depends(get_session),
 ) -> dict:
     """用 6 位 PIN 完成邮箱验证；无效或过期返回 400。"""
+    await check_rate(request, limit=10, window_sec=60)
     ok = await verify_email_pin(session, email=body.email, pin=body.pin)
     if not ok:
         raise HTTPException(
@@ -140,10 +145,12 @@ async def resend_verification_pin_endpoint(
 
 @router.post("/login", response_model=TokenResponse)
 async def login(
+    request: Request,
     body: LoginRequest,
     background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
 ) -> TokenResponse:
+    await check_rate(request, limit=20, window_sec=60)
     try:
         user = await authenticate(session, email=body.email, password=body.password)
     except AccountLockedError as exc:
@@ -268,9 +275,11 @@ async def delete_allowed_domain(
 
 @router.post("/forgot-password", status_code=status.HTTP_200_OK)
 async def forgot_password(
+    request: Request,
     body: ForgotPasswordRequest,
     session: AsyncSession = Depends(get_session),
 ) -> dict:
+    await check_rate(request, limit=5, window_sec=60)
     await request_password_reset(session, email=body.email)
     return {"message": "if_exists_sent"}
 

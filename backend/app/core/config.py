@@ -36,6 +36,9 @@ class Settings(BaseSettings):
         16 * 1024 * 1024, alias="ENGINE_STREAM_LIMIT_BYTES"
     )
 
+    # ── 上传限制 ────────────────────────────────────────
+    max_upload_mb: int = Field(200, alias="MAX_UPLOAD_MB")
+
     # ── 存储（MVP 本地文件系统）──────────────────────────
     storage_backend: str = Field("local", alias="STORAGE_BACKEND")
     local_storage_dir: str = Field("./local_storage", alias="LOCAL_STORAGE_DIR")
