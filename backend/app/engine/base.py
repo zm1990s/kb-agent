@@ -75,6 +75,7 @@ def get_engine(
     backend: str | None = None,
     model: str | None = None,
     audit_user: str | None = None,
+    idle_timeout_sec: int | None = None,
 ) -> EngineProtocol:
     """引擎工厂：按给定 backend（或配置默认）选择实现。
 
@@ -82,13 +83,16 @@ def get_engine(
     以尊重管理员在应用内的选择；不传则回退到 ENGINE_BACKEND 配置。
     model 为可选的模型覆盖，优先级高于环境变量 CLAUDE_MODEL。
     audit_user 为发起调用的用户标识，写入 CLI hook 安全审计（仅 claude_cli 生效）。
+    idle_timeout_sec 可选，若提供则覆盖 env 值（通常由调用方从 DB 读取）。
     """
     resolved = (backend or get_settings().engine_backend).lower()
 
     if resolved == "claude_cli":
         from app.engine.claude_cli import ClaudeCliEngine
 
-        return ClaudeCliEngine(model=model, audit_user=audit_user)
+        return ClaudeCliEngine(
+            model=model, audit_user=audit_user, idle_timeout_sec=idle_timeout_sec
+        )
 
     if resolved == "openai_compat":
         raise NotImplementedError(
@@ -114,6 +118,7 @@ async def get_chat_engine(
     from app.services.settings_service import (
         MODEL_CHAT_KEY,
         get_chat_engine_backend,
+        get_engine_idle_timeout_sec,
         get_openai_api_key,
         get_openai_base_url,
         get_openai_model,
@@ -136,4 +141,5 @@ async def get_chat_engine(
 
     # 默认 claude_cli（extra_headers 静默忽略）
     model = await get_task_model(session, model_key or MODEL_CHAT_KEY)
-    return get_engine("claude_cli", model=model)
+    idle_timeout = await get_engine_idle_timeout_sec(session)
+    return get_engine("claude_cli", model=model, idle_timeout_sec=idle_timeout)

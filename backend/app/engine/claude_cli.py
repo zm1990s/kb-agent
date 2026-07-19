@@ -51,12 +51,21 @@ def _build_cli_env(audit_user: str | None = None) -> dict[str, str]:
 class ClaudeCliEngine:
     """封装 Claude CLI 子进程调用。"""
 
-    def __init__(self, model: str | None = None, audit_user: str | None = None) -> None:
+    def __init__(
+        self,
+        model: str | None = None,
+        audit_user: str | None = None,
+        idle_timeout_sec: int | None = None,
+    ) -> None:
         settings = get_settings()
         self._cli_path = settings.claude_cli_path
         # model 参数优先；均为空时回退到环境变量 CLAUDE_MODEL
         self._model = model or settings.claude_model
-        self._idle_timeout = settings.engine_idle_timeout_sec
+        self._idle_timeout = (
+            idle_timeout_sec
+            if idle_timeout_sec is not None
+            else settings.engine_idle_timeout_sec
+        )
         # 调大子进程 stdout 行缓冲上限，避免大单行 JSON 事件触发 LimitOverrunError
         self._stream_limit = settings.engine_stream_limit_bytes
         # hook 配置路径：仅当放开工具时经 --settings 注入（拦截 env 读取 + 脱敏）

@@ -9,7 +9,6 @@ from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import get_settings
 from app.core.db import SessionLocal, get_session
 from app.core.deps import get_current_user
 from app.models.auth import User
@@ -54,6 +53,7 @@ from app.services.chat_service import (
     recent_history,
     update_conversation,
 )
+from app.services.settings_service import get_max_upload_mb
 from app.services.usage_service import record_event
 from app.services.workspace_service import is_member
 
@@ -557,10 +557,10 @@ async def upload_attachment(
     await _require_module(session, current_user, "chatplus")
     from app.storage.base import get_storage
     data = await file.read()
-    _limit = get_settings().max_upload_mb * 1024 * 1024
-    if len(data) > _limit:
+    _max_mb = await get_max_upload_mb(session)
+    if len(data) > _max_mb * 1024 * 1024:
         raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                            f"文件超过 {get_settings().max_upload_mb} MB 限制")
+                            f"文件超过 {_max_mb} MB 限制")
     key = f"chatplus/uploads/{_uuid.uuid4().hex}"
     storage = get_storage()
     await storage.save(key, data)

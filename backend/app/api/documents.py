@@ -46,7 +46,7 @@ from app.services.document_service import (
 )
 from app.services.folder_service import get_folder_in_workspace
 from app.services.usage_service import record_event
-from app.core.config import get_settings
+from app.services.settings_service import get_max_upload_mb
 from app.services.workspace_service import get_ws_role, is_member
 from app.storage.base import get_storage
 from app.tasks.worker import enqueue_classification
@@ -121,10 +121,10 @@ async def upload(
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "目录不存在")
 
     data = await file.read()
-    _limit = get_settings().max_upload_mb * 1024 * 1024
-    if len(data) > _limit:
+    _max_mb = await get_max_upload_mb(session)
+    if len(data) > _max_mb * 1024 * 1024:
         raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                            f"文件超过 {get_settings().max_upload_mb} MB 限制")
+                            f"文件超过 {_max_mb} MB 限制")
     # 保留原始文件名（仅截取末段），规范化特殊字符，不添加路径前缀
     raw_name = PurePosixPath(file.filename or "untitled").name
     clean_name = sanitize_filename(raw_name)

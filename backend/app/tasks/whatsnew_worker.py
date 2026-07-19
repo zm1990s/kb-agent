@@ -143,7 +143,7 @@ async def run_mail_dispatch() -> None:
                 )
                 if not reports:
                     continue
-                await send_whatsnew_digest(user.email, reports)
+                await send_whatsnew_digest(session, user.email, reports)
                 await mark_sent(session, sub=live_sub)
         except Exception:
             logger.exception("whatsnew mail dispatch failed sub=%s", sub.id)

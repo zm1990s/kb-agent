@@ -215,7 +215,7 @@ async def register_user(
             existing.verification_token_exp = datetime.now(UTC) + timedelta(minutes=_VERIFICATION_PIN_EXPIRE_MINUTES)
             await session.commit()
             from app.services.email_service import send_verification_pin  # noqa: PLC0415
-            await send_verification_pin(email, token)
+            await send_verification_pin(session, email, token)
             logger.info("register: 未验证用户重新注册，新 PIN 已发送 email=%s", email)
         else:
             existing.email_verified = True
@@ -255,7 +255,7 @@ async def register_user(
 
     if require_verification and token:
         from app.services.email_service import send_verification_pin
-        await send_verification_pin(email, token)
+        await send_verification_pin(session, email, token)
         logger.info("register: 验证 PIN 已发送 email=%s", email)
 
     return user, require_verification
@@ -306,7 +306,7 @@ async def resend_verification_pin(session: AsyncSession, *, email: str) -> bool:
     user.verification_token_exp = now + timedelta(minutes=_VERIFICATION_PIN_EXPIRE_MINUTES)
     await session.commit()
 
-    await send_verification_pin(email, token)
+    await send_verification_pin(session, email, token)
     logger.info("resend_verification_pin: PIN 重发 user_id=%s", user.id)
     return True
 
@@ -376,7 +376,7 @@ async def request_password_reset(session: AsyncSession, *, email: str) -> None:
     user.reset_rate_exp = now + timedelta(seconds=_RESET_RATE_LIMIT_SECONDS)
     await session.commit()
 
-    await send_reset_code_email(email, code)
+    await send_reset_code_email(session, email, code)
     logger.info("request_password_reset: 验证码已发送 user_id=%s", user.id)
 
 

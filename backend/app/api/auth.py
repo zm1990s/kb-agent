@@ -25,6 +25,7 @@ from app.schemas.auth import (
     UserPublic,
 )
 from app.services.rbac_service import delete_user
+from app.services.settings_service import get_jwt_expire_min
 from app.services.usage_service import record_event
 from app.services.user_service import (
     AccountLockedError,
@@ -168,7 +169,8 @@ async def login(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="邮箱或密码错误",
         )
-    token = create_access_token(user_id=user.id, role=user.role)
+    expire_min = await get_jwt_expire_min(session)
+    token = create_access_token(user_id=user.id, role=user.role, expire_min=expire_min)
 
     async def _log() -> None:
         async with SessionLocal() as s:

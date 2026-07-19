@@ -98,7 +98,7 @@ export default function MessageBubble({ role, content, sources, errorKey, onDown
               className={`rounded-2xl px-4 py-3 text-sm leading-relaxed ${
                 isUser
                   ? "rounded-tr-sm bg-blue-600 text-white whitespace-pre-wrap"
-                  : "rounded-tl-sm bg-white text-gray-900 border border-gray-200 shadow-sm"
+                  : "rounded-tl-sm bg-white text-gray-700 border border-gray-200 shadow-sm"
               }`}
             >
               {isUser

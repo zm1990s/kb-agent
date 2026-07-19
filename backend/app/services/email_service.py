@@ -8,7 +8,16 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.utils import formataddr, parseaddr
 
-from app.core.config import get_settings
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.services.settings_service import (
+    get_smtp_from,
+    get_smtp_host,
+    get_smtp_password,
+    get_smtp_port,
+    get_smtp_tls,
+    get_smtp_user,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -162,12 +171,18 @@ def _build_plaintext(reports: list[dict]) -> str:
     return "\n".join(lines)
 
 
-async def send_verification_pin(to_email: str, pin: str) -> None:
+async def send_verification_pin(session: AsyncSession, to_email: str, pin: str) -> None:
     """发送邮箱验证 PIN 邮件（6 位数字，10 分钟有效）。SMTP_HOST 未配置时记录警告并跳过。"""
-    cfg = get_settings()
-    if not cfg.smtp_host:
+    smtp_host = await get_smtp_host(session)
+    if not smtp_host:
         logger.warning("email_service: SMTP_HOST 未配置，跳过发送验证 PIN to=%s", to_email)
         return
+
+    smtp_port = await get_smtp_port(session)
+    smtp_user = await get_smtp_user(session)
+    smtp_password = await get_smtp_password(session)
+    smtp_from = await get_smtp_from(session)
+    smtp_tls = await get_smtp_tls(session)
 
     plain = (
         f"您的邮箱验证码为：{pin}\n\n"
@@ -193,7 +208,7 @@ async def send_verification_pin(to_email: str, pin: str) -> None:
 
         msg = MIMEMultipart("alternative")
         msg["Subject"] = Header("您的邮箱验证码", "utf-8").encode()
-        raw_from = cfg.smtp_from or cfg.smtp_user or ""
+        raw_from = smtp_from or smtp_user or ""
         name, addr = parseaddr(raw_from)
         msg["From"] = formataddr((str(Header(name, "utf-8")) if name else "", addr))
         msg["To"] = to_email
@@ -202,78 +217,32 @@ async def send_verification_pin(to_email: str, pin: str) -> None:
 
         await aiosmtplib.send(
             msg,
-            hostname=cfg.smtp_host,
-            port=cfg.smtp_port,
-            username=cfg.smtp_user or None,
-            password=cfg.smtp_password or None,
-            **_smtp_tls_kwargs(cfg.smtp_port, cfg.smtp_tls),
+            hostname=smtp_host,
+            port=smtp_port,
+            username=smtp_user or None,
+            password=smtp_password or None,
+            **_smtp_tls_kwargs(smtp_port, smtp_tls),
         )
         logger.info("email_service: 已发送验证 PIN 邮件 to=%s", to_email)
     except Exception:
         logger.exception("email_service: 验证 PIN 邮件发送失败 to=%s", to_email)
 
 
-async def send_verification_email(to_email: str, verify_url: str) -> None:
-    """发送邮箱验证邮件。SMTP_HOST 未配置时记录警告并跳过。"""
-    cfg = get_settings()
-    if not cfg.smtp_host:
-        logger.warning("email_service: SMTP_HOST 未配置，跳过发送验证邮件 to=%s", to_email)
-        return
-
-    plain = (
-        f"请点击以下链接完成邮箱验证（24小时内有效）：\n\n{verify_url}\n\n"
-        "如非本人操作，请忽略此邮件。"
-    )
-    html_body = (
-        f"<html><body style='max-width:480px;margin:0 auto;padding:24px;{_STYLE}'>"
-        "<h2 style='color:#1d4ed8;margin-bottom:4px'>邮箱验证</h2>"
-        "<hr style='border:none;border-top:1px solid #e5e7eb;margin-bottom:20px'>"
-        "<p>感谢注册！请点击下方按钮完成邮箱验证（24小时内有效）：</p>"
-        f"<p style='margin:24px 0'>"
-        f"<a href='{html.escape(verify_url)}' "
-        f"style='background:#1d4ed8;color:#fff;padding:10px 20px;border-radius:6px;"
-        f"text-decoration:none;font-size:14px'>验证邮箱</a></p>"
-        "<p style='font-size:12px;color:#6b7280'>如果按钮无法点击，请复制以下链接到浏览器：<br>"
-        f"<span style='word-break:break-all'>{html.escape(verify_url)}</span></p>"
-        "<p style='font-size:12px;color:#9ca3af;margin-top:32px;border-top:1px solid #e5e7eb;"
-        "padding-top:12px'>如非本人操作，请忽略此邮件。</p>"
-        "</body></html>"
-    )
-
-    try:
-        import aiosmtplib
-
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = Header("请验证您的邮箱", "utf-8").encode()
-        raw_from = cfg.smtp_from or cfg.smtp_user or ""
-        name, addr = parseaddr(raw_from)
-        msg["From"] = formataddr((str(Header(name, "utf-8")) if name else "", addr))
-        msg["To"] = to_email
-        msg.attach(MIMEText(plain, "plain", "utf-8"))
-        msg.attach(MIMEText(html_body, "html", "utf-8"))
-
-        await aiosmtplib.send(
-            msg,
-            hostname=cfg.smtp_host,
-            port=cfg.smtp_port,
-            username=cfg.smtp_user or None,
-            password=cfg.smtp_password or None,
-            **_smtp_tls_kwargs(cfg.smtp_port, cfg.smtp_tls),
-        )
-        logger.info("email_service: 已发送验证邮件 to=%s", to_email)
-    except Exception:
-        logger.exception("email_service: 验证邮件发送失败 to=%s", to_email)
-
-
-async def send_whatsnew_digest(to_email: str, reports: list[dict]) -> None:
+async def send_whatsnew_digest(session: AsyncSession, to_email: str, reports: list[dict]) -> None:
     """发送新动态摘要邮件。SMTP_HOST 未配置时静默返回。"""
-    cfg = get_settings()
-    if not cfg.smtp_host:
+    smtp_host = await get_smtp_host(session)
+    if not smtp_host:
         logger.warning("email_service: SMTP_HOST 未配置，跳过发送 to=%s", to_email)
         return
     if not reports:
         logger.info("email_service: 无报告可发，跳过 to=%s", to_email)
         return
+
+    smtp_port = await get_smtp_port(session)
+    smtp_user = await get_smtp_user(session)
+    smtp_password = await get_smtp_password(session)
+    smtp_from = await get_smtp_from(session)
+    smtp_tls = await get_smtp_tls(session)
 
     try:
         import aiosmtplib
@@ -281,7 +250,7 @@ async def send_whatsnew_digest(to_email: str, reports: list[dict]) -> None:
         msg = MIMEMultipart("alternative")
         msg["Subject"] = Header("知识库新动态", "utf-8").encode()
         # RFC 2047-encode the display name so non-ASCII chars pass QQ's validator
-        raw_from = cfg.smtp_from or cfg.smtp_user or ""
+        raw_from = smtp_from or smtp_user or ""
         name, addr = parseaddr(raw_from)
         msg["From"] = formataddr((str(Header(name, "utf-8")) if name else "", addr))
         msg["To"] = to_email
@@ -290,23 +259,29 @@ async def send_whatsnew_digest(to_email: str, reports: list[dict]) -> None:
 
         await aiosmtplib.send(
             msg,
-            hostname=cfg.smtp_host,
-            port=cfg.smtp_port,
-            username=cfg.smtp_user or None,
-            password=cfg.smtp_password or None,
-            **_smtp_tls_kwargs(cfg.smtp_port, cfg.smtp_tls),
+            hostname=smtp_host,
+            port=smtp_port,
+            username=smtp_user or None,
+            password=smtp_password or None,
+            **_smtp_tls_kwargs(smtp_port, smtp_tls),
         )
         logger.info("email_service: 已发送新动态邮件 to=%s", to_email)
     except Exception:
         logger.exception("email_service: 发送失败 to=%s", to_email)
 
 
-async def send_reset_code_email(to_email: str, code: str) -> None:
+async def send_reset_code_email(session: AsyncSession, to_email: str, code: str) -> None:
     """发送密码重置验证码邮件。SMTP_HOST 未配置时记录警告并跳过。"""
-    cfg = get_settings()
-    if not cfg.smtp_host:
+    smtp_host = await get_smtp_host(session)
+    if not smtp_host:
         logger.warning("email_service: SMTP_HOST 未配置，跳过发送重置码邮件 to=%s", to_email)
         return
+
+    smtp_port = await get_smtp_port(session)
+    smtp_user = await get_smtp_user(session)
+    smtp_password = await get_smtp_password(session)
+    smtp_from = await get_smtp_from(session)
+    smtp_tls = await get_smtp_tls(session)
 
     plain = (
         f"您的密码重置验证码为：{code}\n\n"
@@ -332,7 +307,7 @@ async def send_reset_code_email(to_email: str, code: str) -> None:
 
         msg = MIMEMultipart("alternative")
         msg["Subject"] = Header("您的密码重置验证码", "utf-8").encode()
-        raw_from = cfg.smtp_from or cfg.smtp_user or ""
+        raw_from = smtp_from or smtp_user or ""
         name, addr = parseaddr(raw_from)
         msg["From"] = formataddr((str(Header(name, "utf-8")) if name else "", addr))
         msg["To"] = to_email
@@ -341,11 +316,11 @@ async def send_reset_code_email(to_email: str, code: str) -> None:
 
         await aiosmtplib.send(
             msg,
-            hostname=cfg.smtp_host,
-            port=cfg.smtp_port,
-            username=cfg.smtp_user or None,
-            password=cfg.smtp_password or None,
-            **_smtp_tls_kwargs(cfg.smtp_port, cfg.smtp_tls),
+            hostname=smtp_host,
+            port=smtp_port,
+            username=smtp_user or None,
+            password=smtp_password or None,
+            **_smtp_tls_kwargs(smtp_port, smtp_tls),
         )
         logger.info("email_service: 已发送重置码邮件 to=%s", to_email)
     except Exception:

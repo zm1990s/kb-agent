@@ -154,9 +154,13 @@ async def run_classification(session: AsyncSession, task_id: uuid.UUID) -> None:
         )
 
         # 文档归类始终使用 Claude CLI（需要 --add-dir 读取本地文件）
-        from app.services.settings_service import MODEL_CLASSIFY_KEY, get_task_model
+        from app.services.settings_service import MODEL_CLASSIFY_KEY, get_engine_idle_timeout_sec, get_task_model
 
-        engine = get_engine("claude_cli", model=await get_task_model(session, MODEL_CLASSIFY_KEY))
+        engine = get_engine(
+            "claude_cli",
+            model=await get_task_model(session, MODEL_CLASSIFY_KEY),
+            idle_timeout_sec=await get_engine_idle_timeout_sec(session),
+        )
         from app.storage.base import get_storage
 
         path = await get_storage().open_path(doc.storage_key)
