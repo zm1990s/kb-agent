@@ -2,13 +2,12 @@
 "use client";
 
 const TOKEN_KEY = "kb_token";
-const ROLE_KEY = "kb_role";
 const EMAIL_KEY = "kb_email";
 
-export function setAuth(token: string, role: string, email?: string): void {
+export function setAuth(token: string, _role: string, email?: string): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(TOKEN_KEY, token);
-  localStorage.setItem(ROLE_KEY, role);
+  // role 不再单独缓存——从 JWT payload 实时解析，避免升/降权后前端状态不同步
   if (email) localStorage.setItem(EMAIL_KEY, email);
 }
 
@@ -22,9 +21,16 @@ export function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY);
 }
 
+/** 从 JWT payload 解析 role，与服务端签发时保持一致。 */
 export function getRole(): string | null {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem(ROLE_KEY);
+  const token = getToken();
+  if (!token) return null;
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1]));
+    return payload.role ?? null;
+  } catch {
+    return null;
+  }
 }
 
 export function isAdmin(): boolean {
@@ -34,7 +40,6 @@ export function isAdmin(): boolean {
 export function clearAuth(): void {
   if (typeof window === "undefined") return;
   localStorage.removeItem(TOKEN_KEY);
-  localStorage.removeItem(ROLE_KEY);
   localStorage.removeItem(EMAIL_KEY);
 }
 
