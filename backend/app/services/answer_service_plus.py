@@ -419,7 +419,8 @@ async def answer_question_plus_streamed(
     yield Stage("thinking", "stage_thinking_phase2")
     # 聊天+ 固定用 Claude CLI：需要文件读写/工作目录能力，
     # 不受「对话引擎」设置（openai_compat 无这些能力）影响。
-    engine = get_engine("claude_cli")
+    # 传入用户邮箱，供 CLI hook 在拦截 env 读取时写入安全审计。
+    engine = get_engine("claude_cli", audit_user=user.email)
 
     try:
         if hasattr(engine, "complete_streaming"):

@@ -71,19 +71,24 @@ class EngineProtocol(Protocol):
         ...
 
 
-def get_engine(backend: str | None = None, model: str | None = None) -> EngineProtocol:
+def get_engine(
+    backend: str | None = None,
+    model: str | None = None,
+    audit_user: str | None = None,
+) -> EngineProtocol:
     """引擎工厂：按给定 backend（或配置默认）选择实现。
 
     backend 通常由 settings_service.get_engine_backend() 从 DB 解析后传入，
     以尊重管理员在应用内的选择；不传则回退到 ENGINE_BACKEND 配置。
     model 为可选的模型覆盖，优先级高于环境变量 CLAUDE_MODEL。
+    audit_user 为发起调用的用户标识，写入 CLI hook 安全审计（仅 claude_cli 生效）。
     """
     resolved = (backend or get_settings().engine_backend).lower()
 
     if resolved == "claude_cli":
         from app.engine.claude_cli import ClaudeCliEngine
 
-        return ClaudeCliEngine(model=model)
+        return ClaudeCliEngine(model=model, audit_user=audit_user)
 
     if resolved == "openai_compat":
         raise NotImplementedError(

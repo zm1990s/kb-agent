@@ -35,6 +35,11 @@ class Settings(BaseSettings):
     engine_stream_limit_bytes: int = Field(
         16 * 1024 * 1024, alias="ENGINE_STREAM_LIMIT_BYTES"
     )
+    # Claude CLI hook 配置文件（PreToolUse/PostToolUse 拦截 env 读取 + 脱敏）。
+    # 经 --settings 注入；留空则不注入 hook（仅测试/特殊场景）。
+    claude_hooks_settings: str = Field(
+        "/app/claude_hooks/settings.json", alias="CLAUDE_HOOKS_SETTINGS"
+    )
 
     # ── 上传限制 ────────────────────────────────────────
     max_upload_mb: int = Field(200, alias="MAX_UPLOAD_MB")

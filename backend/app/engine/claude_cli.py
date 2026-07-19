@@ -9,6 +9,7 @@
 import asyncio
 import json
 import logging
+import os
 from collections.abc import AsyncGenerator
 from pathlib import Path
 
@@ -17,11 +18,40 @@ from app.engine.base import EngineError, EngineResult, TextChunk, ThinkingChunk
 
 logger = logging.getLogger(__name__)
 
+# ── 子进程环境白名单 ────────────────────────────────────────
+# claude 子进程不再继承 uvicorn 的全量 os.environ，只透传 CLI 运行/认证
+# 真正需要的变量，剥离 JWT_SECRET / DATABASE_URL / SMTP_PASSWORD /
+# ADMIN_PASSWORD 等与 CLI 无关的应用密钥（防 agent 经 Bash 跑 env 读回，
+# 见 SECURITY.md #2/#10）。
+# 系统运行必需的具体变量名。
+_CLI_ENV_EXACT = (
+    "PATH", "HOME", "LANG", "LC_ALL", "LC_CTYPE", "TZ", "TERM", "TMPDIR",
+)
+# CLI 认证相关变量：用前缀匹配，天然覆盖未来新增/改名的凭据变量
+# （ANTHROPIC_* 直连/网关、AWS_* Bedrock、CLAUDE_* CLI 自身配置）。
+_CLI_ENV_PREFIXES = ("ANTHROPIC_", "AWS_", "CLAUDE_")
+
+
+def _build_cli_env(audit_user: str | None = None) -> dict[str, str]:
+    """构造传给 claude 子进程的精简环境（白名单透传）。
+
+    只包含 CLI 运行与认证所需变量；前缀透传保证未来新增同前缀认证变量
+    自动生效，无需改代码。剥离所有无关应用密钥。
+    audit_user：发起本次调用的用户标识，经 KB_AGENT_AUDIT_USER 传给 hook 写审计。
+    """
+    out = {k: os.environ[k] for k in _CLI_ENV_EXACT if k in os.environ}
+    for k, v in os.environ.items():
+        if k.startswith(_CLI_ENV_PREFIXES):
+            out[k] = v
+    if audit_user:
+        out["KB_AGENT_AUDIT_USER"] = audit_user
+    return out
+
 
 class ClaudeCliEngine:
     """封装 Claude CLI 子进程调用。"""
 
-    def __init__(self, model: str | None = None) -> None:
+    def __init__(self, model: str | None = None, audit_user: str | None = None) -> None:
         settings = get_settings()
         self._cli_path = settings.claude_cli_path
         # model 参数优先；均为空时回退到环境变量 CLAUDE_MODEL
@@ -29,6 +59,10 @@ class ClaudeCliEngine:
         self._idle_timeout = settings.engine_idle_timeout_sec
         # 调大子进程 stdout 行缓冲上限，避免大单行 JSON 事件触发 LimitOverrunError
         self._stream_limit = settings.engine_stream_limit_bytes
+        # hook 配置路径：仅当放开工具时经 --settings 注入（拦截 env 读取 + 脱敏）
+        self._hooks_settings = settings.claude_hooks_settings
+        # 发起调用的用户标识（写入 hook 安全审计），经子进程 env 传给 hook
+        self._audit_user = audit_user
 
     def _build_argv(
         self, prompt: str, files: list[Path] | None, cwd: Path | None = None
@@ -62,6 +96,10 @@ class ClaudeCliEngine:
             # 按项目决策：工具不做限制、假设平台可信（见 SECURITY.md #2）。
             # 注意：该 flag 拒绝 root 运行，容器以非 root 用户启动。
             argv += ["--dangerously-skip-permissions"]
+            # 注入 hook：PreToolUse 拦截读取环境变量的 Bash 命令（env/printenv/
+            # os.environ 等）+ 写审计（见 SECURITY.md #2/#10）。放开工具时才需要。
+            if self._hooks_settings:
+                argv += ["--settings", self._hooks_settings]
         return argv
 
     async def complete(
@@ -87,6 +125,7 @@ class ClaudeCliEngine:
             proc = await asyncio.create_subprocess_exec(
                 *argv,
                 cwd=str(cwd) if cwd is not None else None,
+                env=_build_cli_env(self._audit_user),
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 limit=self._stream_limit,
@@ -162,6 +201,7 @@ class ClaudeCliEngine:
             proc = await asyncio.create_subprocess_exec(
                 *argv,
                 cwd=str(cwd) if cwd is not None else None,
+                env=_build_cli_env(self._audit_user),
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 limit=self._stream_limit,
