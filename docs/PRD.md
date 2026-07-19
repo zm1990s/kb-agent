@@ -1,7 +1,7 @@
 # PRD · KB-Agent（内部 + Partner 共享 Agent 知识平台）
 
-> **文档状态**：本 PRD 覆盖 MVP（M1–M3 + 前端 MF）与已交付的增强批次（F1–F14）。
-> 权限模型已从「全局角色 + 空间成员」升级为「全局 admin 绕过一切 + 用户组 RBAC + 空间按组授权」。
+> **文档状态**：本 PRD 覆盖 MVP（M1–M3 + 前端 MF）、增强批次（F1–F24）及 v2.0 新模块（F25 Skill 库 + F26 聊天+）。
+> 权限模型已从「全局角色 + 空间成员」升级为「全局 admin 绕过一切 + 用户组 RBAC + 空间按组授权」；RBAC 模块数已扩展至 9 个（含 chatplus / skills）。
 
 ## 1. 目标用户与核心场景
 | 用户角色 | 使用场景 | 期望结果 |
@@ -14,7 +14,7 @@
 **权限模型（现状）**：
 - **全局角色** `admin / user`；**admin 绕过一切 RBAC**（migration 012 已合并 internal/partner → user）。
 - **用户组**：多维规则（邮箱域名/邮箱/角色 × equals/endswith/contains）自动入组（注册时 + 手动全量重算）。
-- **RBAC**：权限绑在用户组上，`模块 × {none/read/write}`；模块 = 对话查询 / 文档管理 / 空间管理 / 用户管理 / 系统设置 / 数据统计 / 新动态（共 7 个）；用户取所属组权限并集最高。
+- **RBAC**：权限绑在用户组上，`模块 × {none/read/write}`；模块 = 对话查询 / 文档管理 / 空间管理 / 用户管理 / 系统设置 / 数据统计 / 新动态 / **聊天+（chatplus）** / **Skill 库（skills）**（共 9 个）；用户取所属组权限并集最高。
 - **空间访问**：个人成员 ∪ 所属组被授权（并存）。
 
 ## 2. 功能需求表（MVP F-00~F-19 + 增强 F1~F8）
@@ -63,11 +63,12 @@
 | F13b | 系统 | 上传大小限制 200 MB | `proxyClientMaxBodySize: "200mb"`（`next.config.js`），前端单次上传上限 200 MB | 超限返 413；200 MB 内正常上传 | ✅ |
 | F14 | 设置 | 按任务模型配置 | 系统设置新增模型配置面板；归类/对话/新动态/会话标题各自独立选模型；持久化于 `app_settings`（键 `model::classify` / `model::chat` / `model::whatsnew` / `model::title`） | 管理员在 UI 选模型后立即生效；各任务调用 engine 时读取对应 key | ✅ |
 | F15 | 前端 | 国际化（i18n） | 5 语言支持（简体中文/繁体中文/English/日本語/한국어）；客户端切换无需刷新；localStorage 持久化；首次访问按浏览器语言自动匹配；NavBar 语言切换器 | 切换语言后全部 UI 文字即时更新；刷新保持语言选择；所有 window.confirm/prompt 替换为自定义 Modal | ✅ |
+| F25 | Skill 库 | Skill 创建与管理 | 平台级/空间级 Skill（SKILL.md 格式）；可见性控制（public / 空间私有）；用户组权限；Bundle 打包（zip，≤50 MB，≤500 文件）；操作审计日志；内置图标搜索 Skill | admin 可创建/编辑/删除；权限控制生效；Bundle 可上传下载；审计可查 | ✅ |
+| F26 | 聊天+ | 工作台与交互模式 | 独立 `/chat-plus` 页面；选择 Skill 作为系统提示；上传附件；引用空间文档原文（指定 doc_ids 或全量）；下载成果文件；后台生成任务（与 SSE 解耦）；**交互模式**（模型通过 `ask-user` 协议向用户澄清，前端渲染可点击选项）；会话间持久化工作目录；RBAC 独立 chatplus 模块 | 选 Skill 后 Skill 内容注入系统提示；交互选项可点击作答；后台任务可轮询状态；成果文件可下载 | ✅ |
 
 ## 3. 明确的 Out of Scope（本次不做）
 - 向量检索 / pgvector（先不上；对话已改为「全空间结构化索引喂 Claude」智能问答，非向量召回）
-- Skill 插拔框架的完整实现（M4，仅预留抽象与 API 契约）
-- SCM skill 端到端下发 PANW 配置（M5，仅预留“确认后执行”审批契约）
+- SCM skill 端到端下发 PANW 配置（M5，仅预留”确认后执行”审批契约）
 - OpenClaw / Codex 引擎接入（预留 Protocol + 前端灰显，未来实现）
 - 云对象存储（当前用本地文件系统，经 StorageProtocol 抽象，未来换 S3/OSS）
 - 文档在线协同编辑、版本历史

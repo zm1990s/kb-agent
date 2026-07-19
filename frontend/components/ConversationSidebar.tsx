@@ -9,6 +9,7 @@ import type { ConversationSummary } from "@/lib/types";
 interface Props {
   conversations: ConversationSummary[];
   activeId: string | null;
+  generatingIds?: Set<string>;
   onSelect: (id: string) => void;
   onNew: () => void;
   onUpdated?: (conv: ConversationSummary) => void;
@@ -18,6 +19,7 @@ interface Props {
 export default function ConversationSidebar({
   conversations,
   activeId,
+  generatingIds,
   onSelect,
   onNew,
   onUpdated,
@@ -129,6 +131,14 @@ export default function ConversationSidebar({
                 : "text-gray-600 hover:bg-gray-100"
             }`}
           >
+            {/* Generating indicator（后台正在生成）*/}
+            {generatingIds?.has(c.id) && (
+              <span
+                className="mr-1.5 mt-1.5 h-2 w-2 shrink-0 animate-pulse rounded-full bg-purple-500"
+                title={t("generating")}
+              />
+            )}
+
             {/* Pin indicator */}
             {c.pinned && (
               <span className="mr-1.5 mt-0.5 shrink-0 text-blue-400" title={t("pinned_title")}>

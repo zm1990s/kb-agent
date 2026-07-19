@@ -30,7 +30,7 @@ const ROOT = "__root__";
 export default function DocumentsPage() {
   const t = useTranslations("documents");
   const { showConfirm, showPrompt } = useDialog();
-  const ready = useAuthGuard();
+  const ready = useAuthGuard("documents");
   const globalAdmin = isAdmin();
   // workspace 内的写权限：全局 admin，或空间 owner/editor
   const [wsRole, setWsRole] = useState<string | null>(null);

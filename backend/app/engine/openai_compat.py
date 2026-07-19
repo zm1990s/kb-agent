@@ -42,7 +42,9 @@ class OpenAICompatEngine:
         *,
         files: list[Path] | None = None,
         system: str | None = None,
+        cwd: Path | None = None,
     ) -> EngineResult:
+        # cwd 对本引擎无意义（不产文件），忽略
         if files:
             raise NotImplementedError(
                 "OpenAICompatEngine 不支持文件读取，文档处理请使用 ClaudeCliEngine"
@@ -89,9 +91,17 @@ class OpenAICompatEngine:
             raise OpenAICompatEngineError(f"响应格式解析失败: {exc}") from exc
 
     async def complete_streaming(
-        self, prompt: str, *, system: str | None = None
+        self,
+        prompt: str,
+        *,
+        files: list[Path] | None = None,
+        system: str | None = None,
+        cwd: Path | None = None,
     ) -> AsyncGenerator[ThinkingChunk | TextChunk, None]:
-        """流式调用：逐 token yield TextChunk（OpenAI 兼容引擎无 thinking 输出）。"""
+        """流式调用：逐 token yield TextChunk（OpenAI 兼容引擎无 thinking 输出）。
+
+        files/cwd 对本引擎无意义（不产文件），忽略。
+        """
         messages: list[dict] = []
         if system:
             messages.append({"role": "system", "content": system})

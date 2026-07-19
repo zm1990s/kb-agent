@@ -36,7 +36,7 @@ const SESSION_KEY = "chat_state";
 
 export default function ChatPage() {
   const t = useTranslations("chat");
-  const ready = useAuthGuard();
+  const ready = useAuthGuard("chat");
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
@@ -89,7 +89,7 @@ export default function ChatPage() {
     try {
       setConversations(
         await api.get<ConversationSummary[]>(
-          `/conversations?workspace_id=${workspaceId}`
+          `/conversations?workspace_id=${workspaceId}&source=chat`
         )
       );
     } catch {

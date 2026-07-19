@@ -57,3 +57,33 @@ class LocalStorage:
         # 该端点用 JWT + require_ws_member 鉴权（见 M2-U7）。此处仅校验 key 合法。
         self._resolve_within_root(key)
         return f"/documents/download?key={key}"
+
+    async def resolve_dir(self, key_prefix: str) -> Path:
+        """把 key 前缀解析为真实目录（创建后返回），供 CLI 在其中读写。"""
+        path = self._resolve_within_root(key_prefix)
+        path.mkdir(parents=True, exist_ok=True)
+        return path
+
+    async def delete_dir(self, key_prefix: str) -> None:
+        """递归删除目录；不存在则静默。"""
+        import shutil
+
+        path = self._resolve_within_root(key_prefix)
+        if path.is_dir():
+            shutil.rmtree(path, ignore_errors=True)
+
+    async def stat_files(self, key_prefix: str) -> list[dict]:
+        """列出目录下文件及 mtime/size；目录不存在返回空列表。"""
+        path = self._resolve_within_root(key_prefix)
+        if not path.is_dir():
+            return []
+        out: list[dict] = []
+        for entry in path.iterdir():
+            if entry.is_file():
+                st = entry.stat()
+                out.append({
+                    "key": f"{key_prefix}/{entry.name}",
+                    "mtime": st.st_mtime,
+                    "size": st.st_size,
+                })
+        return out

@@ -16,7 +16,7 @@ interface Branding {
 }
 
 type Tab = "workspaces" | "users" | "general" | "prompts" | "ai_engine";
-type GeneralSection = "branding" | "domains" | "whatsnew" | "suggested" | "email_verification";
+type GeneralSection = "branding" | "domains" | "whatsnew" | "suggested" | "email_verification" | "chat_retention" | "security" | "storage" | "smtp";
 
 interface Props {
   // null = admin（全部可见）；Record = 普通用户权限表
@@ -51,11 +51,25 @@ export default function SystemSettings({ perms }: Props) {
   const [sqMsg, setSqMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [brandingMsg, setBrandingMsg] = useState<string | null>(null);
-  const [siteBaseUrl, setSiteBaseUrl] = useState("");
-  const [siteBaseUrlInput, setSiteBaseUrlInput] = useState("");
-  const [siteBaseUrlMsg, setSiteBaseUrlMsg] = useState<string | null>(null);
   const [requireEmailVerification, setRequireEmailVerification] = useState(false);
   const [emailVerificationMsg, setEmailVerificationMsg] = useState<string | null>(null);
+  const [smtpHost, setSmtpHost] = useState("");
+  const [smtpPort, setSmtpPort] = useState(587);
+  const [smtpUser, setSmtpUser] = useState("");
+  const [smtpPassword, setSmtpPassword] = useState("");
+  const [smtpFrom, setSmtpFrom] = useState("");
+  const [smtpTls, setSmtpTls] = useState(true);
+  const [smtpMsg, setSmtpMsg] = useState<string | null>(null);
+  const [retentionDays, setRetentionDays] = useState<number>(30);
+  const [retentionInput, setRetentionInput] = useState<number>(30);
+  const [retentionMsg, setRetentionMsg] = useState<string | null>(null);
+  const [jwtExpireMin, setJwtExpireMin] = useState<number>(60);
+  const [jwtExpireInput, setJwtExpireInput] = useState<number>(60);
+  const [maxUploadMb, setMaxUploadMb] = useState<number>(200);
+  const [maxUploadInput, setMaxUploadInput] = useState<number>(200);
+  const [downloadTtlSec, setDownloadTtlSec] = useState<number>(3600);
+  const [downloadTtlInput, setDownloadTtlInput] = useState<number>(3600);
+  const [runtimeConfigMsg, setRuntimeConfigMsg] = useState<string | null>(null);
 
   const loadDomains = useCallback(async () => {
     try {
@@ -94,12 +108,45 @@ export default function SystemSettings({ perms }: Props) {
 
   const loadEmailVerification = useCallback(async () => {
     try {
-      const d = await api.get<{ require_email_verification: boolean; site_base_url: string }>(
+      const d = await api.get<{ require_email_verification: boolean }>(
         "/settings/email-verification"
       );
       setRequireEmailVerification(d.require_email_verification);
-      setSiteBaseUrl(d.site_base_url);
-      setSiteBaseUrlInput(d.site_base_url);
+    } catch { /* 非 admin 正常 */ }
+  }, []);
+
+  const loadSmtpConfig = useCallback(async () => {
+    try {
+      const d = await api.get<{
+        smtp_host: string; smtp_port: number; smtp_user: string;
+        smtp_password: string; smtp_from: string; smtp_tls: boolean;
+      }>("/settings/smtp");
+      setSmtpHost(d.smtp_host);
+      setSmtpPort(d.smtp_port);
+      setSmtpUser(d.smtp_user);
+      setSmtpPassword(d.smtp_password);
+      setSmtpFrom(d.smtp_from);
+      setSmtpTls(d.smtp_tls);
+    } catch { /* 非 admin 正常 */ }
+  }, []);
+
+  const loadRetention = useCallback(async () => {
+    try {
+      const d = await api.get<{ days: number }>("/settings/chat-file-retention");
+      setRetentionDays(d.days);
+      setRetentionInput(d.days);
+    } catch { /* 非 admin 正常 */ }
+  }, []);
+
+  const loadRuntimeConfig = useCallback(async () => {
+    try {
+      const d = await api.get<{ jwt_expire_min: number; max_upload_mb: number; download_url_ttl_sec: number; engine_idle_timeout_sec: number }>("/settings/runtime-config");
+      setJwtExpireMin(d.jwt_expire_min);
+      setJwtExpireInput(d.jwt_expire_min);
+      setMaxUploadMb(d.max_upload_mb);
+      setMaxUploadInput(d.max_upload_mb);
+      setDownloadTtlSec(d.download_url_ttl_sec);
+      setDownloadTtlInput(d.download_url_ttl_sec);
     } catch { /* 非 admin 正常 */ }
   }, []);
 
@@ -109,7 +156,10 @@ export default function SystemSettings({ perms }: Props) {
     loadWnSchedule();
     loadSuggestedQuestions();
     loadEmailVerification();
-  }, [loadDomains, loadBranding, loadWnSchedule, loadSuggestedQuestions, loadEmailVerification]);
+    loadRetention();
+    loadRuntimeConfig();
+    loadSmtpConfig();
+  }, [loadDomains, loadBranding, loadWnSchedule, loadSuggestedQuestions, loadEmailVerification, loadRetention, loadRuntimeConfig, loadSmtpConfig]);
 
   async function addDomain(e: React.FormEvent) {
     e.preventDefault();
@@ -173,6 +223,21 @@ export default function SystemSettings({ perms }: Props) {
     }
   }
 
+  async function saveRetention(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setRetentionMsg(null);
+    try {
+      const d = await api.put<{ days: number }>("/settings/chat-file-retention", {
+        days: retentionInput,
+      });
+      setRetentionDays(d.days);
+      setRetentionMsg(t("chat_retention_saved", { days: d.days }));
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : t("save_failed"));
+    }
+  }
+
   async function triggerWnNow() {
     setWnTriggering(true);
     setWnMsg(null);
@@ -187,22 +252,6 @@ export default function SystemSettings({ perms }: Props) {
     }
   }
 
-  async function saveSiteBaseUrl(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-    setSiteBaseUrlMsg(null);
-    try {
-      const d = await api.put<{ site_base_url: string }>("/settings/email-verification", {
-        site_base_url: siteBaseUrlInput.trim(),
-      });
-      setSiteBaseUrl(d.site_base_url);
-      setSiteBaseUrlInput(d.site_base_url);
-      setSiteBaseUrlMsg(t("site_base_url_saved"));
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : t("save_failed"));
-    }
-  }
-
   async function toggleEmailVerification(enabled: boolean) {
     setError(null);
     setEmailVerificationMsg(null);
@@ -210,6 +259,66 @@ export default function SystemSettings({ perms }: Props) {
       await api.put("/settings/email-verification", { require_email_verification: enabled });
       setRequireEmailVerification(enabled);
       setEmailVerificationMsg(enabled ? t("email_verification_enabled") : t("email_verification_disabled"));
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : t("save_failed"));
+    }
+  }
+
+  async function saveSecurityConfig(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setRuntimeConfigMsg(null);
+    try {
+      const d = await api.put<{ jwt_expire_min: number }>("/settings/runtime-config", {
+        jwt_expire_min: jwtExpireInput,
+      });
+      setJwtExpireMin(d.jwt_expire_min);
+      setRuntimeConfigMsg(t("security_saved"));
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : t("save_failed"));
+    }
+  }
+
+  async function saveStorageConfig(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setRuntimeConfigMsg(null);
+    try {
+      const d = await api.put<{ max_upload_mb: number; download_url_ttl_sec: number }>("/settings/runtime-config", {
+        max_upload_mb: maxUploadInput,
+        download_url_ttl_sec: downloadTtlInput,
+      });
+      setMaxUploadMb(d.max_upload_mb);
+      setDownloadTtlSec(d.download_url_ttl_sec);
+      setRuntimeConfigMsg(t("storage_saved"));
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : t("save_failed"));
+    }
+  }
+
+  async function saveSmtpConfig(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setSmtpMsg(null);
+    try {
+      const d = await api.put<{
+        smtp_host: string; smtp_port: number; smtp_user: string;
+        smtp_password: string; smtp_from: string; smtp_tls: boolean;
+      }>("/settings/smtp", {
+        smtp_host: smtpHost,
+        smtp_port: smtpPort,
+        smtp_user: smtpUser,
+        smtp_password: smtpPassword,
+        smtp_from: smtpFrom,
+        smtp_tls: smtpTls,
+      });
+      setSmtpHost(d.smtp_host);
+      setSmtpPort(d.smtp_port);
+      setSmtpUser(d.smtp_user);
+      setSmtpPassword(d.smtp_password);
+      setSmtpFrom(d.smtp_from);
+      setSmtpTls(d.smtp_tls);
+      setSmtpMsg(t("smtp_saved"));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : t("save_failed"));
     }
@@ -275,7 +384,11 @@ export default function SystemSettings({ perms }: Props) {
                 ["domains", t("setting_domains")],
                 ["whatsnew", t("setting_whatsnew")],
                 ["suggested", t("setting_suggested")],
+                ["smtp", t("setting_smtp")],
                 ["email_verification", t("setting_email_verification")],
+                ["chat_retention", t("setting_chat_retention")],
+                ["security", t("setting_security")],
+                ["storage", t("setting_storage")],
               ] as [GeneralSection, string][]
             ).map(([key, label]) => (
               <button
@@ -428,6 +541,36 @@ export default function SystemSettings({ perms }: Props) {
           </section>
           )}
 
+          {/* 聊天+ 文件保留期 */}
+          {activeSetting === "chat_retention" && (
+          <section className="rounded border bg-white p-4">
+            <h2 className="mb-1 text-sm font-medium">{t("chat_retention_title")}</h2>
+            <p className="mb-3 text-xs text-gray-400">
+              {t("chat_retention_desc", { days: retentionDays })}
+            </p>
+            <form onSubmit={saveRetention} className="flex flex-wrap items-end gap-3">
+              <div>
+                <label className="mb-1 block text-xs text-gray-500">{t("chat_retention_days_label")}</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={3650}
+                  value={retentionInput}
+                  onChange={(e) => setRetentionInput(Number(e.target.value))}
+                  className="w-28 rounded border px-3 py-2 text-sm"
+                />
+              </div>
+              <button
+                type="submit"
+                className="rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700"
+              >
+                {t("chat_retention_save")}
+              </button>
+            </form>
+            {retentionMsg && <p className="mt-2 text-xs text-green-600">{retentionMsg}</p>}
+          </section>
+          )}
+
           {/* 引导问题 */}
           {activeSetting === "suggested" && (
           <section className="rounded border bg-white p-4">
@@ -452,7 +595,86 @@ export default function SystemSettings({ perms }: Props) {
           </section>
           )}
 
-          {/* 邮箱验证开关（含站点基础 URL 子菜单） */}
+          {/* SMTP 配置 */}
+          {activeSetting === "smtp" && (
+          <section className="rounded border bg-white p-4">
+            <h2 className="mb-1 text-sm font-medium">{t("smtp_title")}</h2>
+            <p className="mb-3 text-xs text-gray-400">{t("smtp_desc")}</p>
+            <form onSubmit={saveSmtpConfig} className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-1 block text-xs text-gray-500">{t("smtp_host_label")}</label>
+                  <input
+                    type="text"
+                    value={smtpHost}
+                    onChange={(e) => setSmtpHost(e.target.value)}
+                    placeholder="smtp.example.com"
+                    className="w-full rounded border px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs text-gray-500">{t("smtp_port_label")}</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={65535}
+                    value={smtpPort}
+                    onChange={(e) => setSmtpPort(Number(e.target.value))}
+                    className="w-full rounded border px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs text-gray-500">{t("smtp_user_label")}</label>
+                  <input
+                    type="text"
+                    value={smtpUser}
+                    onChange={(e) => setSmtpUser(e.target.value)}
+                    placeholder="user@example.com"
+                    className="w-full rounded border px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs text-gray-500">{t("smtp_password_label")}</label>
+                  <input
+                    type="password"
+                    value={smtpPassword}
+                    onChange={(e) => setSmtpPassword(e.target.value)}
+                    placeholder={t("smtp_password_placeholder")}
+                    className="w-full rounded border px-3 py-2 text-sm"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <label className="mb-1 block text-xs text-gray-500">{t("smtp_from_label")}</label>
+                  <input
+                    type="text"
+                    value={smtpFrom}
+                    onChange={(e) => setSmtpFrom(e.target.value)}
+                    placeholder="KB-Agent <noreply@example.com>"
+                    className="w-full rounded border px-3 py-2 text-sm"
+                  />
+                </div>
+              </div>
+              <label className="flex cursor-pointer items-center gap-3">
+                <input
+                  type="checkbox"
+                  checked={smtpTls}
+                  onChange={(e) => setSmtpTls(e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300 accent-blue-600"
+                />
+                <span className="text-sm text-gray-700">{t("smtp_tls_label")}</span>
+              </label>
+              <button
+                type="submit"
+                className="rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700"
+              >
+                {t("smtp_save")}
+              </button>
+            </form>
+            {smtpMsg && <p className="mt-2 text-xs text-green-600">{smtpMsg}</p>}
+          </section>
+          )}
+
+          {/* 邮箱验证开关 */}
           {activeSetting === "email_verification" && (
           <section className="rounded border bg-white p-4">
             <h2 className="mb-1 text-sm font-medium">{t("email_verification_title")}</h2>
@@ -469,33 +691,75 @@ export default function SystemSettings({ perms }: Props) {
               </span>
             </label>
             {emailVerificationMsg && <p className="mt-2 text-xs text-green-600">{emailVerificationMsg}</p>}
+          </section>
+          )}
 
-            {/* 站点基础 URL */}
-            <div className="mt-4 rounded border border-gray-100 bg-gray-50 p-3">
-              <h3 className="mb-1 text-xs font-medium text-gray-700">{t("site_base_url_title")}</h3>
-              <p className="mb-3 text-xs text-gray-400">{t("site_base_url_desc")}</p>
-              <form onSubmit={saveSiteBaseUrl} className="flex gap-2">
+          {/* 安全配置 */}
+          {activeSetting === "security" && (
+          <section className="rounded border bg-white p-4">
+            <h2 className="mb-1 text-sm font-medium">{t("security_title")}</h2>
+            <p className="mb-3 text-xs text-gray-400">{t("security_desc", { current: jwtExpireMin })}</p>
+            <form onSubmit={saveSecurityConfig} className="flex flex-wrap items-end gap-3">
+              <div>
+                <label className="mb-1 block text-xs text-gray-500">{t("jwt_expire_label")}</label>
                 <input
-                  type="url"
-                  value={siteBaseUrlInput}
-                  onChange={(e) => setSiteBaseUrlInput(e.target.value)}
-                  placeholder="https://kb.example.com"
-                  className="flex-1 rounded border bg-white px-3 py-2 text-sm focus:border-blue-400 focus:outline-none"
+                  type="number"
+                  min={1}
+                  max={43200}
+                  value={jwtExpireInput}
+                  onChange={(e) => setJwtExpireInput(Number(e.target.value))}
+                  className="w-28 rounded border px-3 py-2 text-sm"
                 />
-                <button
-                  type="submit"
-                  className="rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700"
-                >
-                  {t("site_base_url_save")}
-                </button>
-              </form>
-              {siteBaseUrl && (
-                <p className="mt-2 text-xs text-gray-400">
-                  {t("site_base_url_current")}: <code className="text-gray-600">{siteBaseUrl}</code>
-                </p>
-              )}
-              {siteBaseUrlMsg && <p className="mt-2 text-xs text-green-600">{siteBaseUrlMsg}</p>}
-            </div>
+              </div>
+              <button
+                type="submit"
+                className="rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700"
+              >
+                {t("security_save")}
+              </button>
+            </form>
+            {runtimeConfigMsg && activeSetting === "security" && <p className="mt-2 text-xs text-green-600">{runtimeConfigMsg}</p>}
+          </section>
+          )}
+
+          {/* 存储配置 */}
+          {activeSetting === "storage" && (
+          <section className="rounded border bg-white p-4">
+            <h2 className="mb-1 text-sm font-medium">{t("storage_title")}</h2>
+            <p className="mb-3 text-xs text-gray-400">{t("storage_desc")}</p>
+            <form onSubmit={saveStorageConfig} className="space-y-3">
+              <div className="flex flex-wrap items-end gap-3">
+                <div>
+                  <label className="mb-1 block text-xs text-gray-500">{t("max_upload_mb_label")}</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={10240}
+                    value={maxUploadInput}
+                    onChange={(e) => setMaxUploadInput(Number(e.target.value))}
+                    className="w-28 rounded border px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs text-gray-500">{t("download_ttl_label")}</label>
+                  <input
+                    type="number"
+                    min={60}
+                    max={86400}
+                    value={downloadTtlInput}
+                    onChange={(e) => setDownloadTtlInput(Number(e.target.value))}
+                    className="w-28 rounded border px-3 py-2 text-sm"
+                  />
+                </div>
+              </div>
+              <button
+                type="submit"
+                className="rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700"
+              >
+                {t("storage_save")}
+              </button>
+            </form>
+            {runtimeConfigMsg && activeSetting === "storage" && <p className="mt-2 text-xs text-green-600">{runtimeConfigMsg}</p>}
           </section>
           )}
 

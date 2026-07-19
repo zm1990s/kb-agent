@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { api, ApiError } from "@/lib/api";
-import { setAuth } from "@/lib/auth";
+import { resolveLandingPath, setAuth } from "@/lib/auth";
 import type { TokenResponse } from "@/lib/types";
 
 interface RegisterResponse {
@@ -44,7 +44,7 @@ export default function LoginPage() {
       }
       const tok = await api.post<TokenResponse>("/auth/login", { email, password });
       setAuth(tok.access_token, tok.role, email);
-      router.replace("/chat");
+      router.replace(await resolveLandingPath());
     } catch (err) {
       if (err instanceof ApiError) {
         if (err.status === 423) {
@@ -144,7 +144,7 @@ export default function LoginPage() {
       // 验证成功，自动登录
       const tok = await api.post<TokenResponse>("/auth/login", { email, password });
       setAuth(tok.access_token, tok.role, email);
-      router.replace("/chat");
+      router.replace(await resolveLandingPath());
     } catch (err) {
       if (err instanceof ApiError && err.status === 400) {
         setError(t("err_pin_invalid"));

@@ -41,14 +41,15 @@ def verify_password(password: str, password_hash: str) -> bool:
 # ── JWT ─────────────────────────────────────────────────
 
 
-def create_access_token(*, user_id: uuid.UUID, role: str) -> str:
+def create_access_token(*, user_id: uuid.UUID, role: str, expire_min: int | None = None) -> str:
     settings = get_settings()
     now = datetime.now(UTC)
+    minutes = expire_min if expire_min is not None else settings.jwt_expire_min
     payload = {
         "sub": str(user_id),
         "role": role,
         "iat": now,
-        "exp": now + timedelta(minutes=settings.jwt_expire_min),
+        "exp": now + timedelta(minutes=minutes),
     }
     return jwt.encode(payload, settings.jwt_secret, algorithm=ALGORITHM)
 

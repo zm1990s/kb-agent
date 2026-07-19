@@ -75,6 +75,7 @@ prompts/              # 分步系统提示词
 - 空间访问 = 个人成员 ∪ 所属组授权（`is_member`/`list_my_workspaces` 两者都要查）。
 - 自动入组规则：注册时 `sync_user_groups`；改规则后靠 `recompute-memberships` 全量重算。
 - 引擎工具：**已按决策放开 Claude 全部工具**（含 Bash，供 pdftotext 等）；容器以非 root 运行；提示词注入由外部 Guardrails 兜底。不要再收窄成 allowedTools 而破坏大文件抽取。
+- 引擎 env / hook（防密钥外泄，见 SECURITY #2/#10）：claude 子进程**必须**经 `_build_cli_env()` 白名单 env 启动（前缀透传 `ANTHROPIC_*`/`AWS_*`/`CLAUDE_*` + 系统变量，剥离 `JWT_SECRET`/`DATABASE_URL`/`SMTP_PASSWORD`/`ADMIN_PASSWORD`），**禁止**改回继承全量 `os.environ`；放开工具时**必须**经 `--settings` 注入 `backend/claude_hooks/`（PreToolUse 拦截 env 读取命令 + 写审计），**禁止**去掉 hook。新增 CLI 认证变量若不在 `ANTHROPIC_/AWS_/CLAUDE_` 前缀内，需同步加入 `_CLI_ENV_EXACT`。注：CLI 2.1.197 的 PostToolUse `updatedToolOutput` 实测无效，未做输出脱敏层；如需彻底隔离凭据走网关虚拟 key/出口代理。
 - 引擎超时：使用**闲置超时**（`ENGINE_IDLE_TIMEOUT_SEC`，默认 300s）——连续无输出时才计时，每收到输出块重置；已废弃固定总时长 `ENGINE_TIMEOUT_SEC`。
 - 提示词管理：4 个运行时可配置提示词（`answer_fetch_prompt / answer_prompt / classify_prompt / title_prompt`），DB 覆盖优先于代码默认。**修改代码默认值后，若 DB 有旧记录则不生效**，需 `DELETE FROM app_settings WHERE key='<key>'` 再重启。
 - 系统日志：`logs/kb-agent.log`（应用）+ `logs/access.log`（uvicorn HTTP），均 RotatingFileHandler（10MB×10）。

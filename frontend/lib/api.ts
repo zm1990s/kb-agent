@@ -86,6 +86,27 @@ export async function stream(
     body: JSON.stringify(body),
     signal,
   });
+  return consumeStream(res, onEvent);
+}
+
+// GET 版 SSE：重连正在后台运行的生成流（无 body）。
+export async function streamGet(
+  path: string,
+  onEvent: (event: string, data: unknown) => void,
+  signal?: AbortSignal,
+): Promise<void> {
+  const token = getToken();
+  const headers: Record<string, string> = {};
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  const res = await fetch(`/api${path}`, { method: "GET", headers, signal });
+  return consumeStream(res, onEvent);
+}
+
+async function consumeStream(
+  res: Response,
+  onEvent: (event: string, data: unknown) => void,
+): Promise<void> {
   if (res.status === 401) {
     clearAuth();
     if (typeof window !== "undefined") window.location.href = "/login";
@@ -135,4 +156,5 @@ export const api = {
   del: <T>(path: string) => request<T>(path, { method: "DELETE" }),
   upload: <T>(path: string, form: FormData) => request<T>(path, { method: "POST", form }),
   stream,
+  streamGet,
 };

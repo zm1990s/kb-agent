@@ -319,6 +319,27 @@ async def set_whatsnew_hour(session: AsyncSession, hour: int) -> None:
     await set_setting(session, WHATSNEW_HOUR_KEY, str(hour))
 
 
+# ── 聊天+ 文件保留期 ─────────────────────────────────────────
+
+CHAT_FILE_RETENTION_DAYS_KEY = "chat_file_retention_days"
+CHAT_FILE_RETENTION_DAYS_DEFAULT = 30
+
+
+async def get_chat_file_retention_days(session: AsyncSession) -> int:
+    """返回聊天+ 会话文件保留天数（DB 优先，回退默认 30）。"""
+    stored = await get_setting(session, CHAT_FILE_RETENTION_DAYS_KEY)
+    try:
+        return int(stored) if stored is not None else CHAT_FILE_RETENTION_DAYS_DEFAULT
+    except ValueError:
+        return CHAT_FILE_RETENTION_DAYS_DEFAULT
+
+
+async def set_chat_file_retention_days(session: AsyncSession, days: int) -> None:
+    if not 1 <= days <= 3650:
+        raise ValueError("保留天数须在 1-3650 之间")
+    await set_setting(session, CHAT_FILE_RETENTION_DAYS_KEY, str(days))
+
+
 SUGGESTED_QUESTIONS_KEY = "suggested_questions"
 DEFAULT_SUGGESTED_QUESTIONS = [
     "最近一周有哪些新文档？",
@@ -505,3 +526,148 @@ async def get_task_headers(session: AsyncSession, key: str) -> dict[str, str]:
 async def set_task_headers(session: AsyncSession, key: str, headers: dict[str, str]) -> None:
     """保存指定任务的自定义 headers（覆盖写）。"""
     await set_setting(session, key, json.dumps(headers, ensure_ascii=False))
+
+
+# ── 运行时可调配置（DB 覆盖优先，回落 env 默认） ────────────────────────────
+
+JWT_EXPIRE_MIN_KEY = "jwt_expire_min"
+MAX_UPLOAD_MB_KEY = "max_upload_mb"
+DOWNLOAD_URL_TTL_SEC_KEY = "download_url_ttl_sec"
+ENGINE_IDLE_TIMEOUT_SEC_KEY = "engine_idle_timeout_sec"
+
+
+async def get_jwt_expire_min(session: AsyncSession) -> int:
+    val = await get_setting(session, JWT_EXPIRE_MIN_KEY)
+    if val is not None:
+        try:
+            return max(1, int(val))
+        except ValueError:
+            pass
+    return get_settings().jwt_expire_min
+
+
+async def set_jwt_expire_min(session: AsyncSession, minutes: int) -> None:
+    if minutes < 1:
+        raise ValueError("JWT 过期时间不得小于 1 分钟")
+    await set_setting(session, JWT_EXPIRE_MIN_KEY, str(minutes))
+
+
+async def get_max_upload_mb(session: AsyncSession) -> int:
+    val = await get_setting(session, MAX_UPLOAD_MB_KEY)
+    if val is not None:
+        try:
+            return max(1, int(val))
+        except ValueError:
+            pass
+    return get_settings().max_upload_mb
+
+
+async def set_max_upload_mb(session: AsyncSession, mb: int) -> None:
+    if mb < 1:
+        raise ValueError("上传限制不得小于 1 MB")
+    await set_setting(session, MAX_UPLOAD_MB_KEY, str(mb))
+
+
+async def get_download_url_ttl_sec(session: AsyncSession) -> int:
+    val = await get_setting(session, DOWNLOAD_URL_TTL_SEC_KEY)
+    if val is not None:
+        try:
+            return max(60, int(val))
+        except ValueError:
+            pass
+    return get_settings().download_url_ttl_sec
+
+
+async def set_download_url_ttl_sec(session: AsyncSession, seconds: int) -> None:
+    if seconds < 60:
+        raise ValueError("下载链接有效期不得小于 60 秒")
+    await set_setting(session, DOWNLOAD_URL_TTL_SEC_KEY, str(seconds))
+
+
+async def get_engine_idle_timeout_sec(session: AsyncSession) -> int:
+    val = await get_setting(session, ENGINE_IDLE_TIMEOUT_SEC_KEY)
+    if val is not None:
+        try:
+            return max(30, int(val))
+        except ValueError:
+            pass
+    return get_settings().engine_idle_timeout_sec
+
+
+async def set_engine_idle_timeout_sec(session: AsyncSession, seconds: int) -> None:
+    if seconds < 30:
+        raise ValueError("引擎空闲超时不得小于 30 秒")
+    await set_setting(session, ENGINE_IDLE_TIMEOUT_SEC_KEY, str(seconds))
+
+
+# ── SMTP 配置（DB 覆盖优先，回落 env 默认） ─────────────────────────────────
+
+SMTP_HOST_KEY = "smtp_host"
+SMTP_PORT_KEY = "smtp_port"
+SMTP_USER_KEY = "smtp_user"
+SMTP_PASSWORD_KEY = "smtp_password"  # noqa: S105
+SMTP_FROM_KEY = "smtp_from"
+SMTP_TLS_KEY = "smtp_tls"
+
+
+async def get_smtp_host(session: AsyncSession) -> str:
+    val = await get_setting(session, SMTP_HOST_KEY)
+    return val if val is not None else get_settings().smtp_host
+
+
+async def set_smtp_host(session: AsyncSession, host: str) -> None:
+    await set_setting(session, SMTP_HOST_KEY, host.strip())
+
+
+async def get_smtp_port(session: AsyncSession) -> int:
+    val = await get_setting(session, SMTP_PORT_KEY)
+    if val is not None:
+        try:
+            return max(1, min(65535, int(val)))
+        except ValueError:
+            pass
+    return get_settings().smtp_port
+
+
+async def set_smtp_port(session: AsyncSession, port: int) -> None:
+    if not (1 <= port <= 65535):
+        raise ValueError("SMTP 端口须在 1–65535 范围内")
+    await set_setting(session, SMTP_PORT_KEY, str(port))
+
+
+async def get_smtp_user(session: AsyncSession) -> str:
+    val = await get_setting(session, SMTP_USER_KEY)
+    return val if val is not None else get_settings().smtp_user
+
+
+async def set_smtp_user(session: AsyncSession, user: str) -> None:
+    await set_setting(session, SMTP_USER_KEY, user.strip())
+
+
+async def get_smtp_password(session: AsyncSession) -> str:
+    val = await get_setting(session, SMTP_PASSWORD_KEY)
+    return val if val is not None else get_settings().smtp_password
+
+
+async def set_smtp_password(session: AsyncSession, password: str) -> None:
+    await set_setting(session, SMTP_PASSWORD_KEY, password)
+
+
+async def get_smtp_from(session: AsyncSession) -> str:
+    val = await get_setting(session, SMTP_FROM_KEY)
+    return val if val is not None else get_settings().smtp_from
+
+
+async def set_smtp_from(session: AsyncSession, from_addr: str) -> None:
+    await set_setting(session, SMTP_FROM_KEY, from_addr.strip())
+
+
+async def get_smtp_tls(session: AsyncSession) -> bool:
+    val = await get_setting(session, SMTP_TLS_KEY)
+    if val is not None:
+        return val == "true"
+    return get_settings().smtp_tls
+
+
+async def set_smtp_tls(session: AsyncSession, tls: bool) -> None:
+    await set_setting(session, SMTP_TLS_KEY, "true" if tls else "false")

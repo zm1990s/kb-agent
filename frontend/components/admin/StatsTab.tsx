@@ -21,6 +21,7 @@ interface PerUser {
   login: number;
   upload: number;
   chat: number;
+  chatplus: number;
   download: number;
   total: number;
 }
@@ -41,6 +42,7 @@ const ACTION_COLORS: Record<string, string> = {
   login: "#3b82f6",
   upload: "#10b981",
   chat: "#f59e0b",
+  chatplus: "#a855f7",
   download: "#8b5cf6",
 };
 const DAY_OPTIONS = [7, 14, 30, 90, 180, 365];
@@ -278,6 +280,7 @@ interface DownloadList { total: number; items: DownloadItem[]; }
 interface ChatItem {
   created_at: string;
   email: string;
+  source?: string; // "chat" | "chatplus"
   conversation_id: string;
   question: string;
   answer: string;
@@ -302,12 +305,14 @@ export default function StatsTab() {
     login: t("action_login"),
     upload: t("action_upload"),
     chat: t("action_chat"),
+    chatplus: t("action_chatplus"),
     download: t("action_download"),
   };
   const ACTION_VOL_LABELS: Record<string, string> = {
     login: t("action_login_vol"),
     upload: t("action_upload_vol"),
     chat: t("action_chat_vol"),
+    chatplus: t("action_chatplus_vol"),
     download: t("action_download_vol"),
   };
 
@@ -476,6 +481,7 @@ export default function StatsTab() {
                           <th className="px-4 py-2 text-right">{t("col_login")}</th>
                           <th className="px-4 py-2 text-right">{t("col_upload")}</th>
                           <th className="px-4 py-2 text-right">{t("col_chat")}</th>
+                          <th className="px-4 py-2 text-right">{t("col_chatplus")}</th>
                           <th className="px-4 py-2 text-right">{t("col_download")}</th>
                           <th className="px-4 py-2 text-right font-semibold">{t("col_total")}</th>
                         </tr>
@@ -487,6 +493,7 @@ export default function StatsTab() {
                             <td className="px-4 py-2 text-right tabular-nums">{u.login || "—"}</td>
                             <td className="px-4 py-2 text-right tabular-nums">{u.upload || "—"}</td>
                             <td className="px-4 py-2 text-right tabular-nums">{u.chat || "—"}</td>
+                            <td className="px-4 py-2 text-right tabular-nums">{u.chatplus || "—"}</td>
                             <td className="px-4 py-2 text-right tabular-nums">{u.download || "—"}</td>
                             <td className="px-4 py-2 text-right font-semibold tabular-nums">{u.total}</td>
                           </tr>
@@ -620,6 +627,15 @@ export default function StatsTab() {
                           <div className="flex items-center gap-2 mb-1">
                             <span className="text-xs text-gray-400 whitespace-nowrap">{fmtTime(item.created_at)}</span>
                             <span className="font-mono text-xs text-gray-600">{item.email}</span>
+                            <span
+                              className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
+                                item.source === "chatplus"
+                                  ? "bg-purple-100 text-purple-700"
+                                  : "bg-amber-100 text-amber-700"
+                              }`}
+                            >
+                              {item.source === "chatplus" ? t("action_chatplus") : t("action_chat")}
+                            </span>
                           </div>
                           {expanded ? (
                             <div className="space-y-2 text-xs">

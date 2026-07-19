@@ -30,6 +30,19 @@ class Settings(BaseSettings):
     claude_cli_path: str = Field("claude", alias="CLAUDE_CLI_PATH")
     claude_model: str = Field("", alias="CLAUDE_MODEL")
     engine_idle_timeout_sec: int = Field(300, alias="ENGINE_IDLE_TIMEOUT_SEC")
+    # 子进程 stdout 单行缓冲上限（字节）。stream-json 每行一个 JSON 事件，
+    # 大文件工具结果/整条消息快照可能超 asyncio 默认 64KB → LimitOverrunError。
+    engine_stream_limit_bytes: int = Field(
+        16 * 1024 * 1024, alias="ENGINE_STREAM_LIMIT_BYTES"
+    )
+    # Claude CLI hook 配置文件（PreToolUse/PostToolUse 拦截 env 读取 + 脱敏）。
+    # 经 --settings 注入；留空则不注入 hook（仅测试/特殊场景）。
+    claude_hooks_settings: str = Field(
+        "/app/claude_hooks/settings.json", alias="CLAUDE_HOOKS_SETTINGS"
+    )
+
+    # ── 上传限制 ────────────────────────────────────────
+    max_upload_mb: int = Field(200, alias="MAX_UPLOAD_MB")
 
     # ── 存储（MVP 本地文件系统）──────────────────────────
     storage_backend: str = Field("local", alias="STORAGE_BACKEND")

@@ -20,3 +20,8 @@ venv/
 .DS_Store
 .idea/
 .vscode/
+
+# 运行时日志
+/backend/logs/
+# 本地工具配置（Claude Code）
+/.claude/

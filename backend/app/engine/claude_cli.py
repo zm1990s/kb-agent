@@ -9,6 +9,7 @@
 import asyncio
 import json
 import logging
+import os
 from collections.abc import AsyncGenerator
 from pathlib import Path
 
@@ -17,23 +18,70 @@ from app.engine.base import EngineError, EngineResult, TextChunk, ThinkingChunk
 
 logger = logging.getLogger(__name__)
 
+# ── 子进程环境白名单 ────────────────────────────────────────
+# claude 子进程不再继承 uvicorn 的全量 os.environ，只透传 CLI 运行/认证
+# 真正需要的变量，剥离 JWT_SECRET / DATABASE_URL / SMTP_PASSWORD /
+# ADMIN_PASSWORD 等与 CLI 无关的应用密钥（防 agent 经 Bash 跑 env 读回，
+# 见 SECURITY.md #2/#10）。
+# 系统运行必需的具体变量名。
+_CLI_ENV_EXACT = (
+    "PATH", "HOME", "LANG", "LC_ALL", "LC_CTYPE", "TZ", "TERM", "TMPDIR",
+)
+# CLI 认证相关变量：用前缀匹配，天然覆盖未来新增/改名的凭据变量
+# （ANTHROPIC_* 直连/网关、AWS_* Bedrock、CLAUDE_* CLI 自身配置）。
+_CLI_ENV_PREFIXES = ("ANTHROPIC_", "AWS_", "CLAUDE_")
+
+
+def _build_cli_env(audit_user: str | None = None) -> dict[str, str]:
+    """构造传给 claude 子进程的精简环境（白名单透传）。
+
+    只包含 CLI 运行与认证所需变量；前缀透传保证未来新增同前缀认证变量
+    自动生效，无需改代码。剥离所有无关应用密钥。
+    audit_user：发起本次调用的用户标识，经 KB_AGENT_AUDIT_USER 传给 hook 写审计。
+    """
+    out = {k: os.environ[k] for k in _CLI_ENV_EXACT if k in os.environ}
+    for k, v in os.environ.items():
+        if k.startswith(_CLI_ENV_PREFIXES):
+            out[k] = v
+    if audit_user:
+        out["KB_AGENT_AUDIT_USER"] = audit_user
+    return out
+
 
 class ClaudeCliEngine:
     """封装 Claude CLI 子进程调用。"""
 
-    def __init__(self, model: str | None = None) -> None:
+    def __init__(
+        self,
+        model: str | None = None,
+        audit_user: str | None = None,
+        idle_timeout_sec: int | None = None,
+    ) -> None:
         settings = get_settings()
         self._cli_path = settings.claude_cli_path
         # model 参数优先；均为空时回退到环境变量 CLAUDE_MODEL
         self._model = model or settings.claude_model
-        self._idle_timeout = settings.engine_idle_timeout_sec
+        self._idle_timeout = (
+            idle_timeout_sec
+            if idle_timeout_sec is not None
+            else settings.engine_idle_timeout_sec
+        )
+        # 调大子进程 stdout 行缓冲上限，避免大单行 JSON 事件触发 LimitOverrunError
+        self._stream_limit = settings.engine_stream_limit_bytes
+        # hook 配置路径：仅当放开工具时经 --settings 注入（拦截 env 读取 + 脱敏）
+        self._hooks_settings = settings.claude_hooks_settings
+        # 发起调用的用户标识（写入 hook 安全审计），经子进程 env 传给 hook
+        self._audit_user = audit_user
 
-    def _build_argv(self, prompt: str, files: list[Path] | None) -> list[str]:
+    def _build_argv(
+        self, prompt: str, files: list[Path] | None, cwd: Path | None = None
+    ) -> list[str]:
         """构造 argv 列表；参数以独立元素传入，避免 shell 解析。
 
         文件通过"把路径写进 prompt + --add-dir 授权目录"让 CLI 用 Read 工具读原文
         （CLI 的 --file 是 file_id:path 远程资源语义，不适用于本地路径）。
         headless 下用 --permission-mode 跳过交互授权（平台可信，见 SECURITY #2）。
+        cwd 为工作目录：CLI 子进程在此运行，并授权其读写（--add-dir）。
         """
         files = files or []
         full_prompt = prompt
@@ -49,11 +97,18 @@ class ClaudeCliEngine:
         # 授权每个文件所在目录，供工具访问
         for f in files:
             argv += ["--add-dir", str(f.parent)]
-        if files:
+        # 授权工作目录，供 Agent 在其中创建/修改文件
+        if cwd is not None:
+            argv += ["--add-dir", str(cwd)]
+        if files or cwd is not None:
             # 放开全部工具（含 Bash，用于 pdftotext 等抽取大文件）。
             # 按项目决策：工具不做限制、假设平台可信（见 SECURITY.md #2）。
             # 注意：该 flag 拒绝 root 运行，容器以非 root 用户启动。
             argv += ["--dangerously-skip-permissions"]
+            # 注入 hook：PreToolUse 拦截读取环境变量的 Bash 命令（env/printenv/
+            # os.environ 等）+ 写审计（见 SECURITY.md #2/#10）。放开工具时才需要。
+            if self._hooks_settings:
+                argv += ["--settings", self._hooks_settings]
         return argv
 
     async def complete(
@@ -62,8 +117,9 @@ class ClaudeCliEngine:
         *,
         files: list[Path] | None = None,
         system: str | None = None,
+        cwd: Path | None = None,
     ) -> EngineResult:
-        argv = self._build_argv(prompt, files)
+        argv = self._build_argv(prompt, files, cwd)
         if system:
             argv += ["--append-system-prompt", system]
 
@@ -77,8 +133,11 @@ class ClaudeCliEngine:
         try:
             proc = await asyncio.create_subprocess_exec(
                 *argv,
+                cwd=str(cwd) if cwd is not None else None,
+                env=_build_cli_env(self._audit_user),
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
+                limit=self._stream_limit,
             )
         except FileNotFoundError as exc:
             raise EngineError(f"找不到 Claude CLI: {self._cli_path!r}") from exc
@@ -136,9 +195,10 @@ class ClaudeCliEngine:
         *,
         system: str | None = None,
         files: list[Path] | None = None,
+        cwd: Path | None = None,
     ) -> AsyncGenerator[ThinkingChunk | TextChunk, None]:
         """流式调用：解析 CLI stream-json NDJSON，yield ThinkingChunk / TextChunk。"""
-        argv = self._build_argv(prompt, files)
+        argv = self._build_argv(prompt, files, cwd)
         if system:
             argv += ["--append-system-prompt", system]
         argv += ["--output-format", "stream-json", "--verbose", "--include-partial-messages"]
@@ -149,8 +209,11 @@ class ClaudeCliEngine:
         try:
             proc = await asyncio.create_subprocess_exec(
                 *argv,
+                cwd=str(cwd) if cwd is not None else None,
+                env=_build_cli_env(self._audit_user),
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
+                limit=self._stream_limit,
             )
         except FileNotFoundError as exc:
             raise EngineError(f"找不到 Claude CLI: {self._cli_path!r}") from exc

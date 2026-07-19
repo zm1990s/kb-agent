@@ -25,14 +25,24 @@ from app.services.settings_service import (
     EngineNotAvailableError,
     InvalidPromptError,
     get_chat_engine_backend,
+    get_chat_file_retention_days,
+    get_download_url_ttl_sec,
     get_engine_backend,
+    get_engine_idle_timeout_sec,
+    get_jwt_expire_min,
+    get_max_upload_mb,
     get_openai_api_key,
     get_openai_base_url,
     get_openai_model,
     get_prompt,
     get_require_email_verification,
     get_setting,
-    get_site_base_url,
+    get_smtp_from,
+    get_smtp_host,
+    get_smtp_password,
+    get_smtp_port,
+    get_smtp_tls,
+    get_smtp_user,
     get_suggested_questions,
     get_task_headers,
     get_task_model,
@@ -42,14 +52,24 @@ from app.services.settings_service import (
     list_prompt_history,
     rollback_prompt,
     set_chat_engine_backend,
+    set_chat_file_retention_days,
+    set_download_url_ttl_sec,
     set_engine_backend,
+    set_engine_idle_timeout_sec,
+    set_jwt_expire_min,
+    set_max_upload_mb,
     set_openai_api_key,
     set_openai_base_url,
     set_openai_model,
     set_prompt,
     set_require_email_verification,
     set_setting,
-    set_site_base_url,
+    set_smtp_from,
+    set_smtp_host,
+    set_smtp_password,
+    set_smtp_port,
+    set_smtp_tls,
+    set_smtp_user,
     set_suggested_questions,
     set_task_headers,
     set_task_model,
@@ -360,6 +380,45 @@ async def update_whatsnew_schedule(
     return await _get_schedule_out(session)
 
 
+# ── 聊天+ 文件保留期 ──────────────────────────────────────────
+
+
+class ChatFileRetentionOut(BaseModel):
+    days: int
+
+
+class ChatFileRetentionIn(BaseModel):
+    days: int
+
+
+@router.get("/chat-file-retention", response_model=ChatFileRetentionOut)
+async def get_chat_file_retention(
+    _admin: User = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+) -> ChatFileRetentionOut:
+    return ChatFileRetentionOut(days=await get_chat_file_retention_days(session))
+
+
+@router.put("/chat-file-retention", response_model=ChatFileRetentionOut)
+async def update_chat_file_retention(
+    body: ChatFileRetentionIn,
+    admin: User = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+) -> ChatFileRetentionOut:
+    try:
+        await set_chat_file_retention_days(session, body.days)
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+    logger.info("audit admin set_chat_file_retention admin=%s days=%d", admin.id, body.days)
+    await record_event(
+        session,
+        action="admin_set_chat_file_retention",
+        user_id=admin.id,
+        meta={"days": body.days},
+    )
+    return ChatFileRetentionOut(days=await get_chat_file_retention_days(session))
+
+
 # ── 引导问题 ─────────────────────────────────────────────────
 
 
@@ -509,12 +568,10 @@ async def update_branding(
 
 class EmailVerificationOut(BaseModel):
     require_email_verification: bool
-    site_base_url: str
 
 
 class EmailVerificationIn(BaseModel):
     require_email_verification: bool | None = None
-    site_base_url: str | None = None
 
 
 @router.get("/email-verification", response_model=EmailVerificationOut)
@@ -524,7 +581,6 @@ async def get_email_verification_config(
 ) -> EmailVerificationOut:
     return EmailVerificationOut(
         require_email_verification=await get_require_email_verification(session),
-        site_base_url=await get_site_base_url(session),
     )
 
 
@@ -552,11 +608,8 @@ async def update_email_verification_config(
             )
             await session.commit()
             logger.info("audit admin email_verification_grandfathered admin=%s", admin.id)
-    if body.site_base_url is not None:
-        await set_site_base_url(session, body.site_base_url)
     return EmailVerificationOut(
         require_email_verification=await get_require_email_verification(session),
-        site_base_url=await get_site_base_url(session),
     )
 
 
@@ -682,3 +735,139 @@ async def update_task_headers(
         chat=await get_task_headers(session, TASK_HEADERS_CHAT_KEY),
         whatsnew=await get_task_headers(session, TASK_HEADERS_WHATSNEW_KEY),
     )
+
+
+# ── 运行时可调配置（安全 + 存储 + 引擎超时） ─────────────────────────────────
+
+
+class RuntimeConfigOut(BaseModel):
+    jwt_expire_min: int
+    max_upload_mb: int
+    download_url_ttl_sec: int
+    engine_idle_timeout_sec: int
+
+
+class RuntimeConfigIn(BaseModel):
+    jwt_expire_min: int | None = None
+    max_upload_mb: int | None = None
+    download_url_ttl_sec: int | None = None
+    engine_idle_timeout_sec: int | None = None
+
+
+async def _get_runtime_config_out(session: AsyncSession) -> RuntimeConfigOut:
+    return RuntimeConfigOut(
+        jwt_expire_min=await get_jwt_expire_min(session),
+        max_upload_mb=await get_max_upload_mb(session),
+        download_url_ttl_sec=await get_download_url_ttl_sec(session),
+        engine_idle_timeout_sec=await get_engine_idle_timeout_sec(session),
+    )
+
+
+@router.get("/runtime-config", response_model=RuntimeConfigOut)
+async def get_runtime_config(
+    _admin: User = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+) -> RuntimeConfigOut:
+    return await _get_runtime_config_out(session)
+
+
+@router.put("/runtime-config", response_model=RuntimeConfigOut)
+async def update_runtime_config(
+    body: RuntimeConfigIn,
+    admin: User = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+) -> RuntimeConfigOut:
+    try:
+        if body.jwt_expire_min is not None:
+            await set_jwt_expire_min(session, body.jwt_expire_min)
+        if body.max_upload_mb is not None:
+            await set_max_upload_mb(session, body.max_upload_mb)
+        if body.download_url_ttl_sec is not None:
+            await set_download_url_ttl_sec(session, body.download_url_ttl_sec)
+        if body.engine_idle_timeout_sec is not None:
+            await set_engine_idle_timeout_sec(session, body.engine_idle_timeout_sec)
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+    logger.info("audit admin update_runtime_config admin=%s", admin.id)
+    await record_event(
+        session, action="admin_update_runtime_config", user_id=admin.id,
+        meta={
+            "jwt_expire_min": body.jwt_expire_min,
+            "max_upload_mb": body.max_upload_mb,
+            "download_url_ttl_sec": body.download_url_ttl_sec,
+            "engine_idle_timeout_sec": body.engine_idle_timeout_sec,
+        },
+    )
+    return await _get_runtime_config_out(session)
+
+
+# ── SMTP 配置 ────────────────────────────────────────────────────────────────
+
+_SMTP_MASKED = "***"
+
+
+class SmtpConfigOut(BaseModel):
+    smtp_host: str
+    smtp_port: int
+    smtp_user: str
+    smtp_password: str  # 已设置时返回 "***"，未设置时返回 ""
+    smtp_from: str
+    smtp_tls: bool
+
+
+class SmtpConfigIn(BaseModel):
+    smtp_host: str | None = None
+    smtp_port: int | None = None
+    smtp_user: str | None = None
+    smtp_password: str | None = None  # 传 "" 表示清空，传 "***" 表示不改变
+    smtp_from: str | None = None
+    smtp_tls: bool | None = None
+
+
+async def _get_smtp_config_out(session: AsyncSession) -> SmtpConfigOut:
+    password = await get_smtp_password(session)
+    return SmtpConfigOut(
+        smtp_host=await get_smtp_host(session),
+        smtp_port=await get_smtp_port(session),
+        smtp_user=await get_smtp_user(session),
+        smtp_password=_SMTP_MASKED if password else "",
+        smtp_from=await get_smtp_from(session),
+        smtp_tls=await get_smtp_tls(session),
+    )
+
+
+@router.get("/smtp", response_model=SmtpConfigOut)
+async def get_smtp_config(
+    _admin: User = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+) -> SmtpConfigOut:
+    return await _get_smtp_config_out(session)
+
+
+@router.put("/smtp", response_model=SmtpConfigOut)
+async def update_smtp_config(
+    body: SmtpConfigIn,
+    admin: User = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+) -> SmtpConfigOut:
+    try:
+        if body.smtp_host is not None:
+            await set_smtp_host(session, body.smtp_host)
+        if body.smtp_port is not None:
+            await set_smtp_port(session, body.smtp_port)
+        if body.smtp_user is not None:
+            await set_smtp_user(session, body.smtp_user)
+        if body.smtp_password is not None and body.smtp_password != _SMTP_MASKED:
+            await set_smtp_password(session, body.smtp_password)
+        if body.smtp_from is not None:
+            await set_smtp_from(session, body.smtp_from)
+        if body.smtp_tls is not None:
+            await set_smtp_tls(session, body.smtp_tls)
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+    logger.info("audit admin update_smtp_config admin=%s", admin.id)
+    await record_event(
+        session, action="admin_update_smtp_config", user_id=admin.id,
+        meta={"smtp_host": body.smtp_host, "smtp_port": body.smtp_port},
+    )
+    return await _get_smtp_config_out(session)

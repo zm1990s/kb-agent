@@ -7,7 +7,6 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import get_settings
 from app.engine.base import EngineError, get_chat_engine
 from app.models.auth import Workspace
 from app.models.document import Category, Document
@@ -16,6 +15,7 @@ from app.services.settings_service import (
     MODEL_WHATSNEW_KEY,
     TASK_HEADERS_WHATSNEW_KEY,
     WHATSNEW_PROMPT_KEY,
+    get_download_url_ttl_sec,
     get_prompt,
     get_task_headers,
 )
@@ -137,7 +137,7 @@ async def _build_report_dicts(
             docs_by_id[doc.id] = (doc, cat_name)
 
     storage = get_storage()
-    ttl = get_settings().download_url_ttl_sec
+    ttl = await get_download_url_ttl_sec(session)
 
     output = []
     for report in reports:

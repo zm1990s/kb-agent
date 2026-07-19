@@ -23,6 +23,7 @@ _VERIFICATION_TOKEN_EXPIRE_HOURS = 24
 _VERIFICATION_PIN_EXPIRE_MINUTES = 10
 _MAX_LOGIN_ATTEMPTS = 5
 _LOCKOUT_DURATION_MINUTES = 15
+_MAX_PIN_ATTEMPTS = 5
 
 
 class InvalidCredentialsError(Exception):
@@ -214,7 +215,7 @@ async def register_user(
             existing.verification_token_exp = datetime.now(UTC) + timedelta(minutes=_VERIFICATION_PIN_EXPIRE_MINUTES)
             await session.commit()
             from app.services.email_service import send_verification_pin  # noqa: PLC0415
-            await send_verification_pin(email, token)
+            await send_verification_pin(session, email, token)
             logger.info("register: 未验证用户重新注册，新 PIN 已发送 email=%s", email)
         else:
             existing.email_verified = True
@@ -254,7 +255,7 @@ async def register_user(
 
     if require_verification and token:
         from app.services.email_service import send_verification_pin
-        await send_verification_pin(email, token)
+        await send_verification_pin(session, email, token)
         logger.info("register: 验证 PIN 已发送 email=%s", email)
 
     return user, require_verification
@@ -305,25 +306,37 @@ async def resend_verification_pin(session: AsyncSession, *, email: str) -> bool:
     user.verification_token_exp = now + timedelta(minutes=_VERIFICATION_PIN_EXPIRE_MINUTES)
     await session.commit()
 
-    await send_verification_pin(email, token)
+    await send_verification_pin(session, email, token)
     logger.info("resend_verification_pin: PIN 重发 user_id=%s", user.id)
     return True
 
 
 async def verify_email_pin(session: AsyncSession, *, email: str, pin: str) -> bool:
-    """用 6 位 PIN 完成邮箱验证。PIN 无效、过期或邮箱不匹配返回 False，成功返回 True。"""
+    """用 6 位 PIN 完成邮箱验证。PIN 无效、过期、锁定或邮箱不匹配返回 False，成功返回 True。"""
     user = await get_user_by_email(session, email)
     if user is None:
         return False
     if user.email_verified:
         return True
-    if user.verification_token is None or user.verification_token != pin:
+    now = datetime.now(UTC)
+    # 锁定检查（连续错误 _MAX_PIN_ATTEMPTS 次后锁定 _LOCKOUT_DURATION_MINUTES 分钟）
+    if user.verification_locked_until and user.verification_locked_until > now:
         return False
-    if user.verification_token_exp is None or user.verification_token_exp < datetime.now(UTC):
+    if user.verification_token is None or user.verification_token != pin:
+        user.verification_attempts = (user.verification_attempts or 0) + 1
+        if user.verification_attempts >= _MAX_PIN_ATTEMPTS:
+            user.verification_locked_until = now + timedelta(minutes=_LOCKOUT_DURATION_MINUTES)
+            user.verification_token = None
+            user.verification_token_exp = None
+        await session.commit()
+        return False
+    if user.verification_token_exp is None or user.verification_token_exp < now:
         return False
     user.email_verified = True
     user.verification_token = None
     user.verification_token_exp = None
+    user.verification_attempts = 0
+    user.verification_locked_until = None
     await session.commit()
     logger.info("verify_email_pin: 邮箱验证成功 user_id=%s", user.id)
     return True
@@ -363,7 +376,7 @@ async def request_password_reset(session: AsyncSession, *, email: str) -> None:
     user.reset_rate_exp = now + timedelta(seconds=_RESET_RATE_LIMIT_SECONDS)
     await session.commit()
 
-    await send_reset_code_email(email, code)
+    await send_reset_code_email(session, email, code)
     logger.info("request_password_reset: 验证码已发送 user_id=%s", user.id)
 
 

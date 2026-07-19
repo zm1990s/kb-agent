@@ -17,9 +17,9 @@ from datetime import UTC, datetime
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import get_settings
 from app.engine.base import EngineError, get_chat_engine
 from app.models.document import Category, Document
+from app.services.settings_service import get_download_url_ttl_sec
 from app.storage.base import get_storage
 
 logger = logging.getLogger(__name__)
@@ -37,9 +37,9 @@ class AnswerResult:
     error_key: str | None = None
 
 
-async def _build_source(doc: Document) -> dict:
+async def _build_source(doc: Document, session: AsyncSession) -> dict:
     storage = get_storage()
-    ttl = get_settings().download_url_ttl_sec
+    ttl = await get_download_url_ttl_sec(session)
     return {
         "doc_id": str(doc.id),
         "title": doc.title,
@@ -291,7 +291,7 @@ async def answer_question_streamed(
         )
         return
 
-    sources = [await _build_source(index[num - 1][0]) for num in doc_numbers]
+    sources = [await _build_source(index[num - 1][0], session) for num in doc_numbers]
 
     error_key: str | None = None if answer else "no_answer"
     if not answer:

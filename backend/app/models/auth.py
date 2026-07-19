@@ -55,6 +55,10 @@ class User(Base):
     reset_code_exp: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     reset_attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     reset_rate_exp: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    verification_attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    verification_locked_until: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     __table_args__ = (
         CheckConstraint(

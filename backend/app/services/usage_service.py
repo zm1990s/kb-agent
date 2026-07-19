@@ -95,7 +95,14 @@ async def get_stats(session: AsyncSession, days: int = 30) -> dict:
     for r in user_rows:
         key = r.email or "(匿名)"
         if key not in user_map:
-            user_map[key] = {"email": key, "login": 0, "upload": 0, "chat": 0, "download": 0}
+            user_map[key] = {
+                "email": key,
+                "login": 0,
+                "upload": 0,
+                "chat": 0,
+                "chatplus": 0,
+                "download": 0,
+            }
         if r.action in user_map[key]:
             user_map[key][r.action] = r.cnt
     per_user = sorted(
@@ -162,10 +169,12 @@ async def get_chat_events(
     limit: int = 50,
 ) -> dict:
     since = datetime.utcnow() - timedelta(days=days)
+    # 同时统计普通聊天(chat)与聊天+(chatplus)，用 source 区分
+    chat_actions = ("chat", "chatplus")
     total = (
         await session.execute(
             select(func.count()).select_from(UsageEvent).where(
-                UsageEvent.action == "chat",
+                UsageEvent.action.in_(chat_actions),
                 UsageEvent.created_at >= since,
             )
         )
@@ -174,13 +183,14 @@ async def get_chat_events(
         await session.execute(
             select(
                 UsageEvent.created_at,
+                UsageEvent.action,
                 User.email,
                 UsageEvent.meta["question"].as_string().label("question"),
                 UsageEvent.meta["answer"].as_string().label("answer"),
                 UsageEvent.meta["conversation_id"].as_string().label("conversation_id"),
             )
             .outerjoin(User, User.id == UsageEvent.user_id)
-            .where(UsageEvent.action == "chat", UsageEvent.created_at >= since)
+            .where(UsageEvent.action.in_(chat_actions), UsageEvent.created_at >= since)
             .order_by(UsageEvent.created_at.desc())
             .offset(offset)
             .limit(limit)
@@ -192,6 +202,7 @@ async def get_chat_events(
             {
                 "created_at": r.created_at.isoformat(),
                 "email": r.email or "(匿名)",
+                "source": r.action,  # "chat" | "chatplus"
                 "conversation_id": r.conversation_id,
                 "question": r.question or "",
                 "answer": r.answer or "",

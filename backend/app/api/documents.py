@@ -24,6 +24,7 @@ from app.core.deps import get_current_user
 from app.models.auth import User
 from app.models.document import Document
 from app.schemas.document import (
+    DocumentListItem,
     DocumentMove,
     DocumentPublic,
     DocumentRename,
@@ -45,6 +46,7 @@ from app.services.document_service import (
 )
 from app.services.folder_service import get_folder_in_workspace
 from app.services.usage_service import record_event
+from app.services.settings_service import get_max_upload_mb
 from app.services.workspace_service import get_ws_role, is_member
 from app.storage.base import get_storage
 from app.tasks.worker import enqueue_classification
@@ -119,6 +121,10 @@ async def upload(
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "目录不存在")
 
     data = await file.read()
+    _max_mb = await get_max_upload_mb(session)
+    if len(data) > _max_mb * 1024 * 1024:
+        raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                            f"文件超过 {_max_mb} MB 限制")
     # 保留原始文件名（仅截取末段），规范化特殊字符，不添加路径前缀
     raw_name = PurePosixPath(file.filename or "untitled").name
     clean_name = sanitize_filename(raw_name)
@@ -149,25 +155,29 @@ async def upload(
 
 
 @router.get(
-    "/workspaces/{workspace_id}/documents", response_model=list[DocumentPublic]
+    "/workspaces/{workspace_id}/documents", response_model=list[DocumentListItem]
 )
 async def list_ws_documents(
     workspace_id: uuid.UUID,
     category: uuid.UUID | None = None,
     folder: uuid.UUID | None = None,
     tag: str | None = None,
+    search: str | None = None,
     page: int = 1,
     size: int = 50,
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> list[DocumentPublic]:
     await _ensure_member(session, workspace_id, current_user)
+    # size 上限保护，避免一次拉取过多
+    size = max(1, min(size, 500))
     docs = await list_documents(
         session,
         workspace_id=workspace_id,
         category_id=category,
         folder_id=folder,
         tag=tag,
+        search=search,
         limit=size,
         offset=(max(page, 1) - 1) * size,
     )
@@ -241,6 +251,7 @@ async def move_doc(
     session: AsyncSession = Depends(get_session),
 ) -> DocumentPublic:
     doc = await _get_doc_for_member(session, document_id, current_user)
+    await _require_ws_write(session, doc.workspace_id, current_user)
     # 目标目录须属于同一空间（None 表示移出目录）
     if body.folder_id is not None:
         folder = await get_folder_in_workspace(
