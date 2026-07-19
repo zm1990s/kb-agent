@@ -62,5 +62,11 @@ services:
       - backend
     environment:
       BACKEND_URL: http://backend:8000
+      CF_IP_WHITELIST_ENABLED: "true"   # 只允许 Cloudflare 网段访问；改为 false 可临时关闭
     ports:
       - "80:80"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "10"
