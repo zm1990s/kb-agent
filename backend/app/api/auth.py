@@ -2,16 +2,23 @@
 
 import logging
 import uuid
+from datetime import UTC, datetime, timedelta
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
+from fastapi import APIRouter, BackgroundTasks, Cookie, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel, EmailStr, Field
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import SessionLocal, get_session
 from app.core.deps import get_current_user, require_admin
 from app.core.rate_limit import check_rate
-from app.core.security import create_access_token
-from app.models.auth import User
+from app.core.security import (
+    REFRESH_EXPIRE_DAYS,
+    create_access_token,
+    create_refresh_token,
+    hash_token,
+)
+from app.models.auth import RefreshToken, User
 from app.schemas.auth import (
     AllowedDomainCreate,
     AllowedDomainPublic,
@@ -144,10 +151,27 @@ async def resend_verification_pin_endpoint(
     return {"message": "ok"}
 
 
+def _set_refresh_cookie(response: Response, token: str) -> None:
+    response.set_cookie(
+        key="refresh_token",
+        value=token,
+        httponly=True,
+        secure=True,
+        samesite="strict",
+        max_age=REFRESH_EXPIRE_DAYS * 86400,
+        path="/api/auth/refresh",
+    )
+
+
+def _clear_refresh_cookie(response: Response) -> None:
+    response.delete_cookie(key="refresh_token", path="/api/auth/refresh")
+
+
 @router.post("/login", response_model=TokenResponse)
 async def login(
     request: Request,
     body: LoginRequest,
+    response: Response,
     background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
 ) -> TokenResponse:
@@ -172,12 +196,91 @@ async def login(
     expire_min = await get_jwt_expire_min(session)
     token = create_access_token(user_id=user.id, role=user.role, expire_min=expire_min)
 
+    rt = create_refresh_token()
+    session.add(RefreshToken(
+        user_id=user.id,
+        token_hash=hash_token(rt),
+        expires_at=datetime.now(UTC) + timedelta(days=REFRESH_EXPIRE_DAYS),
+    ))
+    await session.commit()
+    _set_refresh_cookie(response, rt)
+
     async def _log() -> None:
         async with SessionLocal() as s:
             await record_event(s, action="login", user_id=user.id)
 
     background_tasks.add_task(_log)
     return TokenResponse(access_token=token, role=user.role)
+
+
+@router.post("/refresh", response_model=TokenResponse)
+async def refresh_token(
+    response: Response,
+    refresh_token: str | None = Cookie(default=None),
+    session: AsyncSession = Depends(get_session),
+) -> TokenResponse:
+    """用 httpOnly cookie 中的 refresh token 换新 access token（sliding window）。"""
+    if not refresh_token:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "no_refresh_token")
+
+    th = hash_token(refresh_token)
+    now = datetime.now(UTC)
+    result = await session.execute(
+        select(RefreshToken).where(
+            RefreshToken.token_hash == th,
+            RefreshToken.revoked.is_(False),
+            RefreshToken.expires_at > now,
+        )
+    )
+    rt_row = result.scalar_one_or_none()
+    if rt_row is None:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid_refresh_token")
+
+    # 吊销旧 token
+    await session.execute(
+        update(RefreshToken).where(RefreshToken.id == rt_row.id).values(revoked=True)
+    )
+
+    # 查用户
+    user_result = await session.execute(select(User).where(User.id == rt_row.user_id))
+    user = user_result.scalar_one_or_none()
+    if user is None or not user.is_active:
+        await session.commit()
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "user_not_found")
+
+    # 签发新 access token
+    expire_min = await get_jwt_expire_min(session)
+    new_access = create_access_token(user_id=user.id, role=user.role, expire_min=expire_min)
+
+    # 签发新 refresh token（rotate）
+    new_rt = create_refresh_token()
+    session.add(RefreshToken(
+        user_id=user.id,
+        token_hash=hash_token(new_rt),
+        expires_at=datetime.now(UTC) + timedelta(days=REFRESH_EXPIRE_DAYS),
+    ))
+    await session.commit()
+    _set_refresh_cookie(response, new_rt)
+
+    return TokenResponse(access_token=new_access, role=user.role)
+
+
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+async def logout(
+    response: Response,
+    refresh_token: str | None = Cookie(default=None),
+    session: AsyncSession = Depends(get_session),
+) -> None:
+    """吊销当前 refresh token 并清除 cookie（无需 access token，静默调用）。"""
+    if refresh_token:
+        th = hash_token(refresh_token)
+        await session.execute(
+            update(RefreshToken)
+            .where(RefreshToken.token_hash == th)
+            .values(revoked=True)
+        )
+        await session.commit()
+    _clear_refresh_cookie(response)
 
 
 @router.get("/me", response_model=UserPublic)

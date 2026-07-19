@@ -6,6 +6,8 @@
 - 密码用 bcrypt 哈希，不可逆存储。
 """
 
+import hashlib
+import secrets
 import uuid
 from datetime import UTC, datetime, timedelta
 
@@ -52,6 +54,19 @@ def create_access_token(*, user_id: uuid.UUID, role: str, expire_min: int | None
         "exp": now + timedelta(minutes=minutes),
     }
     return jwt.encode(payload, settings.jwt_secret, algorithm=ALGORITHM)
+
+
+REFRESH_EXPIRE_DAYS = 30
+
+
+def create_refresh_token() -> str:
+    """生成 32 字节 URL-safe 随机 token（明文，只通过 Set-Cookie 下发一次）。"""
+    return secrets.token_urlsafe(32)
+
+
+def hash_token(token: str) -> str:
+    """SHA-256 哈希，用于 DB 存储，不存明文。"""
+    return hashlib.sha256(token.encode()).hexdigest()
 
 
 def decode_access_token(token: str) -> dict:

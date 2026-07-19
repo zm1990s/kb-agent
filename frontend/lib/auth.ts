@@ -41,6 +41,8 @@ export function clearAuth(): void {
   if (typeof window === "undefined") return;
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(EMAIL_KEY);
+  // 静默吊销服务端 refresh token cookie，不等结果
+  fetch("/api/auth/logout", { method: "POST", credentials: "include" }).catch(() => {});
 }
 
 export function isLoggedIn(): boolean {
