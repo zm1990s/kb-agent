@@ -335,7 +335,6 @@ async def get_conversation(
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> ConversationHistory:
-    await _require_chat(session, current_user)
     conv = await get_conversation_for_user(
         session, conversation_id=conversation_id, user_id=current_user.id
     )
