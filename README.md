@@ -1,59 +1,79 @@
-# KB-Agent
+# KB-Agent — 让团队知识成为会思考的协作资产
 
-> 面向内部员工与外部 Partner 的**共享 Agent 知识平台**：管理员上传文档 → Agent 自动归类/总结沉淀为可检索知识 → 用户通过对话查询知识并获取原文；支持 Skill 库与聊天+工作台，让 Agent 完成更复杂的生成任务。
+> **AI-Native 多人协同知识管理平台**
+> 以 Claude 为核心引擎，把企业文档变成可对话、可生成、可执行的知识网络，让团队用自然语言高效协同。
 
----
-
-## 使用场景
-
-**知识沉淀与检索**：将产品手册、技术文档、FAQ 批量上传，Agent 自动归类整理并建立全文索引，员工通过对话即可获取答案和原文下载链接，无需手动翻阅文件夹。
-
-**多人协作与权限隔离**：通过空间隔离和用户组授权，将不同级别的知识开放给不同人员，各方只能访问被授权的内容，适合内外部协作场景。
-
-**聊天+工作台**（v2.0）：选择 Skill 定义 Agent 行为，上传附件或引用知识库原文，让 Agent 完成文档生成、数据整理等复杂任务，成果文件可直接下载；交互模式支持 AI 主动向用户提问，实现引导式 AI 规划与学习等场景。
-
-**Skill 共享复用**（v2.0）：将常用提示词和附属文件封装为 Skill，统一保存到 Skill 库，团队成员按权限共享使用，平台内置 Claude 官方 Skill 开箱即用。
+[![AI Powered](https://img.shields.io/badge/AI-Claude%20Powered-blueviolet)](#)
+[![Tech Stack](https://img.shields.io/badge/Stack-Next.js%2016%20%7C%20FastAPI%20%7C%20PostgreSQL%2016-3b82f6)](#)
+[![License](https://img.shields.io/badge/License-MIT-10b981)](#)
 
 ---
 
-## 功能介绍
+## 一句话定位
 
-### v1.0 · 知识库平台
+**KB-Agent = 企业知识库 + 多用户协作空间 + Claude Agent 工作台**
 
-- **空间管理**：支持创建多个独立空间，不同空间之间完全隔离，适合按业务线、密级或团队分类存放文档。
-- **知识库索引**：上传任意格式文档（Word / PDF / 图片 / Excel / PPT 等），AI 自动识别内容（含图片文字）、生成摘要与标签，并建立全文检索索引。
-- **文档查询**：支持目录树浏览（传统方式）和 AI 对话问询两种方式；AI 回答会自动附上相关文档的原文下载链接，方便核查原始资料。
-- **新动态订阅**：系统自动追踪平台内的文档变化并定期汇总，订阅的用户可通过邮件定期收到知识动态通知。
-- **灵活引擎接入**：文件索引任务使用 Claude 完成；对话任务可选 Claude 或任意 OpenAI Compatible API 兼容模型。
+传统知识库是“搜索框 + 文件夹”，信息孤岛、查找低效、协作割裂。KB-Agent 把 Claude 的多步推理、长上下文理解、代码与文档生成能力嵌入到企业知识管理流程中，让团队能够：
 
-### v2.0 · 聊天+与 Skill 库
-
-- **聊天+工作台**：相当于将 Claude 桌面端能力内嵌到平台中，用户可上传任意文件、引用知识库文档，让 Agent 完成任意生成与处理任务，成果文件可在工作台直接下载。
-- **Skill 管理**：用户可手动上传或借助 AI 生成 Skill（SKILL.md 格式），一键保存到平台 Skill 库。多人可协同使用同一 Skill 库，管理员控制可见范围；平台内置 Claude 官方 Skill 供直接使用。
-- **交互模式**：模拟 Claude 桌面端的 ask-user 交互，AI 在对话中会主动弹出问题框让用户选择。结合 Skill 可实现 AI 引导学习、AI 辅助规划等互动场景。
-
-### 平台基础
-
-- **多用户管理**：管理员设置域名白名单，用户通过企业邮箱自助注册；支持用户组与 RBAC 权限模型，按模块精细授权。
-- **完整审计记录**：管理员可查看用户的文件下载、对话记录等完整使用情况，满足企业合规要求。
+- **对话即查询**：用自然语言提问，自动定位原文并生成答案。
+- **知识即工作流**：通过 Skill 把 Prompt、业务逻辑和文档处理封装成可复用的 Agent 能力。
+- **协同即安全**：多空间隔离、用户组权限、完整审计，满足企业级合规。
 
 ---
 
-## 功能概览
+## 核心能力
 
-### 核心能力
+### 1. AI 原生知识沉淀
+上传 Word、PDF、Excel、PPT、图片等任意格式文档，Claude 自动完成：
 
-| 模块 | 功能 |
-|------|------|
-| **认证 & 权限** | 邮箱密码注册（域名白名单）、JWT、用户组 RBAC（9 模块 × 读写）、admin 绕过、自助找回密码 |
-| **空间隔离** | Workspace 隔离边界；成员按个人或用户组授权；空间可删除并打包下载 |
-| **文档管理** | 批量/目录上传（≤200 MB）、Claude 后台归类、目录树拖拽、回收站（30 天软删除）、文件预览 |
-| **对话查询** | Agent 式两阶段索引问答、SSE 流式推送、多轮上下文、会话 Pin & 命名、thinking 过程可折叠查看 |
-| **聊天+**（v2.0） | 独立工作台，Skill 注入系统提示、附件上传/下载、文档引用、后台生成任务、交互模式（ask-user 协议） |
-| **Skill 库**（v2.0） | 平台级/空间级 Skill，可见性控制、用户组权限、Bundle 打包、操作审计日志 |
-| **新动态** | 定时知识摘要（daily–monthly）、邮件订阅派发、前端卡片展示 |
-| **数据统计** | 用量报表、下载记录、对话记录、系统日志 |
-| **系统设置** | 品牌配置、AI 引擎选择、按任务模型配置、提示词版本管理、SMTP、国际化（5 语言） |
+- 内容识别（含图片文字提取）
+- 智能归类与标签生成
+- 摘要与全文索引
+- 原文关联，回答可溯源
+
+### 2. 多人协作空间
+- **Workspace 隔离**：按业务线、项目、客户或密级建立独立空间。
+- **用户组 RBAC**：9 大模块 × 读写级精细授权，内外部人员只能访问被授权内容。
+- **新动态订阅**：文档变更自动汇总，通过邮件定期推送给订阅者。
+
+### 3. 聊天 + 工作台（Chat+）
+把 Claude 桌面端的能力内嵌到平台中：
+
+- 上传附件、引用知识库原文、多轮对话
+- Skill 注入系统提示，让 Agent 完成文档生成、数据整理、报告撰写等复杂任务
+- 成果文件在工作台直接下载
+- 支持 AI 主动提问（ask-user 协议），实现引导式学习、规划等互动场景
+
+### 4. Skill 共享复用
+- 将常用提示词和附属文件封装为 Skill（SKILL.md 格式）
+- 平台级 / 空间级共享，按权限可见
+- 内置 Claude 官方 Skill，开箱即用
+- 降低团队协作门槛，让 Prompt 变成可复用的组织能力
+
+---
+
+## 产品架构
+
+```
+用户/管理员
+   │
+   ├─ 前端 Next.js 16 + React 19 + Tailwind CSS
+   ├─ 后端 FastAPI + PostgreSQL（全文检索 + GIN 索引）
+   ├─ Agent 引擎：Claude CLI（支持 Anthropic API / Bedrock / 网关）
+   ├─ 文件存储：本地/云对象存储（StorageProtocol 抽象）
+   └─ 部署：Docker Compose（开发/生产双模式）
+```
+
+---
+
+## 为谁设计
+
+| 场景 | 痛点 | KB-Agent 解法 |
+|------|------|---------------|
+| **企业内部知识沉淀** | 产品手册、技术文档、FAQ 分散，新人查找困难 | 批量上传 → 自动归类 → 对话即查询 |
+| **跨团队/外部协作** | 文档权限混乱，敏感信息泄露风险 | 空间隔离 + 用户组 RBAC + 完整审计 |
+| **AI 辅助办公** | 员工想调用 AI 生成报告，但缺乏统一入口和权限管控 | 聊天 + 工作台 + Skill 库，成果可下载、可审计 |
+| **AI 引导与学习** | 培训、问答需要人工反复介入 | 交互式 Skill 让 AI 主动引导用户 |
 
 ---
 
@@ -61,21 +81,21 @@
 
 | 层 | 技术 |
 |----|------|
-| Backend | Python 3.12 + FastAPI (async)、Pydantic v2 |
+| Backend | Python 3.12 + FastAPI (async) + Pydantic v2 |
 | Frontend | Next.js 16.2.10 + React 19 + TypeScript + Tailwind CSS |
-| 数据库 | PostgreSQL 16（全文检索 tsvector + GIN 索引，不引入向量库） |
-| Agent 引擎 | 封装 Claude CLI 子进程（EngineProtocol 抽象；支持 API key / 网关 / AWS Bedrock） |
-| 文件存储 | 本地文件系统（StorageProtocol 抽象，可换云对象存储） |
-| 部署 | Docker Compose（开发 / 生产双模式） |
+| Database | PostgreSQL 16（全文检索 tsvector + GIN 索引，零向量库依赖） |
+| Agent Engine | Claude CLI 子进程封装（EngineProtocol，支持 API Key / Bedrock / 网关） |
+| File Storage | 本地文件系统（StorageProtocol 抽象，可替换云对象存储） |
+| Deployment | Docker Compose（开发 / 生产双模式） |
 
 ---
 
 ## 前置条件
 
-### 0. 云主机与 Claude Key
+### 0. 云主机与 Claude 凭据
 
 - **海外云主机**：Claude CLI 需要访问 Anthropic API，建议部署在海外云主机（如 AWS、GCP、Azure 海外区域）或网络可达 Anthropic 服务的环境。
-- **Claude 模型 Key**：需要以下任意一种来源的 Claude 模型访问凭据：
+- **Claude 模型凭据**：任选一种来源：
   - Anthropic 官方 API key（[console.anthropic.com](https://console.anthropic.com)）
   - AWS Bedrock（需开通 Claude 模型权限）
   - Azure 或其他兼容网关（通过 `ANTHROPIC_BASE_URL` 配置）
@@ -90,7 +110,7 @@
 cp .env.example .env
 ```
 
-下表列出各变量含义及默认值：
+下表列出核心变量含义及默认值：
 
 #### 数据库
 
@@ -114,15 +134,15 @@ cp .env.example .env
 | `ENGINE_BACKEND` | 引擎类型，当前支持 `claude_cli` | `claude_cli` |
 | `CLAUDE_CLI_PATH` | Claude CLI 可执行路径 | `claude` |
 | `CLAUDE_MODEL` | 指定模型（留空使用 CLI 默认） | 无 |
-| `ENGINE_IDLE_TIMEOUT_SEC` | 空闲超时秒数（连续无输出才计时，非总时长） | `300` |
+| `ENGINE_IDLE_TIMEOUT_SEC` | 空闲超时秒数 | `300` |
 
-Claude CLI 认证方式三选一，其余留空：
+Claude CLI 认证方式三选一：
 
 | 变量 | 说明 |
 |------|------|
 | `ANTHROPIC_API_KEY` | 方式一：Anthropic 官方 API key |
 | `ANTHROPIC_BASE_URL` + `ANTHROPIC_AUTH_TOKEN` | 方式二：自定义网关（如 Portkey） |
-| `CLAUDE_CODE_USE_BEDROCK` + `AWS_ACCESS_KEY_ID` + `AWS_SECRET_ACCESS_KEY` + `AWS_SESSION_TOKEN` + `AWS_REGION` | 方式三：AWS Bedrock |
+| `CLAUDE_CODE_USE_BEDROCK` + AWS 相关密钥 | 方式三：AWS Bedrock |
 
 #### 文件存储
 
@@ -200,6 +220,16 @@ make lint   # 在 backend 容器内运行 ruff + pyright
 
 ---
 
+## 企业级安全与合规
+
+- **权限隔离**：Workspace 边界 + 用户组 RBAC，防越权 / IDOR。
+- **完整审计**：文件下载、对话记录、Skill 调用均可追溯。
+- **密钥管理**：密钥不硬编码，存储 Key 服务端生成，防路径穿越。
+- **LLM 统一出口**：所有模型调用只经 `app/engine/`，便于审计与成本控制。
+- **部署安全**：Docker Compose 生产模式，支持域名白名单注册。
+
+---
+
 ## 项目结构
 
 ```
@@ -235,7 +265,11 @@ docs/             # PRD / DESIGN / ROADMAP / WORKFLOW / SECURITY
 
 ## 开发约定
 
-- 所有 LLM 调用只经 `app/engine/`，文件存取只经 `app/storage/`
-- 所有文档查询强制带 workspace 权限过滤（防越权/IDOR）
-- 密钥不硬编码；`storage_key` 服务端生成，防路径穿越
-- 详见 [CLAUDE.md](CLAUDE.md)
+- 所有 LLM 调用只经 `app/engine/`，文件存取只经 `app/storage/`。
+- 所有文档查询强制带 workspace 权限过滤（防越权 / IDOR）。
+- 密钥不硬编码；`storage_key` 服务端生成，防路径穿越。
+- 详见 [CLAUDE.md](CLAUDE.md)。
+
+---
+
+> 让每一次对话，都能激活组织的集体智慧。
