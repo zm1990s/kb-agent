@@ -8,7 +8,8 @@
    (对话/上传)        │   ├─ auth: JWT + workspace 成员鉴权       │
                      │   ├─ documents: 上传/列表/下载签名URL     │
                      │   ├─ chat: 对话式检索                     │
-                     │   └─ (预留) skills: 插拔框架              │
+                     │   ├─ chat (plus): 聊天+ 工作台            │
+                     │   └─ skills: Skill 库管理与调用           │
                      └───────┬───────────────────┬──────────────┘
                              │ services/          │
              ┌───────────────┼───────────────┐    │
@@ -55,7 +56,7 @@ class EngineProtocol(Protocol):
 - **单端口**：用户只与 Next.js 交互；所有后端调用走相对路径 `/api/*`，由 rewrites 反代到 FastAPI。规避 CORS，收敛公网暴露面（SECURITY #8）。
 - **鉴权**：登录拿 JWT，前端 `lib/auth` 存取；`lib/api` 统一在请求头注入 `Authorization: Bearer`。路由守卫拦截未登录访问。
 - **角色显隐**：建空间/建分类等全局管理功能仅对全局 admin 显示；文档写操作（上传/删除/重命名/替换/reprocess/回收站/恢复）对空间 **owner / editor** 也显示（`get_ws_role()` 解析有效角色：全局 admin → owner；个人 WorkspaceMember 角色；组 WorkspaceGroupGrant 角色取最高）。仅体验层，后端通过 `_require_ws_write()` 强制校验。
-- **页面**：①登录/注册 ②对话查询（答案 + 每条来源的原文下载链接）③文档管理（上传、归类状态、列表、下载）④管理后台（空间授权及配置/用户管理）⑤系统设置（通用/提示词/空间管理/用户管理）⑥数据统计 ⑦新动态 ⑧账户设置。
+- **页面**：①登录/注册 ②对话查询（答案 + 每条来源的原文下载链接）③**聊天+**（Skill 驱动工作台，文件上传/下载/交互模式/后台生成）④**Skill 库**（创建/编辑/权限/Bundle）⑤文档管理（上传、归类状态、列表、下载）⑥管理后台（空间授权及配置/用户管理）⑦系统设置（通用/提示词/AI 引擎/空间管理/用户管理，左侧导航+右侧面板布局）⑧数据统计 ⑨新动态 ⑩账户设置。
 - **引擎选择**：管理员在系统设置切换 Agent 引擎，选择持久化于 `app_settings`（键 `engine_backend`），归类/问答运行时按此解析。Claude CLI 可用；Codex / OpenClaw 前端灰显、后端拒绝（`available=false`），为未来预留。
 - **按任务模型配置**：系统设置独立配置归类/对话/新动态/会话标题所用模型，持久化于 `app_settings`（键 `model::classify` / `model::chat` / `model::whatsnew` / `model::title`），engine 调用时按 key 读取；未设则使用引擎默认模型。
 - **按任务 HTTP Header 配置**：系统设置支持为四类 LLM 任务（归类/标题生成/对话路由/对话回答）各自配置 HTTP Header，存于 `app_settings`（键 `task_headers::classify` / `task_headers::title` / `task_headers::chat_route` / `task_headers::chat_answer`），默认 `{"x-task": "<task_name>"}`。仅对 OpenAI 兼容引擎生效（ClaudeCliEngine 静默忽略），用于 Portkey 等网关路由标签。
@@ -202,12 +203,28 @@ class StorageProtocol(Protocol):
 | POST | /auth/forgot-password | 发送密码重置验证码（6 位，10 分钟有效，始终返回 200 防枚举） |
 | POST | /auth/reset-password | 验证码 + 新密码重置（5 次错误锁定） |
 
-### Skill（M4 预留，未实现，仅登记契约）
+### Skill 库（v2.0 已实现）
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| GET  | /skills | 列出已注册 skill |
-| POST | /skills/{name}/invoke | 调用 skill；写操作返回 {action_id, status:"pending_approval"} |
-| POST | /actions/{id}/approve | 人工确认后执行（SCM 下发配置等） |
+| GET  | /skills | 列出 skill（支持 search/category/workspace_id 过滤） |
+| POST | /skills | 创建 skill（需 skills:write 权限） |
+| GET  | /skills/{id} | 查单个 skill |
+| PUT  | /skills/{id} | 更新 skill（内容/描述/标签/可见性） |
+| DELETE | /skills/{id} | 删除 skill |
+| GET  | /skills/{id}/bundle | 下载 skill Bundle（zip） |
+| POST | /skills/{id}/bundle | 上传 skill Bundle（zip，≤50 MB，≤500 文件） |
+| GET  | /skills/audit | 操作审计日志（admin-only） |
+| GET  | /icons/search | 图标搜索（Iconify/iconfont，内置 Skill） |
+
+### 聊天+（v2.0 已实现）
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | /chat/plus/stream | SSE 流式聊天+（支持 skill_id/doc_ids/all_docs/file_ids 参数） |
+| POST | /chat/plus/files | 上传附件（临时文件，绑定会话工作目录） |
+| GET  | /chat/plus/sessions/{conv}/files | 列出会话工作目录中的成果文件 |
+| GET  | /chat/plus/sessions/{conv}/files/{filename} | 下载成果文件 |
+| POST | /chat/plus/tasks | 创建后台生成任务（与 SSE 流解耦） |
+| GET  | /chat/plus/tasks/{task_id} | 查询后台任务状态 |
 
 ## 数据模型（一旦确定，后续只做 additive 修改）
 
@@ -309,7 +326,7 @@ class StorageProtocol(Protocol):
 - **groups**（F5）：`id, name(UNIQUE), description, created_at`。
 - **group_rules**（F5）：`id, group_id(FK), field(email_domain/email/role), op(equals/endswith/contains), value`。
 - **group_members**（F5）：`(group_id, user_id)` PK。
-- **group_permissions**（F6）：`(group_id, module)` PK, `level CHECK(none/read/write)`；module ∈ chat/documents/workspaces/users/settings/stats/whatsnew。
+- **group_permissions**（F6）：`(group_id, module)` PK, `level CHECK(none/read/write)`；module ∈ chat/documents/workspaces/users/settings/stats/whatsnew/**chatplus**/**skills**（共 9 个）。
 - **workspace_group_grants**（F7）：`(workspace_id, group_id)` PK, `role_in_ws CHECK(owner/editor/viewer)`。
 - **users**（F4）新增 `is_active BOOLEAN default true`。
 - **usage_events**（migration 009）：用量统计事件表（用户/动作/时间）。
@@ -322,6 +339,13 @@ class StorageProtocol(Protocol):
 - **whatsnew_subscriptions**（migration 015）：用户订阅频率表（weekly/biweekly/monthly）。
 - **constraints**（migration 016）：补全约束与索引。
 - **documents**（migration 020）：新增 `deleted_at TIMESTAMPTZ NULL` + partial index，实现回收站软删除。
+- **skills**（migration 025）：`id, workspace_id(FK, NULL=平台级), name, description, content(SKILL.md文本), category, tags(TEXT[]), bundle_key(nullable), is_public, created_by(FK users), created_at, updated_at`。
+- **skill_group_permissions**（migration 026）：`(skill_id, group_id)` PK，控制私有 skill 对特定组可见。
+- **skill_audit_logs**（migration 026）：skill 操作审计（created/updated/deleted/visibility_changed/permission_granted/permission_revoked/used_in_chat）。
+- **messages（chatplus 扩展）**（migration 027）：conversations/messages 新增 `source` 字段（`chat` / `chatplus`），区分两种对话来源；conversations 新增 `workspace_id` 可为 NULL（聊天+ 不强绑空间）。
+- **conversation_settings**（migration 028）：会话级 Skill 绑定（`skill_id FK, conv_id FK`）。
+- **rbac 模块扩展**（migration 029）：group_permissions.module 新增 `chatplus` / `skills`。
+- **skill_bundle_files**（migration 030）：Bundle 文件索引（`skill_id, filename, storage_key, size`）。
 
 ## 关键技术选型的“为什么”
 - **不上向量库 / Agent 式索引问答**：以原文为准、减少幻觉。对话不做关键词硬匹配，而是把**整个空间的结构化索引**（标题/分类/标签/摘要）喂给 Claude，由它理解意图、组织答案、按编号挑相关文档（服务端映射回真实文档，防 ID 幻觉）。文档量上千后再评估 pgvector。

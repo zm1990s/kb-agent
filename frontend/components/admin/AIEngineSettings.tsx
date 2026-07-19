@@ -261,7 +261,9 @@ export default function AIEngineSettings() {
             <div className="space-y-3">
               {taskModels.tasks.map((task) => (
                 <div key={task.key} className="flex items-center gap-2">
-                  <label className="w-36 flex-shrink-0 text-xs text-gray-600">{task.label}</label>
+                  <label className="w-36 flex-shrink-0 text-xs text-gray-600">
+                    {{ classify: t("task_classify"), chat: t("task_chat"), whatsnew: t("task_whatsnew"), title: t("task_title") }[task.key.split("::")[1]] ?? task.key}
+                  </label>
                   <input
                     value={taskModelInputs[task.key] ?? ""}
                     onChange={(e) =>
@@ -324,7 +326,7 @@ export default function AIEngineSettings() {
                   type="password"
                   value={chatEngineInput.openai_api_key}
                   onChange={(e) => setChatEngineInput((prev) => ({ ...prev, openai_api_key: e.target.value }))}
-                  placeholder={chatEngine.openai_api_key === "***" ? "（留空保持不变）" : "none"}
+                  placeholder={chatEngine.openai_api_key === "***" ? t("openai_api_key_set") : "none"}
                   className="w-full rounded border px-3 py-1.5 text-sm font-mono focus:border-blue-400 focus:outline-none"
                 />
               </div>

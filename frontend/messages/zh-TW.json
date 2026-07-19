@@ -240,6 +240,7 @@
     "new_password": "新密碼（至少 8 個字元）",
     "confirm_password": "確認新密碼",
     "save_password": "儲存新密碼",
+    "saving": "儲存中…",
     "password_success": "密碼已修改成功。",
     "modify_again": "再次修改",
     "err_mismatch": "兩次輸入的新密碼不一致",

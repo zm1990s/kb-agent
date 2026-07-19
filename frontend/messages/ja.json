@@ -240,6 +240,7 @@
     "new_password": "新しいパスワード（8文字以上）",
     "confirm_password": "新しいパスワードを確認",
     "save_password": "新しいパスワードを保存",
+    "saving": "保存中…",
     "password_success": "パスワードが変更されました。",
     "modify_again": "再度変更",
     "err_mismatch": "新しいパスワードが一致しません",

@@ -240,6 +240,7 @@
     "new_password": "새 비밀번호 (8자 이상)",
     "confirm_password": "새 비밀번호 확인",
     "save_password": "새 비밀번호 저장",
+    "saving": "저장 중…",
     "password_success": "비밀번호가 변경되었습니다.",
     "modify_again": "다시 변경",
     "err_mismatch": "새 비밀번호가 일치하지 않습니다",
