@@ -57,6 +57,10 @@ type StreamBlock =
 
 const SESSION_KEY = "chat_plus_state";
 
+// SSE 中断后自动重连：最多 3 次，退避 1s / 2s / 4s
+const RECONNECT_BACKOFF_MS = [1000, 2000, 4000];
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 export default function ChatPlusPage() {
   const t = useTranslations("chatPlus");
   const ready = useAuthGuard("chatplus");
@@ -98,6 +102,10 @@ export default function ChatPlusPage() {
   const sessionFilesRef = useRef<SessionFilesHandle>(null);
   // 保证「挂载后自动重连」只触发一次（同标签页返回场景）
   const mountReconnectDoneRef = useRef(false);
+  // 重连模式：收到重连流首个 thinking/token 时先清空一次再累积（幂等重建，避免留白/重复）
+  const reconnectFreshRef = useRef(false);
+  // 追踪最新 conversation_id，供异步 catch 读取（新会话经 meta 事件中途才知晓）
+  const conversationIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     // 会话不分空间：仅从 sessionStorage 恢复该窗口的当前对话/消息。
@@ -162,6 +170,7 @@ export default function ChatPlusPage() {
   }, []);
 
   useEffect(() => {
+    conversationIdRef.current = conversationId;
     try {
       sessionStorage.setItem(SESSION_KEY, JSON.stringify({ conversationId, turns }));
     } catch {}
@@ -212,6 +221,13 @@ export default function ChatPlusPage() {
   }, [input]);
 
   async function selectConversation(id: string) {
+    // 切走前先断开上一条流并清理，避免两条流叠加 / 上一会话的流块串到新会话
+    abortRef.current?.abort();
+    abortRef.current = null;
+    reconnectFreshRef.current = false;
+    setBusy(false);
+    setStreamingBlocks([]);
+    streamingBlocksRef.current = [];
     setError(null);
     setConversationId(id);
     setAttachedFiles([]);
@@ -285,25 +301,47 @@ export default function ChatPlusPage() {
   // 共享的 SSE 事件处理器：POST 首发与 GET 重连走同一套逻辑。
   // isNew 仅在首发新会话时用于保存 Skill 选择。
   function makeStreamHandler(isNew: boolean) {
+    // 重连后收到的首个流块要触发一次「幂等重建」（清空再按 catchup 累积），只消费一次
+    const consumeReconnectFresh = () => {
+      if (reconnectFreshRef.current) {
+        reconnectFreshRef.current = false;
+        return true;
+      }
+      return false;
+    };
     return (event: string, data: unknown) => {
       // 聊天+ 不再展示三步动画，忽略 stage 事件
-      if (event === "thinking") {
+      if (event === "meta") {
+        // 首发事件带 conversation_id：新会话在 done 之前断流也能重连
+        const d = data as { conversation_id: string };
+        setConversationId(d.conversation_id);
+        setConversations((prev) => {
+          if (prev.some((c) => c.id === d.conversation_id)) return prev;
+          return [
+            { id: d.conversation_id, workspace_id: null, title: null, pinned: false, created_at: new Date().toISOString() },
+            ...prev,
+          ];
+        });
+      } else if (event === "thinking") {
         const text = (data as { text: string }).text;
         setStreamingBlocks((prev) => {
-          const last = prev[prev.length - 1];
+          // 重连后首个流块：清空一次再累积（catchup 会按序补发完整内容，避免重复/留白）
+          const base = consumeReconnectFresh() ? [] : prev;
+          const last = base[base.length - 1];
           const next = last?.type === "thinking"
-            ? [...prev.slice(0, -1), { type: "thinking" as const, text: last.text + text }]
-            : [...prev, { type: "thinking" as const, text }];
+            ? [...base.slice(0, -1), { type: "thinking" as const, text: last.text + text }]
+            : [...base, { type: "thinking" as const, text }];
           streamingBlocksRef.current = next;
           return next;
         });
       } else if (event === "token") {
         const text = (data as { text: string }).text;
         setStreamingBlocks((prev) => {
-          const last = prev[prev.length - 1];
+          const base = consumeReconnectFresh() ? [] : prev;
+          const last = base[base.length - 1];
           const next = last?.type === "text"
-            ? [...prev.slice(0, -1), { type: "text" as const, text: last.text + text }]
-            : [...prev, { type: "text" as const, text }];
+            ? [...base.slice(0, -1), { type: "text" as const, text: last.text + text }]
+            : [...base, { type: "text" as const, text }];
           streamingBlocksRef.current = next;
           return next;
         });
@@ -367,34 +405,84 @@ export default function ChatPlusPage() {
     };
   }
 
-  // 重连正在后台运行的生成流（切回会话 / 首发 409 时）。
-  async function reconnectStream(convId: string) {
+  // 生成已结束且过了保留窗口（重连 404）：静默拉取历史，显示最终结果。
+  async function reloadHistory(convId: string) {
+    try {
+      const hist = await api.get<ConversationHistory>(`/conversations/${convId}`);
+      setTurns(
+        hist.messages.map((m) => ({
+          role: m.role,
+          content: m.content,
+          sources: m.sources,
+          attachments: m.attachments ?? [],
+          output_files: m.output_files ?? [],
+        }))
+      );
+    } catch {
+      /* 拉历史失败也不打断：保持已渲染内容 */
+    }
+  }
+
+  // 重连正在后台运行的生成流。
+  // attempt=0 为首次（切回会话 / 首发 409）；>0 为断流后的自动重连（带退避）。
+  // 断流不再直接报「失败」：只要后端仍在跑就自动接回，Thinking 由 catchup 连续补发。
+  async function reconnectStream(convId: string, attempt = 0) {
     setError(null);
     setBusy(true);
     setPendingOutputFiles([]);
-    streamingBlocksRef.current = [];
-    setStreamingBlocks([]);
+    // 不在此清空 streamingBlocks（避免留白）；改由 handler 收到首个流块时幂等重建
+    reconnectFreshRef.current = true;
     const ac = new AbortController();
     abortRef.current = ac;
+    let finished = false;
     try {
       await api.streamGet(
         `/chat/plus/stream/${convId}`,
         makeStreamHandler(false),
         ac.signal,
       );
+      finished = true; // 流正常结束（done 事件已处理）
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") {
-        // 切走/停止：不报错
-      } else if (err instanceof ApiError && err.status === 404) {
-        // 生成已结束且过了保留窗口——历史里已有结果，静默
-      } else {
-        setError(err instanceof ApiError ? err.message : t("requestFailed"));
+        return; // 切走/停止：不报错，也不重连
       }
+      if (err instanceof ApiError && err.status === 404) {
+        // 生成已结束且过了保留窗口——拉历史显示最终结果，不报错
+        await reloadHistory(convId);
+        finished = true;
+        return;
+      }
+      // 其它中断：后端任务可能仍在跑，自动退避重连
+      if (attempt < RECONNECT_BACKOFF_MS.length) {
+        setError(t("reconnecting"));
+        await sleep(RECONNECT_BACKOFF_MS[attempt]);
+        if (ac.signal.aborted) return; // 退避期间被切走/停止
+        await reconnectStream(convId, attempt + 1);
+        return;
+      }
+      // 重试用尽：确认后端是否仍在跑
+      try {
+        const r = await api.get<{ conversation_ids: string[] }>("/chat/plus/active");
+        if (r.conversation_ids.includes(convId)) {
+          // 仍在跑，但连不上：提示可稍后切回，不误报致命失败
+          setError(t("reconnectPending"));
+        } else {
+          // 已不在跑：拉历史看结果
+          await reloadHistory(convId);
+        }
+      } catch {
+        setError(t("reconnectFailed"));
+      }
+      finished = true;
     } finally {
-      setBusy(false);
-      setStreamingBlocks([]);
-      streamingBlocksRef.current = [];
-      abortRef.current = null;
+      // 仅在本次不再继续重连（正常结束 / 放弃）时收尾，避免中途 finally 清空转圈
+      if (finished || attempt >= RECONNECT_BACKOFF_MS.length) {
+        setBusy(false);
+        setStreamingBlocks([]);
+        streamingBlocksRef.current = [];
+        reconnectFreshRef.current = false;
+        abortRef.current = null;
+      }
     }
   }
 
@@ -438,6 +526,18 @@ export default function ChatPlusPage() {
         await reconnectStream(conversationId);
         return;
       } else {
+        // 区分「发起就失败」与「生成中途断流」：
+        // convId 已知（含本轮 meta 事件中途学到的）说明生成已启动，属可恢复的断流 → 自动重连；
+        // 否则是尚未开始生成的真失败 → 提示 requestFailed。
+        const convId = conversationIdRef.current;
+        const recoverable =
+          convId !== null && !(err instanceof ApiError && err.status >= 400 && err.status < 500);
+        if (recoverable) {
+          setAttachedFiles([]);
+          abortRef.current = null;
+          await reconnectStream(convId!);
+          return;
+        }
         setError(err instanceof ApiError ? err.message : t("requestFailed"));
       }
     } finally {

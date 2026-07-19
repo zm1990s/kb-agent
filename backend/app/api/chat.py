@@ -491,8 +491,15 @@ async def chat_plus_stream(
     sub = subscribe(conv.id, current_user.id)
     if sub is None:  # 理论上不会发生（刚 start）；兜底
         raise HTTPException(status.HTTP_404_NOT_FOUND, "生成任务不存在")
+
+    async def _relay_with_meta():
+        # 首发 meta 事件带上 conversation_id：新会话在 done 之前断流也能重连。
+        yield _sse("meta", {"conversation_id": str(conv.id)})
+        async for chunk in _relay(sub):
+            yield chunk
+
     return StreamingResponse(
-        _relay(sub),
+        _relay_with_meta(),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )

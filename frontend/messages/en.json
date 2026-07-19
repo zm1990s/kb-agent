@@ -669,7 +669,10 @@
     "stopGenerating": "Stop generating",
     "retry": "Retry",
     "loadFailed": "Failed to load conversation",
-    "requestFailed": "Request failed, please retry"
+    "requestFailed": "Request failed, please retry",
+    "reconnecting": "Connection interrupted, reconnecting…",
+    "reconnectPending": "Connection lost. The task is still running in the background — switch back later to view it.",
+    "reconnectFailed": "Reconnect failed. The task may still be running in the background — switch back later to view it."
   },
   "chatComponents": {
     "selectSkill": "Select Skill",

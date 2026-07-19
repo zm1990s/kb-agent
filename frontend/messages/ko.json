@@ -669,7 +669,10 @@
     "stopGenerating": "생성 중지",
     "retry": "재시도",
     "loadFailed": "대화를 불러오지 못했습니다",
-    "requestFailed": "요청 실패, 다시 시도하세요"
+    "requestFailed": "요청 실패, 다시 시도하세요",
+    "reconnecting": "연결이 중단되어 다시 연결 중…",
+    "reconnectPending": "연결이 끊어졌습니다. 작업은 백그라운드에서 계속 실행 중이며, 나중에 다시 돌아와 확인할 수 있습니다",
+    "reconnectFailed": "재연결 실패. 작업이 백그라운드에서 계속 실행 중일 수 있으니 나중에 다시 돌아와 확인하세요"
   },
   "chatComponents": {
     "selectSkill": "스킬 선택",

@@ -669,7 +669,10 @@
     "stopGenerating": "生成を停止",
     "retry": "再試行",
     "loadFailed": "会話の読み込みに失敗しました",
-    "requestFailed": "リクエストに失敗しました。再試行してください"
+    "requestFailed": "リクエストに失敗しました。再試行してください",
+    "reconnecting": "接続が中断されました。再接続しています…",
+    "reconnectPending": "接続が切断されました。タスクはバックグラウンドで実行中です。後で戻って確認してください",
+    "reconnectFailed": "再接続に失敗しました。タスクはバックグラウンドで実行中の可能性があります。後で戻って確認してください"
   },
   "chatComponents": {
     "selectSkill": "スキルを選択",
