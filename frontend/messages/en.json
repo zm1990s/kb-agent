@@ -347,7 +347,10 @@
     "log_select_hint": "Select a log file to view its contents",
     "log_empty": "Log file is empty",
     "load_failed": "Load failed",
-    "deleted_doc": "(document deleted)"
+    "deleted_doc": "(document deleted)",
+    "action_chatplus": "Chat+",
+    "action_chatplus_vol": "Chat+",
+    "col_chatplus": "Chat+"
   },
   "settings": {
     "title": "Settings",
@@ -650,6 +653,8 @@
     "docsCount": "{count} docs",
     "wsPickerHint": "Workspace (optional). Referenced documents' content is provided to Claude as context; otherwise it's a plain chat.",
     "allFilesHint": "(reference all documents in this workspace)",
+    "useOriginal": "Read original files",
+    "useOriginalHint": "Give original files to Claude to read in full (more complete, slower)",
     "overLimitHint": "Many documents; only the {max} most recent will be referenced.",
     "searchDocs": "Search documents…",
     "noReadyDocs": "No matching ready documents",

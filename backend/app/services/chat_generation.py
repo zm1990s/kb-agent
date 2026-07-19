@@ -24,6 +24,7 @@ from app.services.answer_service_plus import (
     answer_question_plus_streamed,
 )
 from app.services.chat_service import add_message, generate_conversation_title
+from app.services.usage_service import record_event
 
 logger = logging.getLogger(__name__)
 
@@ -190,6 +191,7 @@ async def _run_generation(
     skill_ids: list[uuid.UUID] | None,
     attachment_keys: list[str] | None,
     interactive: bool = False,
+    use_original_docs: bool = False,
 ) -> None:
     """detached 任务主体：跑生成、广播事件、完成落库。"""
     final: AnswerResult | None = None
@@ -217,6 +219,7 @@ async def _run_generation(
                 skill_ids=skill_ids,
                 attachment_keys=attachment_keys,
                 interactive=interactive,
+                use_original_docs=use_original_docs,
             ):
                 if isinstance(item, ThinkingChunk):
                     _broadcast(state, "thinking", {"text": item.text})
@@ -281,6 +284,19 @@ async def _run_generation(
             except Exception:
                 logger.exception("助手消息落库失败 conv=%s", state.conversation_id)
 
+            # 用量统计：与 /chat 一致记一条事件（聊天+ 用 action="chatplus"）
+            await record_event(
+                session,
+                action="chatplus",
+                user_id=state.user_id,
+                workspace_id=workspace_id,
+                meta={
+                    "conversation_id": str(state.conversation_id),
+                    "question": question,
+                    "answer": final.answer,
+                },
+            )
+
             if state.is_new_conv:
                 title = await generate_conversation_title(
                     session,
@@ -315,6 +331,7 @@ def start_generation(
     skill_ids: list[uuid.UUID] | None,
     attachment_keys: list[str] | None,
     interactive: bool = False,
+    use_original_docs: bool = False,
 ) -> GenerationState:
     """启动一个 detached 生成任务；该会话已在跑则抛 GenerationInProgress。
 
@@ -344,6 +361,7 @@ def start_generation(
             skill_ids=skill_ids,
             attachment_keys=attachment_keys,
             interactive=interactive,
+            use_original_docs=use_original_docs,
         )
     )
     state.task = task

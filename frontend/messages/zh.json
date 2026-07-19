@@ -347,7 +347,10 @@
     "log_select_hint": "选择日志文件查看内容",
     "log_empty": "日志文件为空",
     "load_failed": "加载失败",
-    "deleted_doc": "（文档已删除）"
+    "deleted_doc": "（文档已删除）",
+    "action_chatplus": "聊天+",
+    "action_chatplus_vol": "聊天+量",
+    "col_chatplus": "聊天+"
   },
   "settings": {
     "title": "系统设置",
@@ -650,6 +653,8 @@
     "docsCount": "{count} 篇",
     "wsPickerHint": "工作区（可选）。引用文档后其正文会作为上下文提供给 Claude；不引用即纯对话。",
     "allFilesHint": "（引用本空间全部文档）",
+    "useOriginal": "读取原始文件",
+    "useOriginalHint": "把原文件交给 Claude 读全文（更完整，更慢）",
     "overLimitHint": "文档较多，仅最近 {max} 篇的正文会被引用。",
     "searchDocs": "搜索文档…",
     "noReadyDocs": "无匹配的就绪文档",

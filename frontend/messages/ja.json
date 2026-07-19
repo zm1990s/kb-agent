@@ -347,7 +347,10 @@
     "log_select_hint": "ログファイルを選択して内容を確認",
     "log_empty": "ログファイルが空です",
     "load_failed": "読み込み失敗",
-    "deleted_doc": "（ドキュメント削除済み）"
+    "deleted_doc": "（ドキュメント削除済み）",
+    "action_chatplus": "チャット+",
+    "action_chatplus_vol": "チャット+数",
+    "col_chatplus": "チャット+"
   },
   "settings": {
     "title": "設定",
@@ -650,6 +653,8 @@
     "docsCount": "{count} 件",
     "wsPickerHint": "ワークスペース（任意）。参照した文書の内容がコンテキストとして Claude に渡されます。参照しなければ通常のチャットです。",
     "allFilesHint": "（このワークスペースの全文書を参照）",
+    "useOriginal": "元ファイルを読む",
+    "useOriginalHint": "元ファイルを Claude に渡して全文を読ませる（より完全、より遅い）",
     "overLimitHint": "文書が多いため、最新 {max} 件のみ参照されます。",
     "searchDocs": "ドキュメントを検索…",
     "noReadyDocs": "該当する準備完了の文書がありません",

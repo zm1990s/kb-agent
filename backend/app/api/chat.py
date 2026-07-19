@@ -412,6 +412,9 @@ class ChatPlusRequest(BaseModel):
     all_docs: bool = False
     # 交互模式：开时向 system 注入 ask-user 协议，让模型可弹选项让用户澄清（瞬时，不落库）
     interactive: bool = False
+    # 读取原始文件：开时把选中文档的原始文件拷进工作目录供 Claude 直接读全文
+    # （不再注入截断的 content_text 摘录）；关时维持现状（瞬时，不落库）
+    use_original_docs: bool = False
     # 附件：携带展示元数据（filename/size）；引擎侧只用 storage_key
     attachments: list[ChatPlusAttachment] | None = None
 
@@ -476,6 +479,7 @@ async def chat_plus_stream(
             skill_ids=body.skill_ids,
             attachment_keys=attachment_keys or None,
             interactive=body.interactive,
+            use_original_docs=body.use_original_docs,
         )
     except GenerationInProgress:
         raise HTTPException(status.HTTP_409_CONFLICT, "该会话正在生成中") from None

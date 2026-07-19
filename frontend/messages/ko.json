@@ -347,7 +347,10 @@
     "log_select_hint": "로그 파일을 선택하여 내용을 확인하세요",
     "log_empty": "로그 파일이 비어 있습니다",
     "load_failed": "불러오기 실패",
-    "deleted_doc": "(문서 삭제됨)"
+    "deleted_doc": "(문서 삭제됨)",
+    "action_chatplus": "채팅+",
+    "action_chatplus_vol": "채팅+ 수",
+    "col_chatplus": "채팅+"
   },
   "settings": {
     "title": "설정",
@@ -650,6 +653,8 @@
     "docsCount": "{count}개",
     "wsPickerHint": "워크스페이스(선택). 참조한 문서 내용이 컨텍스트로 Claude에 제공됩니다. 참조하지 않으면 일반 대화입니다.",
     "allFilesHint": "(이 워크스페이스의 모든 문서 참조)",
+    "useOriginal": "원본 파일 읽기",
+    "useOriginalHint": "원본 파일을 Claude에 전달해 전문을 읽습니다 (더 완전, 더 느림)",
     "overLimitHint": "문서가 많아 최근 {max}개만 참조됩니다.",
     "searchDocs": "문서 검색…",
     "noReadyDocs": "일치하는 준비된 문서가 없습니다",

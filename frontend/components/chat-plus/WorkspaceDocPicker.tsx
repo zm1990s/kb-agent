@@ -18,6 +18,8 @@ interface Props {
   onDocsChange: (ids: string[]) => void;
   allDocs: boolean;
   onAllDocsChange: (v: boolean) => void;
+  useOriginal: boolean;
+  onUseOriginalChange: (v: boolean) => void;
 }
 
 const PAGE_SIZE = 50;
@@ -37,6 +39,8 @@ export default function WorkspaceDocPicker({
   onDocsChange,
   allDocs,
   onAllDocsChange,
+  useOriginal,
+  onUseOriginalChange,
 }: Props) {
   const t = useTranslations("chatComponents");
   const [open, setOpen] = useState(false);
@@ -177,6 +181,20 @@ export default function WorkspaceDocPicker({
                 <span className="text-xs font-medium text-gray-700">{t("allFiles")}</span>
                 <span className="text-xs text-gray-400">{t("allFilesHint")}</span>
               </label>
+
+              {/* 读取原始文件开关：把原文件拷进工作目录供 Claude 读全文（仅有选择时可用）*/}
+              {(allDocs || docIds.length > 0) && (
+                <label className="flex cursor-pointer items-center gap-2 border-b border-gray-100 px-3 py-2 hover:bg-gray-50">
+                  <input
+                    type="checkbox"
+                    checked={useOriginal}
+                    onChange={(e) => onUseOriginalChange(e.target.checked)}
+                    className="h-3.5 w-3.5 shrink-0"
+                  />
+                  <span className="text-xs font-medium text-gray-700">{t("useOriginal")}</span>
+                  <span className="text-xs text-gray-400">{t("useOriginalHint")}</span>
+                </label>
+              )}
 
               {/* 上下文限量提示 */}
               {overLimit && (

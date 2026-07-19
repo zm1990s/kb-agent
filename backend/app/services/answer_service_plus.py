@@ -79,10 +79,12 @@ def _slug(name: str) -> str:
 
 # 注入的 Skill 附属文件放在此前缀下，检测输出时需排除
 _SKILL_DIR = "skills"
+# 注入的原始参考文档放在此前缀下（use_original_docs），检测输出时同样排除
+_CONTEXT_DIR = "context"
 
 
 def _list_workdir_files(workdir) -> set[str]:
-    """递归列出工作目录下所有文件的相对 POSIX 路径（排除 skills/ 注入目录）。"""
+    """递归列出工作目录下所有文件的相对 POSIX 路径（排除注入目录 skills/、context/）。"""
     from pathlib import Path
 
     root = Path(workdir)
@@ -91,10 +93,29 @@ def _list_workdir_files(workdir) -> set[str]:
         if not p.is_file():
             continue
         rel = p.relative_to(root).as_posix()
-        if rel == _SKILL_DIR or rel.startswith(_SKILL_DIR + "/"):
-            continue  # 注入的 Skill 附属文件不算输出
+        if any(
+            rel == d or rel.startswith(d + "/") for d in (_SKILL_DIR, _CONTEXT_DIR)
+        ):
+            continue  # 注入的 Skill 附属文件 / 参考原始文档不算输出
         out.add(rel)
     return out
+
+
+def _safe_doc_filename(title: str, fallback: str) -> str:
+    """从文档 title 重建安全的落盘文件名（SECURITY #5 防路径穿越）。
+
+    只取 basename，去除路径分隔符/父目录引用/控制字符，保留扩展名（Claude 靠
+    扩展名/MIME 识别类型）。清洗后为空则用 fallback。
+    """
+    import re
+    from pathlib import PurePosixPath, PureWindowsPath
+
+    # 同时按 POSIX 与 Windows 分隔符取 basename，防 a/b 或 a\b
+    name = PureWindowsPath(PurePosixPath(title).name).name
+    name = name.replace("\x00", "").strip().strip(".")
+    # 去掉除字母数字、点、下划线、连字符、空格、常见 CJK 外的字符
+    name = re.sub(r"[^\w.\- ]+", "_", name, flags=re.UNICODE).strip()
+    return name or fallback
 
 
 def _extract_bundle(data: bytes, dest_dir) -> list[str]:
@@ -196,6 +217,7 @@ async def answer_question_plus_streamed(
     skill_ids: list[uuid.UUID] | None = None,
     attachment_keys: list[str] | None = None,
     interactive: bool = False,
+    use_original_docs: bool = False,
 ):
     """聊天+ 流式问答生成器：复刻 Claude Desktop 直连体验。
 
@@ -251,23 +273,31 @@ async def answer_question_plus_streamed(
             else f"{ASK_USER_PROTOCOL}\n\n---\n\n{skill_system}"
         )
 
-    # ── 可选：注入文档正文作为上下文（需选定工作区 + 勾选文档/所有文件，均限量）──
+    # ── 可选：引用工作区文档（需选定工作区 + 勾选文档/所有文件，均限量）──
+    # 两种模式：
+    #   use_original_docs=False（默认）：注入截断的 content_text 摘录到 prompt；
+    #   use_original_docs=True：把原始文件拷进 workdir/context/ 供 Claude 直接读全文
+    #     （见下方工作目录块，不再注入摘录）。
     context_block = ""
+    original_docs: list = []  # use_original_docs 时待拷贝的文档
     if workspace_id is not None and (doc_ids or all_docs):
         docs = await _load_context_docs(
             session, workspace_id=workspace_id, doc_ids=doc_ids, all_docs=all_docs
         )
-        ctx_lines = []
-        for doc in docs:
-            if doc.content_text:
-                ctx_lines.append(f"\n## {doc.title}\n{doc.content_text[:_DOC_CONTEXT_CHARS]}")
-        if ctx_lines:
-            scope = "本空间最近的文档" if all_docs else "用户选定的参考文档"
-            context_block = (
-                f"以下是{scope}（共 {len(ctx_lines)} 篇，请在需要时参考其内容）：\n"
-                + "\n".join(ctx_lines)
-                + "\n\n---\n\n"
-            )
+        if use_original_docs:
+            original_docs = docs
+        else:
+            ctx_lines = []
+            for doc in docs:
+                if doc.content_text:
+                    ctx_lines.append(f"\n## {doc.title}\n{doc.content_text[:_DOC_CONTEXT_CHARS]}")
+            if ctx_lines:
+                scope = "本空间最近的文档" if all_docs else "用户选定的参考文档"
+                context_block = (
+                    f"以下是{scope}（共 {len(ctx_lines)} 篇，请在需要时参考其内容）：\n"
+                    + "\n".join(ctx_lines)
+                    + "\n\n---\n\n"
+                )
 
     # ── 准备每会话持久工作目录和附件（与工作区解耦）──────────────
     storage = get_storage()
@@ -281,6 +311,32 @@ async def answer_question_plus_streamed(
             dest = workdir / path.name
             shutil.copy2(str(path), str(dest))
             attach_names.append(path.name)
+
+    # ── use_original_docs：把选中文档的原始文件拷到 workdir/context/ ──────
+    # 必须在 pre_files 快照之前；context/ 已在 _list_workdir_files 内排除（不算输出）。
+    doc_names: list[str] = []
+    if original_docs:
+        ctx_dir = workdir / _CONTEXT_DIR
+        ctx_dir.mkdir(parents=True, exist_ok=True)
+        used_names: set[str] = set()
+        for i, doc in enumerate(original_docs):
+            try:
+                src = await storage.open_path(doc.storage_key)
+            except Exception:  # noqa: BLE001
+                logger.warning("原始文档读取失败 doc=%s key=%s", doc.id, doc.storage_key)
+                continue
+            fname = _safe_doc_filename(doc.title, fallback=f"doc-{i + 1}")
+            # 重名加序号，避免覆盖
+            if fname in used_names:
+                stem, dot, ext = fname.partition(".")
+                fname = f"{stem}-{i + 1}{dot}{ext}"
+            used_names.add(fname)
+            try:
+                shutil.copy2(str(src), str(ctx_dir / fname))
+            except OSError:
+                logger.warning("原始文档拷贝失败 doc=%s -> %s", doc.id, fname)
+                continue
+            doc_names.append(fname)
 
     # ── 解包带附属文件的 Skill bundle 到 workdir/skills/<slug>/ ──────
     # 必须在 pre_files 快照之前完成，否则会被误判为「本轮生成的输出文件」。
@@ -307,6 +363,12 @@ async def answer_question_plus_streamed(
     if attach_names:
         listing = "、".join(attach_names)
         workdir_note += f"\n工作目录中已有用户上传的附件：{listing}。"
+    if doc_names:
+        listing = "、".join(doc_names)
+        workdir_note += (
+            f"\n用户引用的原始文档已放入 {_CONTEXT_DIR}/ 目录，请直接读取分析其完整内容："
+            f"{listing}。"
+        )
     if bundle_notes:
         workdir_note += (
             "\n所选 Skill 随附了可用的脚本/资源文件，可直接读取或执行："

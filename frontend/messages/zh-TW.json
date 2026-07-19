@@ -347,7 +347,10 @@
     "log_select_hint": "選擇日誌檔案以查看內容",
     "log_empty": "日誌檔案為空",
     "load_failed": "載入失敗",
-    "deleted_doc": "（文件已刪除）"
+    "deleted_doc": "（文件已刪除）",
+    "action_chatplus": "聊天+",
+    "action_chatplus_vol": "聊天+量",
+    "col_chatplus": "聊天+"
   },
   "settings": {
     "title": "系統設定",
@@ -650,6 +653,8 @@
     "docsCount": "{count} 篇",
     "wsPickerHint": "工作區（可選）。引用文件後其內容會作為上下文提供給 Claude；不引用即純對話。",
     "allFilesHint": "（引用本空間全部文件）",
+    "useOriginal": "讀取原始檔案",
+    "useOriginalHint": "把原始檔案交給 Claude 讀取全文（更完整，更慢）",
     "overLimitHint": "文件較多，僅最近 {max} 篇的內容會被引用。",
     "searchDocs": "搜尋文件…",
     "noReadyDocs": "無匹配的就緒文件",

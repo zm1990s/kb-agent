@@ -81,6 +81,8 @@ export default function ChatPlusPage() {
   const [allDocs, setAllDocs] = useState(false);
   // 交互模式：开时后端注入 ask-user 协议，模型可弹选项让用户澄清（瞬时，不持久化）
   const [interactive, setInteractive] = useState(false);
+  // 读取原始文件：开时把引用文档的原始文件拷进工作目录供 Claude 读全文（瞬时，不持久化）
+  const [useOriginalDocs, setUseOriginalDocs] = useState(false);
   const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
   // 记录最后一次发送，供出错重试
   const [lastSent, setLastSent] = useState<
@@ -217,6 +219,7 @@ export default function ChatPlusPage() {
     setWorkspaceId(null);
     setDocFilterIds([]);
     setAllDocs(false);
+    setUseOriginalDocs(false);
     try {
       const hist = await api.get<ConversationHistory>(`/conversations/${id}`);
       setTurns(
@@ -256,6 +259,7 @@ export default function ChatPlusPage() {
     setWorkspaceId(null);
     setDocFilterIds([]);
     setAllDocs(false);
+    setUseOriginalDocs(false);
     setInteractive(false);
     setLastSent(null);
   }
@@ -417,6 +421,7 @@ export default function ChatPlusPage() {
           skill_ids: activeSkillIds.length > 0 ? activeSkillIds : null,
           doc_ids: docFilterIds.length > 0 ? docFilterIds : null,
           all_docs: allDocs,
+          use_original_docs: useOriginalDocs,
           interactive,
           attachments: filesToSend.length > 0 ? filesToSend : null,
         },
@@ -496,7 +501,7 @@ export default function ChatPlusPage() {
               <div className="flex h-full flex-col items-center justify-center text-center">
                 <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-purple-100 text-purple-600">
                   <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4Q13 11 20 12Q13 13 12 20Q11 13 4 12Q11 11 12 4z" />
                   </svg>
                 </div>
                 <p className="text-sm font-medium text-gray-600">{t("emptyTitle")}</p>
@@ -627,6 +632,8 @@ export default function ChatPlusPage() {
                 onDocsChange={handleDocChange}
                 allDocs={allDocs}
                 onAllDocsChange={setAllDocs}
+                useOriginal={useOriginalDocs}
+                onUseOriginalChange={setUseOriginalDocs}
               />
               <FileAttachPanel files={attachedFiles} onChange={setAttachedFiles} />
               <SessionFilesPanel ref={sessionFilesRef} conversationId={conversationId} canWriteSkill={canWriteSkill} />
