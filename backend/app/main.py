@@ -14,6 +14,7 @@ from app.api import (
     chat,
     documents,
     folders,
+    icons,
     settings,
     skills,
     whatsnew,
@@ -67,6 +68,7 @@ app.include_router(settings.router)
 app.include_router(admin.router)
 app.include_router(whatsnew.router)
 app.include_router(skills.router)
+app.include_router(icons.router)
 
 
 @app.get("/health")

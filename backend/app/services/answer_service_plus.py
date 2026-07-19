@@ -81,10 +81,45 @@ def _slug(name: str) -> str:
 _SKILL_DIR = "skills"
 # 注入的原始参考文档放在此前缀下（use_original_docs），检测输出时同样排除
 _CONTEXT_DIR = "context"
+# 顶层注入目录：仅当作为工作目录根下的一级前缀时排除
+_INJECTED_PREFIXES = (_SKILL_DIR, _CONTEXT_DIR)
+
+# 编程/依赖产生的临时目录：路径中任意一段命中即排除（node_modules 等）
+_NOISE_DIRS = frozenset({
+    "node_modules", "__pycache__", ".git", ".venv", "venv", "env",
+    ".cache", ".npm", ".pnpm-store", ".yarn", ".next", ".nuxt",
+    "dist", "build", ".pytest_cache", ".mypy_cache", ".ruff_cache",
+    ".ipynb_checkpoints", ".gradle", "target", ".tox", "site-packages",
+})
+# 依赖锁文件 / 编程杂项：按 basename 精确排除
+_NOISE_FILES = frozenset({
+    "package-lock.json", "yarn.lock", "pnpm-lock.yaml", "package.json",
+    "requirements.txt", "poetry.lock", "Pipfile", "Pipfile.lock",
+    ".gitignore", ".npmrc", ".DS_Store", "tsconfig.json",
+})
+# 临时/编译产物后缀
+_NOISE_SUFFIXES = (".pyc", ".pyo", ".log", ".lock", ".tmp")
+
+
+def _is_noise(rel: str) -> bool:
+    """判断相对路径是否为编程/依赖产生的临时文件，应从输出中排除。"""
+    parts = rel.split("/")
+    # 顶层注入目录（skills/、context/）
+    if parts[0] in _INJECTED_PREFIXES:
+        return True
+    # 路径任意一段命中噪声目录名（node_modules 可能嵌套在子目录里）
+    if any(seg in _NOISE_DIRS for seg in parts[:-1]):
+        return True
+    name = parts[-1]
+    if name in _NOISE_FILES:
+        return True
+    if name.startswith("."):  # 隐藏文件（.env 等杂项），非用户产物
+        return True
+    return name.endswith(_NOISE_SUFFIXES)
 
 
 def _list_workdir_files(workdir) -> set[str]:
-    """递归列出工作目录下所有文件的相对 POSIX 路径（排除注入目录 skills/、context/）。"""
+    """递归列出工作目录下的输出文件相对路径，排除注入目录与编程临时文件。"""
     from pathlib import Path
 
     root = Path(workdir)
@@ -93,10 +128,8 @@ def _list_workdir_files(workdir) -> set[str]:
         if not p.is_file():
             continue
         rel = p.relative_to(root).as_posix()
-        if any(
-            rel == d or rel.startswith(d + "/") for d in (_SKILL_DIR, _CONTEXT_DIR)
-        ):
-            continue  # 注入的 Skill 附属文件 / 参考原始文档不算输出
+        if _is_noise(rel):
+            continue
         out.add(rel)
     return out
 
