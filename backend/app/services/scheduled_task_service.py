@@ -26,16 +26,50 @@ def _title_prefix(locale: str) -> str:
 
 def compute_next_run(task: ScheduledTask) -> datetime:
     """计算任务的下次执行时间（UTC）。"""
+    import calendar
+
     now = datetime.now(UTC)
+
     if task.schedule_type == "interval":
         minutes = task.interval_minutes or 5
         return now + timedelta(minutes=minutes)
-    # daily 模式
+
+    # daily / weekly / monthly 共用时分逻辑
     hour = task.daily_hour or 0
     minute = task.daily_minute or 0
-    candidate = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+
+    if task.schedule_type == "daily":
+        candidate = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+        if candidate <= now:
+            candidate += timedelta(days=1)
+        return candidate
+
+    if task.schedule_type == "weekly":
+        # week_day: 0=周一…6=周日，与 Python weekday() 一致
+        target_wd = task.week_day if task.week_day is not None else 0
+        current_wd = now.weekday()
+        days_ahead = (target_wd - current_wd) % 7
+        candidate = (now + timedelta(days=days_ahead)).replace(
+            hour=hour, minute=minute, second=0, microsecond=0
+        )
+        if candidate <= now:
+            candidate += timedelta(weeks=1)
+        return candidate
+
+    # monthly
+    target_day = task.month_day if task.month_day is not None else 1
+    # 当月是否还没到
+    max_day = calendar.monthrange(now.year, now.month)[1]
+    day = min(target_day, max_day)
+    candidate = now.replace(day=day, hour=hour, minute=minute, second=0, microsecond=0)
     if candidate <= now:
-        candidate += timedelta(days=1)
+        # 推到下个月
+        if now.month == 12:
+            y, m = now.year + 1, 1
+        else:
+            y, m = now.year, now.month + 1
+        max_day2 = calendar.monthrange(y, m)[1]
+        candidate = candidate.replace(year=y, month=m, day=min(target_day, max_day2))
     return candidate
 
 
@@ -139,6 +173,8 @@ async def create_task(
     interval_minutes: int | None,
     daily_hour: int | None,
     daily_minute: int | None,
+    week_day: int | None,
+    month_day: int | None,
     system_prompt: str | None,
     initial_message: str,
     skill_ids: list[uuid.UUID],
@@ -154,6 +190,8 @@ async def create_task(
         interval_minutes=interval_minutes,
         daily_hour=daily_hour,
         daily_minute=daily_minute,
+        week_day=week_day,
+        month_day=month_day,
         system_prompt=system_prompt,
         initial_message=initial_message,
         skill_ids=skill_ids,

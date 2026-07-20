@@ -10,10 +10,12 @@ from pydantic import BaseModel, ConfigDict, Field
 class ScheduledTaskCreate(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     enabled: bool = True
-    schedule_type: Literal["interval", "daily"]
+    schedule_type: Literal["interval", "daily", "weekly", "monthly"]
     interval_minutes: int | None = Field(default=None, ge=5)
     daily_hour: int | None = Field(default=None, ge=0, le=23)
     daily_minute: int | None = Field(default=None, ge=0, le=59)
+    week_day: int | None = Field(default=None, ge=0, le=6)
+    month_day: int | None = Field(default=None, ge=1, le=31)
     system_prompt: str | None = None
     initial_message: str = Field(min_length=1)
     skill_ids: list[uuid.UUID] = Field(default_factory=list)
@@ -24,10 +26,12 @@ class ScheduledTaskCreate(BaseModel):
 class ScheduledTaskUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=200)
     enabled: bool | None = None
-    schedule_type: Literal["interval", "daily"] | None = None
+    schedule_type: Literal["interval", "daily", "weekly", "monthly"] | None = None
     interval_minutes: int | None = Field(default=None, ge=5)
     daily_hour: int | None = Field(default=None, ge=0, le=23)
     daily_minute: int | None = Field(default=None, ge=0, le=59)
+    week_day: int | None = Field(default=None, ge=0, le=6)
+    month_day: int | None = Field(default=None, ge=1, le=31)
     system_prompt: str | None = None
     initial_message: str | None = Field(default=None, min_length=1)
     skill_ids: list[uuid.UUID] | None = None
@@ -46,6 +50,8 @@ class ScheduledTaskPublic(BaseModel):
     interval_minutes: int | None
     daily_hour: int | None
     daily_minute: int | None
+    week_day: int | None
+    month_day: int | None
     system_prompt: str | None
     initial_message: str
     skill_ids: list[uuid.UUID]

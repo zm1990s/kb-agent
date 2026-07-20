@@ -3,7 +3,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import ARRAY, Boolean, Integer, SmallInteger, String, Text
+from sqlalchemy import ARRAY, Boolean, DateTime, Integer, SmallInteger, String, Text, func
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -21,11 +21,15 @@ class ScheduledTask(Base):
     interval_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
     daily_hour: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
     daily_minute: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+    week_day: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+    month_day: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
     system_prompt: Mapped[str | None] = mapped_column(Text, nullable=True)
     initial_message: Mapped[str] = mapped_column(Text, nullable=False)
     skill_ids: Mapped[list] = mapped_column(ARRAY(PGUUID(as_uuid=True)), nullable=False, server_default="{}")
     workspace_id: Mapped[uuid.UUID | None] = mapped_column(PGUUID(as_uuid=True), nullable=True)
     locale: Mapped[str] = mapped_column(String(10), nullable=False, server_default="zh")
-    last_run_at: Mapped[datetime | None] = mapped_column(nullable=True)
-    next_run_at: Mapped[datetime | None] = mapped_column(nullable=True)
-    created_at: Mapped[datetime] = mapped_column(nullable=False, server_default="NOW()")
+    last_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    next_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )

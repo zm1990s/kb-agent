@@ -15,10 +15,12 @@ interface ScheduledTask {
   id: string;
   name: string;
   enabled: boolean;
-  schedule_type: "interval" | "daily";
+  schedule_type: "interval" | "daily" | "weekly" | "monthly";
   interval_minutes: number | null;
   daily_hour: number | null;
   daily_minute: number | null;
+  week_day: number | null;
+  month_day: number | null;
   system_prompt: string | null;
   initial_message: string;
   skill_ids: string[];
@@ -48,6 +50,43 @@ function minutesToDisplay(minutes: number): { value: number; unit: Unit } {
   return { value: minutes, unit: "minutes" };
 }
 
+// 时间选择器：HH:MM
+function TimeSelect({
+  hour,
+  minute,
+  onHourChange,
+  onMinuteChange,
+}: {
+  hour: number;
+  minute: number;
+  onHourChange: (h: number) => void;
+  onMinuteChange: (m: number) => void;
+}) {
+  return (
+    <div className="flex items-center gap-1">
+      <select
+        value={hour}
+        onChange={(e) => onHourChange(Number(e.target.value))}
+        className="rounded-lg border border-gray-300 px-2 py-1.5 text-sm"
+      >
+        {Array.from({ length: 24 }, (_, i) => (
+          <option key={i} value={i}>{String(i).padStart(2, "0")}</option>
+        ))}
+      </select>
+      <span className="text-sm text-gray-500">:</span>
+      <select
+        value={minute}
+        onChange={(e) => onMinuteChange(Number(e.target.value))}
+        className="rounded-lg border border-gray-300 px-2 py-1.5 text-sm"
+      >
+        {[0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55].map((m) => (
+          <option key={m} value={m}>{String(m).padStart(2, "0")}</option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
 export default function ScheduledTaskPanel({ open, onClose }: Props) {
   const t = useTranslations("scheduledTask");
   const locale = useLocale();
@@ -64,11 +103,13 @@ export default function ScheduledTaskPanel({ open, onClose }: Props) {
   // form state
   const [fName, setFName] = useState("");
   const [fEnabled, setFEnabled] = useState(true);
-  const [fScheduleType, setFScheduleType] = useState<"interval" | "daily">("interval");
+  const [fScheduleType, setFScheduleType] = useState<ScheduledTask["schedule_type"]>("daily");
   const [fIntervalValue, setFIntervalValue] = useState(60);
   const [fIntervalUnit, setFIntervalUnit] = useState<Unit>("minutes");
-  const [fDailyHour, setFDailyHour] = useState(9);
-  const [fDailyMinute, setFDailyMinute] = useState(0);
+  const [fHour, setFHour] = useState(9);
+  const [fMinute, setFMinute] = useState(0);
+  const [fWeekDay, setFWeekDay] = useState(0);   // 0=Mon…6=Sun
+  const [fMonthDay, setFMonthDay] = useState(1);  // 1–31
   const [fMessage, setFMessage] = useState("");
   const [fSystemPrompt, setFSystemPrompt] = useState("");
   const [fSkillIds, setFSkillIds] = useState<string[]>([]);
@@ -90,9 +131,10 @@ export default function ScheduledTaskPanel({ open, onClose }: Props) {
 
   function openNew() {
     setEditing(null);
-    setFName(""); setFEnabled(true); setFScheduleType("interval");
+    setFName(""); setFEnabled(true); setFScheduleType("daily");
     setFIntervalValue(60); setFIntervalUnit("minutes");
-    setFDailyHour(9); setFDailyMinute(0);
+    setFHour(9); setFMinute(0);
+    setFWeekDay(0); setFMonthDay(1);
     setFMessage(""); setFSystemPrompt(""); setFSkillIds([]);
     setFormOpen(true);
   }
@@ -106,8 +148,10 @@ export default function ScheduledTaskPanel({ open, onClose }: Props) {
       const { value, unit } = minutesToDisplay(task.interval_minutes);
       setFIntervalValue(value); setFIntervalUnit(unit);
     }
-    setFDailyHour(task.daily_hour ?? 9);
-    setFDailyMinute(task.daily_minute ?? 0);
+    setFHour(task.daily_hour ?? 9);
+    setFMinute(task.daily_minute ?? 0);
+    setFWeekDay(task.week_day ?? 0);
+    setFMonthDay(task.month_day ?? 1);
     setFMessage(task.initial_message);
     setFSystemPrompt(task.system_prompt ?? "");
     setFSkillIds(task.skill_ids);
@@ -117,13 +161,16 @@ export default function ScheduledTaskPanel({ open, onClose }: Props) {
   async function save() {
     if (!fName.trim() || !fMessage.trim()) return;
     setSaving(true);
+    const hasTime = fScheduleType !== "interval";
     const body = {
       name: fName.trim(),
       enabled: fEnabled,
       schedule_type: fScheduleType,
       interval_minutes: fScheduleType === "interval" ? unitToMinutes(fIntervalValue, fIntervalUnit) : null,
-      daily_hour: fScheduleType === "daily" ? fDailyHour : null,
-      daily_minute: fScheduleType === "daily" ? fDailyMinute : null,
+      daily_hour: hasTime ? fHour : null,
+      daily_minute: hasTime ? fMinute : null,
+      week_day: fScheduleType === "weekly" ? fWeekDay : null,
+      month_day: fScheduleType === "monthly" ? fMonthDay : null,
       initial_message: fMessage.trim(),
       system_prompt: fSystemPrompt.trim() || null,
       skill_ids: fSkillIds,
@@ -168,11 +215,20 @@ export default function ScheduledTaskPanel({ open, onClose }: Props) {
   }
 
   function formatSchedule(task: ScheduledTask): string {
+    const h = String(task.daily_hour ?? 0).padStart(2, "0");
+    const m = String(task.daily_minute ?? 0).padStart(2, "0");
+    const timeStr = `${h}:${m}`;
     if (task.schedule_type === "daily") {
-      const h = String(task.daily_hour ?? 0).padStart(2, "0");
-      const m = String(task.daily_minute ?? 0).padStart(2, "0");
-      return `${t("dailyAt")} ${h}:${m} ${t("utcNote")}`;
+      return `${t("dailyAt")} ${timeStr} ${t("utcNote")}`;
     }
+    if (task.schedule_type === "weekly") {
+      const wdKey = String(task.week_day ?? 0) as "0";
+      return `${t("weekDayLabel")} ${t(`weekDays.${wdKey}`)} ${timeStr} ${t("utcNote")}`;
+    }
+    if (task.schedule_type === "monthly") {
+      return `${t("monthDayLabel")} ${task.month_day ?? 1} 号 ${timeStr} ${t("utcNote")}`;
+    }
+    // interval
     const min = task.interval_minutes ?? 5;
     const { value, unit } = minutesToDisplay(min);
     return `${t("intervalValue")} ${value} ${t(`units.${unit}`)}`;
@@ -185,12 +241,14 @@ export default function ScheduledTaskPanel({ open, onClose }: Props) {
 
   if (!open) return null;
 
+  const SCHEDULE_TYPES: ScheduledTask["schedule_type"][] = ["daily", "weekly", "monthly", "interval"];
+
   return (
     <div className="fixed inset-0 z-40 flex">
       {/* 遮罩 */}
       <div className="flex-1 bg-black/30" onClick={onClose} />
       {/* 面板 */}
-      <div className="flex w-[420px] shrink-0 flex-col bg-white shadow-xl">
+      <div className="flex w-[440px] shrink-0 flex-col bg-white shadow-xl">
         {/* 顶栏 */}
         <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
           <h2 className="text-base font-semibold text-gray-900">{t("title")}</h2>
@@ -230,8 +288,8 @@ export default function ScheduledTaskPanel({ open, onClose }: Props) {
                 {/* 调度方式 */}
                 <div>
                   <label className="mb-1 block text-xs font-medium text-gray-600">{t("scheduleType")}</label>
-                  <div className="flex gap-3">
-                    {(["interval", "daily"] as const).map((type) => (
+                  <div className="flex flex-wrap gap-3">
+                    {SCHEDULE_TYPES.map((type) => (
                       <label key={type} className="flex items-center gap-1.5 text-sm text-gray-700 cursor-pointer">
                         <input
                           type="radio"
@@ -273,23 +331,44 @@ export default function ScheduledTaskPanel({ open, onClose }: Props) {
                 {fScheduleType === "daily" && (
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-gray-600">{t("dailyAt")}</span>
-                    <input
-                      type="number"
-                      min={0}
-                      max={23}
-                      value={fDailyHour}
-                      onChange={(e) => setFDailyHour(Number(e.target.value))}
-                      className="w-16 rounded-lg border border-gray-300 px-2 py-1.5 text-sm outline-none focus:border-blue-500"
-                    />
-                    <span className="text-sm text-gray-500">:</span>
-                    <input
-                      type="number"
-                      min={0}
-                      max={59}
-                      value={fDailyMinute}
-                      onChange={(e) => setFDailyMinute(Number(e.target.value))}
-                      className="w-16 rounded-lg border border-gray-300 px-2 py-1.5 text-sm outline-none focus:border-blue-500"
-                    />
+                    <TimeSelect hour={fHour} minute={fMinute} onHourChange={setFHour} onMinuteChange={setFMinute} />
+                    <span className="text-xs text-gray-400">{t("utcNote")}</span>
+                  </div>
+                )}
+
+                {/* weekly 设置 */}
+                {fScheduleType === "weekly" && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm text-gray-600">{t("weekDayLabel")}</span>
+                    <select
+                      value={fWeekDay}
+                      onChange={(e) => setFWeekDay(Number(e.target.value))}
+                      className="rounded-lg border border-gray-300 px-2 py-1.5 text-sm"
+                    >
+                      {[0, 1, 2, 3, 4, 5, 6].map((d) => (
+                        <option key={d} value={d}>{t(`weekDays.${d as 0}`)}</option>
+                      ))}
+                    </select>
+                    <TimeSelect hour={fHour} minute={fMinute} onHourChange={setFHour} onMinuteChange={setFMinute} />
+                    <span className="text-xs text-gray-400">{t("utcNote")}</span>
+                  </div>
+                )}
+
+                {/* monthly 设置 */}
+                {fScheduleType === "monthly" && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm text-gray-600">{t("monthDayLabel")}</span>
+                    <select
+                      value={fMonthDay}
+                      onChange={(e) => setFMonthDay(Number(e.target.value))}
+                      className="rounded-lg border border-gray-300 px-2 py-1.5 text-sm"
+                    >
+                      {Array.from({ length: 28 }, (_, i) => i + 1).map((d) => (
+                        <option key={d} value={d}>{d}</option>
+                      ))}
+                    </select>
+                    <span className="text-sm text-gray-600">{t("atTime")}</span>
+                    <TimeSelect hour={fHour} minute={fMinute} onHourChange={setFHour} onMinuteChange={setFMinute} />
                     <span className="text-xs text-gray-400">{t("utcNote")}</span>
                   </div>
                 )}

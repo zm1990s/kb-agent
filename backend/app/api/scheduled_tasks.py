@@ -55,6 +55,8 @@ async def create_scheduled_task(
         interval_minutes=body.interval_minutes,
         daily_hour=body.daily_hour,
         daily_minute=body.daily_minute,
+        week_day=body.week_day,
+        month_day=body.month_day,
         system_prompt=body.system_prompt,
         initial_message=body.initial_message,
         skill_ids=body.skill_ids,
