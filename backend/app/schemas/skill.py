@@ -75,6 +75,7 @@ class SkillPublic(BaseModel):
     created_by_email: str | None = None
     created_at: datetime
     updated_at: datetime
+    can_edit: bool = False
 
     @computed_field
     def has_bundle(self) -> bool:
@@ -98,6 +99,7 @@ class SkillSummary(BaseModel):
     created_by_email: str | None = None
     created_at: datetime
     updated_at: datetime
+    can_edit: bool = False
 
     @computed_field
     def has_bundle(self) -> bool:

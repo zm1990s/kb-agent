@@ -76,6 +76,9 @@ async def list_skills(
     for s in skills:
         summary = SkillSummary.model_validate(s)
         summary.created_by_email = emails.get(s.created_by) if s.created_by else None
+        summary.can_edit = await skill_service.check_skill_access(
+            session, user=current_user, skill=s, level="write"
+        )
         out.append(summary)
     return out
 
@@ -257,6 +260,9 @@ async def get_skill(
     pub = SkillPublic.model_validate(skill)
     emails = await skill_service.resolve_creator_emails(session, [skill])
     pub.created_by_email = emails.get(skill.created_by) if skill.created_by else None
+    pub.can_edit = await skill_service.check_skill_access(
+        session, user=current_user, skill=skill, level="write"
+    )
     return pub
 
 

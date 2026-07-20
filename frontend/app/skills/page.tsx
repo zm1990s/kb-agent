@@ -20,6 +20,7 @@ interface Skill {
   created_by_email?: string | null;
   created_at: string;
   updated_at: string;
+  can_edit?: boolean;
 }
 
 export default function SkillsPage() {
@@ -442,7 +443,7 @@ export default function SkillsPage() {
                   {t("downloadSkill")}
                 </button>
               </div>
-              {canWrite && (
+              {detail?.can_edit && (
                 <div className="flex gap-2">
                   <button
                     onClick={() => handleDelete(detail)}
