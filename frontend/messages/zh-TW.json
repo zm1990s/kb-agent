@@ -135,7 +135,9 @@
     "exportModal_folder": "目標目錄（選填）",
     "exportModal_confirm": "確認存入",
     "exportModal_noPermission": "無寫入權限",
-    "exportModal_saveFailed": "儲存失敗，請重試"
+    "exportModal_saveFailed": "儲存失敗，請重試",
+    "exportModal_selectMessages": "選擇訊息",
+    "exportModal_loading": "載入中…"
   },
   "messageBubble": {
     "me": "我",
@@ -729,7 +731,9 @@
     "reconnecting": "連線中斷，正在重連…",
     "reconnectPending": "連線中斷，任務仍在背景執行，可稍後切回查看",
     "reconnectFailed": "重連失敗，任務可能仍在背景執行，請稍後切回查看",
-    "export": "匯出"
+    "export": "匯出",
+    "interactiveMode": "互動模式",
+    "interactiveModeTitle": "互動模式：需要釐清時彈出選項讓你選擇"
   },
   "chatComponents": {
     "selectSkill": "選擇 Skill",

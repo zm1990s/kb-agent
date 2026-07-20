@@ -135,7 +135,9 @@
     "exportModal_folder": "目标目录（可选）",
     "exportModal_confirm": "确认存入",
     "exportModal_noPermission": "无写入权限",
-    "exportModal_saveFailed": "保存失败，请重试"
+    "exportModal_saveFailed": "保存失败，请重试",
+    "exportModal_selectMessages": "选择消息",
+    "exportModal_loading": "加载中…"
   },
   "messageBubble": {
     "me": "我",
@@ -730,7 +732,9 @@
     "reconnecting": "连接中断，正在重连…",
     "reconnectPending": "连接中断，任务仍在后台运行，可稍后切回查看",
     "reconnectFailed": "重连失败，任务可能仍在后台运行，请稍后切回查看",
-    "export": "导出"
+    "export": "导出",
+    "interactiveMode": "交互模式",
+    "interactiveModeTitle": "交互模式：需要澄清时弹出选项让你选择"
   },
   "chatComponents": {
     "selectSkill": "选择 Skill",

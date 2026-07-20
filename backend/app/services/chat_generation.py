@@ -190,6 +190,7 @@ async def _run_generation(
     all_docs: bool,
     skill_ids: list[uuid.UUID] | None,
     attachment_keys: list[str] | None,
+    attachment_names: dict[str, str] | None,
     interactive: bool = False,
     use_original_docs: bool = False,
 ) -> None:
@@ -218,6 +219,7 @@ async def _run_generation(
                 all_docs=all_docs,
                 skill_ids=skill_ids,
                 attachment_keys=attachment_keys,
+                attachment_names=attachment_names,
                 interactive=interactive,
                 use_original_docs=use_original_docs,
             ):
@@ -330,6 +332,7 @@ def start_generation(
     all_docs: bool,
     skill_ids: list[uuid.UUID] | None,
     attachment_keys: list[str] | None,
+    attachment_names: dict[str, str] | None = None,
     interactive: bool = False,
     use_original_docs: bool = False,
 ) -> GenerationState:
@@ -360,6 +363,7 @@ def start_generation(
             all_docs=all_docs,
             skill_ids=skill_ids,
             attachment_keys=attachment_keys,
+            attachment_names=attachment_names,
             interactive=interactive,
             use_original_docs=use_original_docs,
         )

@@ -613,6 +613,7 @@ async def chat_plus_stream(
     history = await recent_history(session, conversation_id=conv.id)
     attachments = [a.model_dump() for a in (body.attachments or [])]
     attachment_keys = [a["storage_key"] for a in attachments]
+    attachment_names = {a["storage_key"]: a["filename"] for a in attachments}
     for _k in attachment_keys:
         if not _k.startswith("chatplus/uploads/"):
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "非法附件引用")
@@ -637,6 +638,7 @@ async def chat_plus_stream(
             all_docs=body.all_docs,
             skill_ids=body.skill_ids,
             attachment_keys=attachment_keys or None,
+            attachment_names=attachment_names or None,
             interactive=body.interactive,
             use_original_docs=body.use_original_docs,
         )

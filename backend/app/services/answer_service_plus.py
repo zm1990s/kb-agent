@@ -251,6 +251,7 @@ async def answer_question_plus_streamed(
     all_docs: bool = False,
     skill_ids: list[uuid.UUID] | None = None,
     attachment_keys: list[str] | None = None,
+    attachment_names: dict[str, str] | None = None,
     interactive: bool = False,
     use_original_docs: bool = False,
 ):
@@ -342,11 +343,22 @@ async def answer_question_plus_streamed(
 
     attach_names: list[str] = []
     if attachment_keys:
+        used_attach_names: set[str] = set()
         for key in attachment_keys:
             path = await storage.open_path(key)
-            dest = workdir / path.name
+            raw_name = (attachment_names or {}).get(key, "") if attachment_names else ""
+            safe = _safe_doc_filename(raw_name, fallback=path.name) if raw_name else path.name
+            # 重名去重：report.pdf → report-2.pdf
+            stem, suffix = safe.rsplit(".", 1) if "." in safe else (safe, "")
+            candidate = safe
+            counter = 2
+            while candidate in used_attach_names:
+                candidate = f"{stem}-{counter}.{suffix}" if suffix else f"{stem}-{counter}"
+                counter += 1
+            used_attach_names.add(candidate)
+            dest = workdir / candidate
             shutil.copy2(str(path), str(dest))
-            attach_names.append(path.name)
+            attach_names.append(candidate)
 
     # ── use_original_docs：把选中文档的原始文件拷到 workdir/context/ ──────
     # 必须在 pre_files 快照之前；context/ 已在 _list_workdir_files 内排除（不算输出）。

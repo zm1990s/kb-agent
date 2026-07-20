@@ -796,7 +796,7 @@ export default function ChatPlusPage() {
               <button
                 type="button"
                 onClick={() => setInteractive((v) => !v)}
-                title="交互模式：需要澄清时弹出选项让你选择"
+                title={t("interactiveModeTitle")}
                 className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-sm transition-colors ${
                   interactive
                     ? "border-purple-400 bg-purple-50 text-purple-700"
@@ -806,7 +806,7 @@ export default function ChatPlusPage() {
                 <span
                   className={`h-2 w-2 rounded-full ${interactive ? "bg-purple-500" : "bg-gray-300"}`}
                 />
-                交互模式
+                {t("interactiveMode")}
               </button>
             </div>
 

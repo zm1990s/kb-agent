@@ -220,7 +220,7 @@ export default function ExportConversationModal({ conversationId, conversationTi
           {/* 消息选择 */}
           <div>
             <div className="mb-2 flex items-center justify-between">
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">选择消息</p>
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">{t("exportModal_selectMessages")}</p>
               <button
                 onClick={toggleAll}
                 className="text-xs text-blue-600 hover:underline"
@@ -229,7 +229,7 @@ export default function ExportConversationModal({ conversationId, conversationTi
               </button>
             </div>
             {loading ? (
-              <p className="py-4 text-center text-sm text-gray-400">加载中…</p>
+              <p className="py-4 text-center text-sm text-gray-400">{t("exportModal_loading")}</p>
             ) : (
               <div className="max-h-56 space-y-1.5 overflow-y-auto rounded-xl border border-gray-100 bg-gray-50 p-2">
                 {messages.map((msg) => (

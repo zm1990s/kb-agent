@@ -135,7 +135,9 @@
     "exportModal_folder": "Target Folder (optional)",
     "exportModal_confirm": "Confirm Save",
     "exportModal_noPermission": "No write permission",
-    "exportModal_saveFailed": "Save failed, please try again"
+    "exportModal_saveFailed": "Save failed, please try again",
+    "exportModal_selectMessages": "Select Messages",
+    "exportModal_loading": "Loading…"
   },
   "messageBubble": {
     "me": "Me",
@@ -730,7 +732,9 @@
     "reconnecting": "Connection interrupted, reconnecting…",
     "reconnectPending": "Connection lost. The task is still running in the background — switch back later to view it.",
     "reconnectFailed": "Reconnect failed. The task may still be running in the background — switch back later to view it.",
-    "export": "Export"
+    "export": "Export",
+    "interactiveMode": "Interactive Mode",
+    "interactiveModeTitle": "Interactive mode: shows options for you to choose when clarification is needed"
   },
   "chatComponents": {
     "selectSkill": "Select Skill",
