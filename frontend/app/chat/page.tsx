@@ -85,12 +85,12 @@ export default function ChatPage() {
   }, []);
 
   const loadConversations = useCallback(async () => {
-    if (!workspaceId) return;
     try {
+      const qs = workspaceId
+        ? `workspace_id=${workspaceId}&source=chat`
+        : `source=chat`;
       setConversations(
-        await api.get<ConversationSummary[]>(
-          `/conversations?workspace_id=${workspaceId}&source=chat`
-        )
+        await api.get<ConversationSummary[]>(`/conversations?${qs}`)
       );
     } catch {
       setConversations([]);
@@ -177,6 +177,10 @@ export default function ChatPage() {
     const ac = new AbortController();
     abortRef.current = ac;
 
+    // 标记答案（done）是否已到达：done 之后后端仍有落库/审计/生成标题等收尾，
+    // 若此时流因超时/断开而中断，答案其实已拿到，不应再弹「请求失败」。
+    let doneReceived = false;
+
     const isNew = conversationId === null;
     try {
       await api.stream(
@@ -201,6 +205,7 @@ export default function ChatPage() {
           } else if (event === "token") {
             setStreamingText((prev) => prev + (data as { text: string }).text);
           } else if (event === "done") {
+            doneReceived = true;
             setStreamingText("");
             setStreamingThinking("");
             const savedThinking = thinkingAccRef.current || undefined;
@@ -235,6 +240,8 @@ export default function ChatPage() {
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") {
         // user stopped — keep turns as-is
+      } else if (doneReceived) {
+        // 答案已收到，仅是 done 之后的流收尾中断（超时/断开）——不误报失败
       } else {
         setError(err instanceof ApiError ? err.message : t("request_failed"));
       }

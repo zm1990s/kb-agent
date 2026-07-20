@@ -262,44 +262,58 @@ async def chat_stream(
         if final.error_key:
             done_payload["error_key"] = final.error_key
         yield sse("done", done_payload)
-        # 落库助手消息（done 已发，后续延迟不影响用户体验）
-        await add_message(
-            session,
-            conversation_id=conv.id,
-            role="assistant",
-            content=final.answer,
-            sources=final.sources,
-        )
+        # done 已发，后续收尾（落库/审计/标题）各自兜底：任一失败都不得中断 SSE 流，
+        # 否则前端会在答案已显示后误报「请求失败」。分别 try 避免一个失败拖垮其余。
+        try:
+            # 落库助手消息（done 已发，后续延迟不影响用户体验）
+            await add_message(
+                session,
+                conversation_id=conv.id,
+                role="assistant",
+                content=final.answer,
+                sources=final.sources,
+            )
+        except Exception:
+            logger.exception(
+                "chat_stream 落库助手消息失败 conversation=%s（答案已推送）", conv.id
+            )
         logger.info(
             "audit chat_stream user=%s workspace=%s conversation=%s q_len=%d a_len=%d",
             current_user.id,
-            target_ws,
+            conv_ws,
             conv.id,
             len(body.message),
             len(final.answer),
         )
-        async with SessionLocal() as audit_session:
-            await record_event(
-                audit_session,
-                action="chat",
-                user_id=current_user.id,
-                workspace_id=target_ws,
-                meta={
-                    "conversation_id": str(conv.id),
-                    "question": body.message,
-                    "answer": final.answer,
-                },
-            )
-        # 新会话：生成标题，写入 DB 后推送 title 事件让前端直接更新侧边栏
-        if is_new_conv:
-            async with SessionLocal() as bg_session:
-                title = await generate_conversation_title(
-                    bg_session,
-                    conversation_id=conv.id,
-                    first_message=body.message,
+        try:
+            async with SessionLocal() as audit_session:
+                await record_event(
+                    audit_session,
+                    action="chat",
+                    user_id=current_user.id,
+                    workspace_id=conv_ws,
+                    meta={
+                        "conversation_id": str(conv.id),
+                        "question": body.message,
+                        "answer": final.answer,
+                    },
                 )
-            if title:
-                yield sse("title", {"conversation_id": str(conv.id), "title": title})
+        except Exception:
+            logger.exception("chat_stream 写用量审计失败 conversation=%s", conv.id)
+        # 新会话：生成标题，写入 DB 后推送 title 事件让前端直接更新侧边栏。
+        # generate_conversation_title 内部已 try 兜底，这里再包一层防 title 推送异常。
+        if is_new_conv:
+            try:
+                async with SessionLocal() as bg_session:
+                    title = await generate_conversation_title(
+                        bg_session,
+                        conversation_id=conv.id,
+                        first_message=body.message,
+                    )
+                if title:
+                    yield sse("title", {"conversation_id": str(conv.id), "title": title})
+            except Exception:
+                logger.exception("chat_stream 生成/推送标题失败 conversation=%s", conv.id)
 
     return StreamingResponse(
         gen(),
