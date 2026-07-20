@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import ConversationSidebar from "@/components/ConversationSidebar";
+import ScheduledTaskPanel from "@/components/chat-plus/ScheduledTaskPanel";
 import ExportConversationModal from "@/components/ExportConversationModal";
 import Markdown from "@/components/Markdown";
 import MessageBubble from "@/components/MessageBubble";
@@ -77,6 +78,7 @@ export default function ChatPlusPage() {
   // 正在后台生成的会话 id 集合（侧边栏指示器；后端 /chat/plus/active 轮询）
   const [activeIds, setActiveIds] = useState<Set<string>>(new Set());
   const [exportOpen, setExportOpen] = useState(false);
+  const [scheduledPanelOpen, setScheduledPanelOpen] = useState(false);
 
   // 是否有 skills:write（控制「存为 Skill」显隐；后端仍是唯一防线）
   const [canWriteSkill, setCanWriteSkill] = useState(false);
@@ -621,6 +623,11 @@ export default function ChatPlusPage() {
             setConversations((prev) => prev.filter((c) => c.id !== id));
             if (conversationId === id) newConversation();
           }}
+          onScheduledTasks={() => setScheduledPanelOpen(true)}
+        />
+        <ScheduledTaskPanel
+          open={scheduledPanelOpen}
+          onClose={() => setScheduledPanelOpen(false)}
         />
 
         <main className="flex flex-1 flex-col overflow-hidden">

@@ -14,6 +14,7 @@ interface Props {
   onNew: () => void;
   onUpdated?: (conv: ConversationSummary) => void;
   onDeleted?: (id: string) => void;
+  onScheduledTasks?: () => void;
 }
 
 export default function ConversationSidebar({
@@ -24,6 +25,7 @@ export default function ConversationSidebar({
   onNew,
   onUpdated,
   onDeleted,
+  onScheduledTasks,
 }: Props) {
   const t = useTranslations("sidebar");
   const { showConfirm } = useDialog();
@@ -100,6 +102,18 @@ export default function ConversationSidebar({
 
   return (
     <aside className="flex w-60 shrink-0 flex-col border-r border-gray-200 bg-white">
+      {onScheduledTasks && (
+        <button
+          onClick={onScheduledTasks}
+          className="mx-3 mt-3 flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 transition-colors"
+        >
+          <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75}>
+            <circle cx="12" cy="12" r="10" />
+            <polyline points="12 6 12 12 16 14" />
+          </svg>
+          {t("scheduled_tasks")}
+        </button>
+      )}
       <div className="flex items-center gap-2 p-3">
         <button
           onClick={onNew}

@@ -248,7 +248,8 @@
     "delete_confirm": "删除会话「{title}」？",
     "collapse": "收起侧边栏",
     "expand": "展开侧边栏",
-    "generating": "生成中…"
+    "generating": "生成中…",
+    "scheduled_tasks": "定时任务"
   },
   "account": {
     "title": "账户管理",
@@ -784,5 +785,37 @@
     "noWorkspace": "不引用工作区",
     "category": "分类",
     "categoryPlaceholder": "如 写作、翻译"
+  },
+  "scheduledTask": {
+    "title": "定时任务",
+    "new": "新建任务",
+    "edit": "编辑任务",
+    "name": "任务名称",
+    "namePlaceholder": "给任务取个名字",
+    "scheduleType": "调度方式",
+    "interval": "间隔执行",
+    "daily": "每天定时",
+    "intervalValue": "每",
+    "units": { "minutes": "分钟", "hours": "小时", "days": "天" },
+    "dailyAt": "每天",
+    "utcNote": "（UTC 时间）",
+    "initialMessage": "初始消息",
+    "initialMessagePlaceholder": "发给 Agent 的第一条消息…",
+    "systemPrompt": "系统提示词",
+    "systemPromptPlaceholder": "可选，注入的系统提示词…",
+    "skills": "使用的 Skills",
+    "noSkills": "无",
+    "enabled": "启用",
+    "runNow": "立即运行",
+    "running": "执行中…",
+    "lastRun": "上次运行",
+    "nextRun": "下次运行",
+    "never": "从未运行",
+    "save": "保存",
+    "cancel": "取消",
+    "delete": "删除",
+    "deleteConfirm": "确认删除「{name}」？",
+    "empty": "暂无定时任务",
+    "noFileNote": "注：定时任务不支持文件产出，如需文件请在任务完成后继续对话"
   }
 }

@@ -784,5 +784,38 @@
     "noWorkspace": "不引用工作區",
     "category": "分類",
     "categoryPlaceholder": "如 寫作、翻譯"
+  },
+  "scheduledTask": {
+    "title": "定時任務",
+    "new": "新增任務",
+    "edit": "編輯任務",
+    "name": "任務名稱",
+    "namePlaceholder": "給任務取個名字",
+    "scheduleType": "排程方式",
+    "interval": "間隔執行",
+    "daily": "每天定時",
+    "intervalValue": "每",
+    "units": { "minutes": "分鐘", "hours": "小時", "days": "天" },
+    "dailyAt": "每天",
+    "utcNote": "（UTC 時間）",
+    "initialMessage": "初始訊息",
+    "initialMessagePlaceholder": "傳送給 Agent 的第一條訊息…",
+    "systemPrompt": "系統提示詞",
+    "systemPromptPlaceholder": "可選，注入的系統提示詞…",
+    "skills": "使用的 Skills",
+    "noSkills": "無",
+    "enabled": "啟用",
+    "runNow": "立即執行",
+    "running": "執行中…",
+    "lastRun": "上次執行",
+    "nextRun": "下次執行",
+    "never": "從未執行",
+    "save": "儲存",
+    "cancel": "取消",
+    "delete": "刪除",
+    "deleteConfirm": "確認刪除「{name}」？",
+    "empty": "暫無定時任務",
+    "noFileNote": "注意：定時任務不支援檔案產出，如需檔案請在任務完成後繼續對話"
   }
+}
 }

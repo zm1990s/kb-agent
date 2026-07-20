@@ -248,7 +248,8 @@
     "delete_confirm": "Delete conversation \"{title}\"?",
     "collapse": "Collapse sidebar",
     "expand": "Expand sidebar",
-    "generating": "Generating…"
+    "generating": "Generating…",
+    "scheduled_tasks": "Scheduled Tasks"
   },
   "account": {
     "title": "Account",
@@ -784,5 +785,37 @@
     "noWorkspace": "No workspace",
     "category": "Category",
     "categoryPlaceholder": "e.g. Writing, Translation"
+  },
+  "scheduledTask": {
+    "title": "Scheduled Tasks",
+    "new": "New Task",
+    "edit": "Edit Task",
+    "name": "Task Name",
+    "namePlaceholder": "Give this task a name",
+    "scheduleType": "Schedule",
+    "interval": "Interval",
+    "daily": "Daily",
+    "intervalValue": "Every",
+    "units": { "minutes": "min", "hours": "hr", "days": "day" },
+    "dailyAt": "Daily at",
+    "utcNote": "(UTC)",
+    "initialMessage": "Initial Message",
+    "initialMessagePlaceholder": "First message to send to the Agent…",
+    "systemPrompt": "System Prompt",
+    "systemPromptPlaceholder": "Optional system prompt…",
+    "skills": "Skills",
+    "noSkills": "None",
+    "enabled": "Enabled",
+    "runNow": "Run Now",
+    "running": "Running…",
+    "lastRun": "Last run",
+    "nextRun": "Next run",
+    "never": "Never",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "deleteConfirm": "Delete task \"{name}\"?",
+    "empty": "No scheduled tasks",
+    "noFileNote": "Note: Scheduled tasks do not support file output. Continue the conversation after the task completes if files are needed."
   }
 }

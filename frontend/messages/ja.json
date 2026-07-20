@@ -784,5 +784,38 @@
     "noWorkspace": "参照しない",
     "category": "カテゴリ",
     "categoryPlaceholder": "例：ライティング、翻訳"
+  },
+  "scheduledTask": {
+    "title": "スケジュールタスク",
+    "new": "新規タスク",
+    "edit": "タスクを編集",
+    "name": "タスク名",
+    "namePlaceholder": "タスク名を入力",
+    "scheduleType": "スケジュール",
+    "interval": "間隔実行",
+    "daily": "毎日定時",
+    "intervalValue": "毎",
+    "units": { "minutes": "分", "hours": "時間", "days": "日" },
+    "dailyAt": "毎日",
+    "utcNote": "（UTC）",
+    "initialMessage": "初期メッセージ",
+    "initialMessagePlaceholder": "Agentへの最初のメッセージ…",
+    "systemPrompt": "システムプロンプト",
+    "systemPromptPlaceholder": "省略可のシステムプロンプト…",
+    "skills": "スキル",
+    "noSkills": "なし",
+    "enabled": "有効",
+    "runNow": "今すぐ実行",
+    "running": "実行中…",
+    "lastRun": "最終実行",
+    "nextRun": "次回実行",
+    "never": "未実行",
+    "save": "保存",
+    "cancel": "キャンセル",
+    "delete": "削除",
+    "deleteConfirm": "タスク「{name}」を削除しますか？",
+    "empty": "スケジュールタスクなし",
+    "noFileNote": "注：スケジュールタスクはファイル出力に対応していません。ファイルが必要な場合はタスク完了後に会話を続けてください。"
   }
+}
 }

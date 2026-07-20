@@ -16,6 +16,7 @@ from app.api import (
     documents,
     folders,
     icons,
+    scheduled_tasks,
     settings,
     skills,
     whatsnew,
@@ -25,6 +26,7 @@ from app.core.db import SessionLocal
 from app.core.logging_setup import configure_logging
 from app.services.user_service import seed_admin
 from app.tasks.chat_file_cleanup import start_chat_file_cleanup_loop
+from app.tasks.scheduled_task_worker import start_scheduled_task_loop
 from app.tasks.trash_cleanup import start_trash_cleanup_loop
 from app.tasks.whatsnew_worker import start_mail_loop, start_whatsnew_loop
 
@@ -54,6 +56,10 @@ async def lifespan(_app: FastAPI):
     t4 = asyncio.create_task(start_chat_file_cleanup_loop())
     _bg_tasks.add(t4)
     t4.add_done_callback(_bg_tasks.discard)
+    # 启动定时任务 Worker
+    t5 = asyncio.create_task(start_scheduled_task_loop())
+    _bg_tasks.add(t5)
+    t5.add_done_callback(_bg_tasks.discard)
     yield
 
 
@@ -71,6 +77,7 @@ app.include_router(whatsnew.router)
 app.include_router(skills.router)
 app.include_router(icons.router)
 app.include_router(cases.router)
+app.include_router(scheduled_tasks.router)
 
 
 @app.get("/health")

@@ -784,5 +784,38 @@
     "noWorkspace": "참조 안 함",
     "category": "카테고리",
     "categoryPlaceholder": "예: 작문, 번역"
+  },
+  "scheduledTask": {
+    "title": "예약 작업",
+    "new": "새 작업",
+    "edit": "작업 편집",
+    "name": "작업 이름",
+    "namePlaceholder": "작업 이름을 입력하세요",
+    "scheduleType": "일정",
+    "interval": "간격 실행",
+    "daily": "매일 정시",
+    "intervalValue": "매",
+    "units": { "minutes": "분", "hours": "시간", "days": "일" },
+    "dailyAt": "매일",
+    "utcNote": "(UTC)",
+    "initialMessage": "초기 메시지",
+    "initialMessagePlaceholder": "에이전트에게 보낼 첫 메시지…",
+    "systemPrompt": "시스템 프롬프트",
+    "systemPromptPlaceholder": "선택적 시스템 프롬프트…",
+    "skills": "스킬",
+    "noSkills": "없음",
+    "enabled": "활성화",
+    "runNow": "지금 실행",
+    "running": "실행 중…",
+    "lastRun": "마지막 실행",
+    "nextRun": "다음 실행",
+    "never": "실행된 적 없음",
+    "save": "저장",
+    "cancel": "취소",
+    "delete": "삭제",
+    "deleteConfirm": "작업 \"{name}\"을(를) 삭제하시겠습니까?",
+    "empty": "예약 작업 없음",
+    "noFileNote": "참고: 예약 작업은 파일 출력을 지원하지 않습니다. 파일이 필요한 경우 작업 완료 후 대화를 계속하세요."
   }
+}
 }
