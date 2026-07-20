@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { api } from "@/lib/api";
 import { getToken } from "@/lib/auth";
 import SaveAsSkillButton from "@/components/chat-plus/SaveAsSkillButton";
+import SaveToWorkspaceButton from "@/components/chat-plus/SaveToWorkspaceButton";
 
 interface SessionFile {
   filename: string;
@@ -16,6 +17,7 @@ interface SessionFile {
 interface Props {
   conversationId: string | null;
   canWriteSkill?: boolean;
+  canWriteDoc?: boolean;
 }
 
 export interface SessionFilesHandle {
@@ -34,7 +36,7 @@ function encodePath(p: string): string {
 }
 
 const SessionFilesPanel = forwardRef<SessionFilesHandle, Props>(
-  function SessionFilesPanel({ conversationId, canWriteSkill }, ref) {
+  function SessionFilesPanel({ conversationId, canWriteSkill, canWriteDoc }, ref) {
     const t = useTranslations("chatComponents");
     const [open, setOpen] = useState(false);
     const [files, setFiles] = useState<SessionFile[]>([]);
@@ -158,6 +160,12 @@ const SessionFilesPanel = forwardRef<SessionFilesHandle, Props>(
                       <span className="truncate text-xs text-gray-700">{f.relpath ?? f.filename}</span>
                       <span className="shrink-0 text-xs text-gray-400">{fmtSize(f.size)}</span>
                     </button>
+                    <SaveToWorkspaceButton
+                      conversationId={conversationId}
+                      filename={f.filename}
+                      relpath={f.relpath}
+                      canWrite={canWriteDoc}
+                    />
                     <SaveAsSkillButton
                       conversationId={conversationId}
                       filename={f.filename}

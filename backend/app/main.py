@@ -10,6 +10,7 @@ from fastapi import FastAPI
 from app.api import (
     admin,
     auth,
+    cases,
     categories,
     chat,
     documents,
@@ -69,6 +70,7 @@ app.include_router(admin.router)
 app.include_router(whatsnew.router)
 app.include_router(skills.router)
 app.include_router(icons.router)
+app.include_router(cases.router)
 
 
 @app.get("/health")

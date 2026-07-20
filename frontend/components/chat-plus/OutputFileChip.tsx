@@ -1,7 +1,9 @@
 "use client";
 
 import { getToken } from "@/lib/auth";
+import { useTranslations } from "next-intl";
 import SaveAsSkillButton from "@/components/chat-plus/SaveAsSkillButton";
+import SaveToWorkspaceButton from "@/components/chat-plus/SaveToWorkspaceButton";
 
 interface OutputFile {
   filename: string;
@@ -14,6 +16,7 @@ interface Props {
   files: OutputFile[];
   conversationId: string | null;
   canWriteSkill?: boolean;
+  canWriteDoc?: boolean;
 }
 
 // 逐段编码相对路径，保留 / 作为分隔符（供 {file_path:path} 端点）
@@ -21,7 +24,13 @@ function encodePath(p: string): string {
   return p.split("/").map(encodeURIComponent).join("/");
 }
 
-export default function OutputFileChip({ files, conversationId, canWriteSkill }: Props) {
+export default function OutputFileChip({
+  files,
+  conversationId,
+  canWriteSkill,
+  canWriteDoc,
+}: Props) {
+  const t = useTranslations("chatComponents");
   if (!files || files.length === 0) return null;
 
   async function download(file: OutputFile) {
@@ -45,24 +54,44 @@ export default function OutputFileChip({ files, conversationId, canWriteSkill }:
   return (
     <div className="mt-2 flex flex-wrap gap-1.5">
       {files.map((f) => (
-        <div key={f.filename} className="flex items-center gap-1.5">
-          <button
-            type="button"
-            onClick={() => download(f)}
-            className="flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-xs text-blue-700 hover:bg-blue-100 transition-colors"
+        // group：文件名 chip 常显；操作按钮在大屏悬浮时浮现、小屏常显（触屏可点）
+        <div
+          key={f.filename}
+          className="group flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-1.5 py-1"
+        >
+          <span
+            className="flex items-center gap-1.5 px-1 text-xs text-gray-700"
+            title={f.relpath ?? f.filename}
           >
-            <svg className="h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
+            <svg className="h-3.5 w-3.5 shrink-0 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" />
             </svg>
-            <span className="max-w-[200px] truncate" title={f.relpath ?? f.filename}>
-              {f.relpath ?? f.filename}
-            </span>
-          </button>
-          <SaveAsSkillButton
-            conversationId={f.conversation_id ?? conversationId}
-            filename={f.filename}
-            canWrite={canWriteSkill}
-          />
+            <span className="max-w-[200px] truncate">{f.relpath ?? f.filename}</span>
+          </span>
+          <div className="flex items-center gap-1.5 md:hidden md:group-hover:flex">
+            <button
+              type="button"
+              onClick={() => download(f)}
+              className="flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-2 py-1.5 text-xs text-blue-700 hover:bg-blue-100 transition-colors"
+              title={t("download")}
+            >
+              <svg className="h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
+              </svg>
+              {t("download")}
+            </button>
+            <SaveToWorkspaceButton
+              conversationId={f.conversation_id ?? conversationId}
+              filename={f.filename}
+              relpath={f.relpath}
+              canWrite={canWriteDoc}
+            />
+            <SaveAsSkillButton
+              conversationId={f.conversation_id ?? conversationId}
+              filename={f.filename}
+              canWrite={canWriteSkill}
+            />
+          </div>
         </div>
       ))}
     </div>

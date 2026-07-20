@@ -78,6 +78,8 @@ export default function ChatPlusPage() {
 
   // 是否有 skills:write（控制「存为 Skill」显隐；后端仍是唯一防线）
   const [canWriteSkill, setCanWriteSkill] = useState(false);
+  // 是否有 documents:write（控制「保存到文档库」显隐；后端仍是唯一防线）
+  const [canWriteDoc, setCanWriteDoc] = useState(false);
 
   // Chat+ extras
   const [activeSkillIds, setActiveSkillIds] = useState<string[]>([]);
@@ -126,16 +128,23 @@ export default function ChatPlusPage() {
   // unmount：仅断开本地 SSE 订阅（后端生成继续跑）。取消生成只走「停止」按钮。
   useEffect(() => { return () => { abortRef.current?.abort(); }; }, []);
 
-  // 拉取权限，决定是否显示「存为 Skill」（admin 恒可）
+  // 拉取权限，决定是否显示「存为 Skill」/「保存到文档库」（admin 恒可）
   useEffect(() => {
     if (isAdmin()) {
       setCanWriteSkill(true);
+      setCanWriteDoc(true);
       return;
     }
     api
       .get<Record<string, string>>("/auth/my-permissions")
-      .then((perms) => setCanWriteSkill(perms.skills === "write"))
-      .catch(() => setCanWriteSkill(false));
+      .then((perms) => {
+        setCanWriteSkill(perms.skills === "write");
+        setCanWriteDoc(perms.documents === "write");
+      })
+      .catch(() => {
+        setCanWriteSkill(false);
+        setCanWriteDoc(false);
+      });
   }, []);
 
   // 会话列表不分空间：列出当前用户全部 chatplus 会话
@@ -661,7 +670,7 @@ export default function ChatPlusPage() {
                 )}
                 {turn.role === "assistant" && turn.output_files && turn.output_files.length > 0 && (
                   <div className="ml-11 mt-1">
-                    <OutputFileChip files={turn.output_files} conversationId={conversationId} canWriteSkill={canWriteSkill} />
+                    <OutputFileChip files={turn.output_files} conversationId={conversationId} canWriteSkill={canWriteSkill} canWriteDoc={canWriteDoc} />
                   </div>
                 )}
               </div>
@@ -736,7 +745,7 @@ export default function ChatPlusPage() {
                 onUseOriginalChange={setUseOriginalDocs}
               />
               <FileAttachPanel files={attachedFiles} onChange={setAttachedFiles} />
-              <SessionFilesPanel ref={sessionFilesRef} conversationId={conversationId} canWriteSkill={canWriteSkill} />
+              <SessionFilesPanel ref={sessionFilesRef} conversationId={conversationId} canWriteSkill={canWriteSkill} canWriteDoc={canWriteDoc} />
               <button
                 type="button"
                 onClick={() => setInteractive((v) => !v)}

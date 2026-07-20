@@ -671,3 +671,18 @@ async def get_smtp_tls(session: AsyncSession) -> bool:
 
 async def set_smtp_tls(session: AsyncSession, tls: bool) -> None:
     await set_setting(session, SMTP_TLS_KEY, "true" if tls else "false")
+
+
+# ── Case 录入默认保存空间 ──────────────────────────────────────────────────
+# 管理员配置：Case 录入生成的文档默认保存到哪个空间（未设则 Case 录入不可用）。
+
+CASE_DEFAULT_WORKSPACE_KEY = "case_default_workspace_id"
+
+
+async def get_case_default_workspace_id(session: AsyncSession) -> str | None:
+    """返回默认空间 UUID 字符串；未配置返回 None。"""
+    return await get_setting(session, CASE_DEFAULT_WORKSPACE_KEY)
+
+
+async def set_case_default_workspace_id(session: AsyncSession, workspace_id: str) -> None:
+    await set_setting(session, CASE_DEFAULT_WORKSPACE_KEY, workspace_id.strip())

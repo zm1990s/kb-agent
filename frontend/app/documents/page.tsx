@@ -26,6 +26,8 @@ function sanitizeName(name: string): string {
 // 特殊过滤值：全部 / 未归目录
 const ALL = "__all__";
 const ROOT = "__root__";
+// 记住文档管理页上次选择的空间
+const WS_STORAGE_KEY = "documents_workspace_id";
 
 export default function DocumentsPage() {
   const t = useTranslations("documents");
@@ -40,7 +42,22 @@ export default function DocumentsPage() {
     ready: t("status_ready"),
     failed: t("status_failed"),
   };
-  const [workspaceId, setWorkspaceId] = useState<string | null>(null);
+  // 记住上次选择的空间（跨页面/刷新）：懒初始化直接读 localStorage（本页为 client 组件）。
+  // WorkspacePicker 会在缓存 ID 失效（不在用户可见空间列表）时自动回落到 null。
+  const [workspaceId, setWorkspaceIdState] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem(WS_STORAGE_KEY);
+    } catch {
+      return null;
+    }
+  });
+  const setWorkspaceId = useCallback((id: string | null) => {
+    setWorkspaceIdState(id);
+    try {
+      if (id) localStorage.setItem(WS_STORAGE_KEY, id);
+      else localStorage.removeItem(WS_STORAGE_KEY);
+    } catch {}
+  }, []);
   const [folders, setFolders] = useState<Folder[]>([]);
   const [activeFolder, setActiveFolder] = useState<string>(ALL);
   const [docs, setDocs] = useState<DocumentPublic[]>([]);

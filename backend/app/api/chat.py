@@ -20,8 +20,10 @@ from app.schemas.chat import (
     ConversationSummary,
     ConversationUpdate,
     MessagePublic,
+    SaveFileToLibrary,
     SourceRef,
 )
+from app.schemas.document import DocumentUploadAccepted
 from app.services.answer_service import (
     AnswerResult,
     Stage,
@@ -709,6 +711,100 @@ async def download_conversation_file(
             "X-Content-Type-Options": "nosniff",
         },
     )
+
+
+# 可保存进文档库的成果文件后缀（常见可归档文档格式；与前端白名单保持一致）
+_SAVEABLE_DOC_SUFFIXES = (
+    ".md", ".markdown", ".txt", ".csv",
+    ".pdf", ".png", ".jpg", ".jpeg",
+    ".doc", ".docx", ".ppt", ".pptx", ".xls", ".xlsx",
+)
+
+
+@router.post(
+    "/chat/plus/conversations/{conversation_id}/files/{file_path:path}/save-to-library",
+    response_model=DocumentUploadAccepted,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def save_conversation_file_to_library(
+    conversation_id: uuid.UUID,
+    file_path: str,
+    body: SaveFileToLibrary,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> DocumentUploadAccepted:
+    """把聊天+ 会话工作目录里的成果文件保存进文档库（选空间+目录）。
+
+    读取会话文件字节，复用普通上传的入库路径（storage.save→Document→归类任务）。
+    需：会话属主 + chatplus 准入 + 目标空间写权限（owner/editor）。
+    """
+    import mimetypes
+    from pathlib import PurePosixPath
+
+    from app.services.document_service import upload_document
+    from app.services.folder_service import get_folder_in_workspace
+    from app.services.workspace_service import get_ws_role
+    from app.storage.base import get_storage
+    from app.storage.local import StorageError
+    from app.tasks.worker import enqueue_classification
+
+    # 会话归属校验（不泄漏存在性）+ 聊天+ 准入
+    conv = await get_conversation_for_user(
+        session, conversation_id=conversation_id, user_id=current_user.id
+    )
+    if conv is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "会话不存在")
+    await _require_module(session, current_user, _module_for_source(conv.source))
+
+    # 目标空间写权限（全局 admin 或 owner/editor）
+    role = await get_ws_role(
+        session, workspace_id=body.workspace_id, user_id=current_user.id
+    )
+    if role not in ("owner", "editor"):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "需要空间管理员或编辑权限")
+
+    # 防穿越：规范化后不得为绝对路径 / 含 .. / 空 / 目录（保留子目录 relpath）
+    rel = PurePosixPath(file_path)
+    if rel.is_absolute() or ".." in rel.parts or not file_path or file_path.endswith("/"):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "非法文件路径")
+
+    # 格式白名单：仅常见可归档文档格式可保存
+    if not rel.name.lower().endswith(_SAVEABLE_DOC_SUFFIXES):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "该文件格式不支持保存到文档库")
+
+    # 目录归属校验（若指定）
+    if body.folder_id is not None:
+        folder = await get_folder_in_workspace(
+            session, folder_id=body.folder_id, workspace_id=body.workspace_id
+        )
+        if folder is None:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "目录不存在")
+
+    # 读取会话文件字节（storage 层再次校验落在根目录内）
+    storage = get_storage()
+    key = f"chatplus/conv_{conversation_id}/{file_path}"
+    try:
+        data = await storage.read_bytes(key)
+    except (FileNotFoundError, StorageError, IsADirectoryError) as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "文件不存在") from exc
+
+    mime_type = mimetypes.guess_type(rel.name)[0] or "application/octet-stream"
+    # 复用普通上传入库路径：拷贝字节到新文档 storage_key，触发异步归类
+    doc, task = await upload_document(
+        session,
+        workspace_id=body.workspace_id,
+        filename=rel.name,
+        mime_type=mime_type,
+        data=data,
+        uploaded_by=current_user.id,
+        folder_id=body.folder_id,
+    )
+    enqueue_classification(task.id)
+    logger.info(
+        "audit chatplus_save_to_library user=%s conversation=%s ws=%s doc=%s file=%s",
+        current_user.id, conversation_id, body.workspace_id, doc.id, rel.name,
+    )
+    return DocumentUploadAccepted(id=doc.id, status=doc.status, task_id=task.id)
 
 
 @router.get("/conversations/{conversation_id}/settings", response_model=ConversationSettingsPublic)

@@ -3,6 +3,7 @@ FROM python:3.12-slim
 WORKDIR /app
 
 # 系统依赖：编译工具 + Node.js(Claude CLI) + poppler-utils(pdftotext 抽取 PDF)
+# 注：Case 录入导出中文 PDF 用 reportlab 内置 CID 字体(STSong-Light)，无需额外字体包
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential curl ca-certificates poppler-utils gosu \
     && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \

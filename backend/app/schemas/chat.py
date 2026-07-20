@@ -59,3 +59,10 @@ class ConversationSummary(BaseModel):
 class ConversationUpdate(BaseModel):
     title: str | None = None
     pinned: bool | None = None
+
+
+class SaveFileToLibrary(BaseModel):
+    """把聊天+ 会话工作目录里的成果文件保存进文档库。"""
+
+    workspace_id: uuid.UUID
+    folder_id: uuid.UUID | None = None

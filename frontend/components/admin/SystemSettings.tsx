@@ -16,7 +16,7 @@ interface Branding {
 }
 
 type Tab = "workspaces" | "users" | "general" | "prompts" | "ai_engine";
-type GeneralSection = "branding" | "domains" | "whatsnew" | "suggested" | "email_verification" | "chat_retention" | "security" | "storage" | "smtp";
+type GeneralSection = "branding" | "domains" | "whatsnew" | "suggested" | "email_verification" | "chat_retention" | "security" | "storage" | "smtp" | "case_workspace";
 
 interface Props {
   // null = admin（全部可见）；Record = 普通用户权限表
@@ -70,6 +70,23 @@ export default function SystemSettings({ perms }: Props) {
   const [downloadTtlSec, setDownloadTtlSec] = useState<number>(3600);
   const [downloadTtlInput, setDownloadTtlInput] = useState<number>(3600);
   const [runtimeConfigMsg, setRuntimeConfigMsg] = useState<string | null>(null);
+  // Case 录入默认保存空间
+  const [caseWorkspaces, setCaseWorkspaces] = useState<{ id: string; name: string }[]>([]);
+  const [caseWsId, setCaseWsId] = useState<string>("");
+  const [caseWsMsg, setCaseWsMsg] = useState<string | null>(null);
+
+  const loadCaseWorkspace = useCallback(async () => {
+    try {
+      const [wsList, current] = await Promise.all([
+        api.get<{ id: string; name: string }[]>("/workspaces"),
+        api.get<{ workspace_id: string | null }>("/settings/case-default-workspace"),
+      ]);
+      setCaseWorkspaces(wsList.map((w) => ({ id: w.id, name: w.name })));
+      setCaseWsId(current.workspace_id ?? "");
+    } catch {
+      /* 非管理员读不到也没关系 */
+    }
+  }, []);
 
   const loadDomains = useCallback(async () => {
     try {
@@ -159,7 +176,8 @@ export default function SystemSettings({ perms }: Props) {
     loadRetention();
     loadRuntimeConfig();
     loadSmtpConfig();
-  }, [loadDomains, loadBranding, loadWnSchedule, loadSuggestedQuestions, loadEmailVerification, loadRetention, loadRuntimeConfig, loadSmtpConfig]);
+    loadCaseWorkspace();
+  }, [loadDomains, loadBranding, loadWnSchedule, loadSuggestedQuestions, loadEmailVerification, loadRetention, loadRuntimeConfig, loadSmtpConfig, loadCaseWorkspace]);
 
   async function addDomain(e: React.FormEvent) {
     e.preventDefault();
@@ -389,6 +407,7 @@ export default function SystemSettings({ perms }: Props) {
                 ["chat_retention", t("setting_chat_retention")],
                 ["security", t("setting_security")],
                 ["storage", t("setting_storage")],
+                ["case_workspace", t("setting_case_workspace")],
               ] as [GeneralSection, string][]
             ).map(([key, label]) => (
               <button
@@ -760,6 +779,44 @@ export default function SystemSettings({ perms }: Props) {
               </button>
             </form>
             {runtimeConfigMsg && activeSetting === "storage" && <p className="mt-2 text-xs text-green-600">{runtimeConfigMsg}</p>}
+          </section>
+          )}
+
+          {/* Case 录入默认保存空间 */}
+          {activeSetting === "case_workspace" && (
+          <section className="rounded border bg-white p-4">
+            <h2 className="mb-1 text-sm font-medium">{t("case_workspace_title")}</h2>
+            <p className="mb-3 text-xs text-gray-500">{t("case_workspace_desc")}</p>
+            <div className="flex items-center gap-3">
+              <select
+                value={caseWsId}
+                onChange={(e) => setCaseWsId(e.target.value)}
+                className="rounded border px-2 py-1.5 text-sm"
+              >
+                <option value="">{t("case_workspace_none")}</option>
+                {caseWorkspaces.map((w) => (
+                  <option key={w.id} value={w.id}>{w.name}</option>
+                ))}
+              </select>
+              <button
+                type="button"
+                disabled={!caseWsId}
+                onClick={async () => {
+                  setCaseWsMsg(null);
+                  setError(null);
+                  try {
+                    await api.put("/settings/case-default-workspace", { workspace_id: caseWsId });
+                    setCaseWsMsg(t("case_workspace_saved"));
+                  } catch (err) {
+                    setError(err instanceof ApiError ? err.message : t("save_failed"));
+                  }
+                }}
+                className="rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700 disabled:opacity-40"
+              >
+                {t("case_workspace_save")}
+              </button>
+            </div>
+            {caseWsMsg && <p className="mt-2 text-xs text-green-600">{caseWsMsg}</p>}
           </section>
           )}
 

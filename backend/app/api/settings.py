@@ -24,6 +24,7 @@ from app.services.settings_service import (
     WHATSNEW_FREQ_DAYS,
     EngineNotAvailableError,
     InvalidPromptError,
+    get_case_default_workspace_id,
     get_chat_engine_backend,
     get_chat_file_retention_days,
     get_download_url_ttl_sec,
@@ -51,6 +52,7 @@ from app.services.settings_service import (
     get_workspace_suggested_questions,
     list_prompt_history,
     rollback_prompt,
+    set_case_default_workspace_id,
     set_chat_engine_backend,
     set_chat_file_retention_days,
     set_download_url_ttl_sec,
@@ -871,3 +873,63 @@ async def update_smtp_config(
         meta={"smtp_host": body.smtp_host, "smtp_port": body.smtp_port},
     )
     return await _get_smtp_config_out(session)
+
+
+# ── Case 录入默认保存空间（管理员） ─────────────────────────────────────────
+
+
+class CaseWorkspaceOut(BaseModel):
+    workspace_id: str | None
+    workspace_name: str | None
+
+
+class CaseWorkspaceIn(BaseModel):
+    workspace_id: str
+
+
+@router.get("/case-default-workspace", response_model=CaseWorkspaceOut)
+async def get_case_default_workspace(
+    _admin: User = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+) -> CaseWorkspaceOut:
+    """返回 Case 录入的默认保存空间；未配置返回 null。"""
+    import uuid as _uuid
+
+    from app.models.auth import Workspace
+
+    ws_id = await get_case_default_workspace_id(session)
+    if not ws_id:
+        return CaseWorkspaceOut(workspace_id=None, workspace_name=None)
+    name: str | None = None
+    try:
+        ws = await session.get(Workspace, _uuid.UUID(ws_id))
+        name = ws.name if ws is not None else None
+    except (ValueError, TypeError):
+        name = None
+    return CaseWorkspaceOut(workspace_id=ws_id, workspace_name=name)
+
+
+@router.put("/case-default-workspace", response_model=CaseWorkspaceOut)
+async def update_case_default_workspace(
+    body: CaseWorkspaceIn,
+    admin: User = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+) -> CaseWorkspaceOut:
+    """管理员设置 Case 录入的默认保存空间；校验空间存在。"""
+    import uuid as _uuid
+
+    from app.models.auth import Workspace
+
+    try:
+        ws = await session.get(Workspace, _uuid.UUID(body.workspace_id))
+    except (ValueError, TypeError) as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "非法空间 ID") from exc
+    if ws is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "空间不存在")
+    await set_case_default_workspace_id(session, body.workspace_id)
+    logger.info("audit admin set_case_default_workspace admin=%s ws=%s", admin.id, body.workspace_id)
+    await record_event(
+        session, action="admin_set_case_default_workspace", user_id=admin.id,
+        meta={"workspace_id": body.workspace_id},
+    )
+    return CaseWorkspaceOut(workspace_id=body.workspace_id, workspace_name=ws.name)
