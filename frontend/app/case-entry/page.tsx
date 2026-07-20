@@ -15,7 +15,7 @@ interface CaseWorkspace {
 
 export default function CaseEntryPage() {
   const t = useTranslations("caseEntry");
-  const ready = useAuthGuard("documents");
+  const ready = useAuthGuard("cases");
   const editorRef = useRef<CaseEditorHandle>(null);
 
   const [title, setTitle] = useState("");

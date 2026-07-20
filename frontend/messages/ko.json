@@ -644,6 +644,7 @@
     "engine_timeout_save": "저장",
     "engine_timeout_saved": "엔진 타임아웃이 저장되었습니다",
     "module_chatplus": "채팅+",
+    "module_cases": "케이스 입력",
     "module_skills": "스킬"
   },
   "verifyEmail": {

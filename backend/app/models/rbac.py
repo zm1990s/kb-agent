@@ -13,6 +13,7 @@ from app.core.db import Base
 MODULES = (
     "chat",
     "chatplus",
+    "cases",
     "documents",
     "workspaces",
     "users",

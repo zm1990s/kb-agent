@@ -68,6 +68,7 @@ class PermissionSet(BaseModel):
     module: Literal[
         "chat",
         "chatplus",
+        "cases",
         "documents",
         "workspaces",
         "users",

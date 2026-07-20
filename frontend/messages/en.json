@@ -644,6 +644,7 @@
     "engine_timeout_save": "Save",
     "engine_timeout_saved": "Engine timeout saved",
     "module_chatplus": "Chat+",
+    "module_cases": "Case Entry",
     "module_skills": "Skills"
   },
   "verifyEmail": {

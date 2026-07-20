@@ -27,15 +27,15 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["cases"])
 
 
-async def _require_documents(session: AsyncSession, user: User) -> None:
-    """要求用户对 documents 模块有权限（≥read）；admin 绕过。"""
+async def _require_cases(session: AsyncSession, user: User) -> None:
+    """要求用户对 cases 模块有权限（≥read）；admin 绕过。"""
     if user.role == "admin":
         return
     from app.services.rbac_service import effective_permissions
 
     perms = await effective_permissions(session, user=user)
-    if perms.get("documents", "none") == "none":
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "无文档模块权限")
+    if perms.get("cases", "none") == "none":
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "无 Case 录入权限")
 
 
 @router.post("/cases", response_model=DocumentPublic, status_code=status.HTTP_201_CREATED)
@@ -45,7 +45,7 @@ async def create_case(
     session: AsyncSession = Depends(get_session),
 ) -> DocumentPublic:
     """把 Case 富文本导出为 docx/pdf，存进默认空间（status=ready）。"""
-    await _require_documents(session, current_user)
+    await _require_cases(session, current_user)
 
     # 默认空间：管理员在系统设置配置；未配置则 Case 录入不可用
     ws_id_str = await get_case_default_workspace_id(session)

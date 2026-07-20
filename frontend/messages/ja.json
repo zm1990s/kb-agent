@@ -644,6 +644,7 @@
     "engine_timeout_save": "保存",
     "engine_timeout_saved": "エンジンタイムアウトを保存しました",
     "module_chatplus": "チャット+",
+    "module_cases": "ケース入力",
     "module_skills": "スキル"
   },
   "verifyEmail": {

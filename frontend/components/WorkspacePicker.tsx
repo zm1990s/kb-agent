@@ -28,9 +28,6 @@ export default function WorkspacePicker({ value, onChange, onWorkspaceChange }: 
           const valid = ws.some((w) => w.id === value);
           if (!valid) onChange(null);
         }
-        // 通知父组件当前选中的空间对象（仅有明确选择时）
-        const current = value ? ws.find((w) => w.id === value) : undefined;
-        if (current) onWorkspaceChange?.(current);
       })
       .finally(() => setLoading(false));
   }, [onChange, value]); // eslint-disable-line react-hooks/exhaustive-deps

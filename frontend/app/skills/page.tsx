@@ -373,7 +373,7 @@ export default function SkillsPage() {
                     </span>
                   ))}
                 </div>
-                <p className="mt-2 truncate text-xs text-gray-400">
+                <p className="mt-4 truncate text-xs text-gray-400">
                   {s.created_by_email ?? t("unknown")} · {s.updated_at.slice(0, 10)}
                 </p>
               </button>

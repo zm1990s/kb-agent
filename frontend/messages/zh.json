@@ -644,6 +644,7 @@
     "engine_timeout_save": "保存",
     "engine_timeout_saved": "引擎超时配置已保存",
     "module_chatplus": "聊天+",
+    "module_cases": "Case 录入",
     "module_skills": "Skill 库"
   },
   "verifyEmail": {

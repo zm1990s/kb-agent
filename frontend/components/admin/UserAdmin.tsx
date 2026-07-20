@@ -33,6 +33,7 @@ const MODULE_KEYS = [
   "whatsnew",
   "chat",
   "chatplus",
+  "cases",
   "skills",
   "documents",
   "workspaces",

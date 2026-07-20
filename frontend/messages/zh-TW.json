@@ -644,6 +644,7 @@
     "engine_timeout_save": "儲存",
     "engine_timeout_saved": "引擎逾時設定已儲存",
     "module_chatplus": "對話+",
+    "module_cases": "Case 錄入",
     "module_skills": "Skill 庫"
   },
   "verifyEmail": {
