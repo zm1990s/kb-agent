@@ -57,6 +57,9 @@ export default function DocumentsPage() {
   // 预览
   const [previewDoc, setPreviewDoc] = useState<DocumentPublic | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  // 解析类文档（PPT/Word/Excel 等）预览返回的是提取出的 Markdown 文本，
+  // 读入后经 Markdown 组件渲染；原生可预览类型（PDF/图片/纯文本/CSV）走 previewUrl。
+  const [previewMarkdown, setPreviewMarkdown] = useState<string | null>(null);
   // 分类名映射（展示用）
   const [categories, setCategories] = useState<Category[]>([]);
   // 搜索关键词
@@ -370,6 +373,18 @@ export default function DocumentsPage() {
     }
   }
 
+  // 原生可预览类型（后端直接返回原文件）：PDF / 图片 / 纯文本 / CSV。
+  // 其余类型（PPT/Word/Excel 等）后端返回提取出的 Markdown，需渲染而非当原文展示。
+  function isNativePreview(mime: string | null | undefined): boolean {
+    if (!mime) return false;
+    return (
+      mime.startsWith("image/") ||
+      mime === "application/pdf" ||
+      mime === "text/plain" ||
+      mime === "text/csv"
+    );
+  }
+
   async function previewDoc_(doc: DocumentPublic) {
     try {
       const token = getToken();
@@ -377,10 +392,19 @@ export default function DocumentsPage() {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       if (!res.ok) throw new Error();
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      setPreviewDoc(doc);
-      setPreviewUrl(url);
+      if (isNativePreview(doc.mime_type)) {
+        // 原文件直接预览（iframe/img 指向 blob URL）
+        const blob = await res.blob();
+        setPreviewDoc(doc);
+        setPreviewUrl(URL.createObjectURL(blob));
+        setPreviewMarkdown(null);
+      } else {
+        // 解析类文档：后端返回提取出的 Markdown 文本，读入后渲染
+        const text = await res.text();
+        setPreviewDoc(doc);
+        setPreviewUrl(null);
+        setPreviewMarkdown(text);
+      }
     } catch {
       setError(t("preview_failed"));
     }
@@ -390,6 +414,20 @@ export default function DocumentsPage() {
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setPreviewDoc(null);
     setPreviewUrl(null);
+    setPreviewMarkdown(null);
+  }
+
+  // 打开文件详情：先用列表项即时展示（摘要/标签），再拉单文档补全 content_text。
+  // 列表接口出于安全不返回 content_text（避免批量泄露全文），单文档接口才含。
+  async function openDetail(doc: DocumentPublic) {
+    setDetailDoc(doc);
+    try {
+      const full = await api.get<DocumentPublic>(`/documents/${doc.id}`);
+      // 仅当仍停留在同一文档详情时才更新，避免快速切换时错位
+      setDetailDoc((cur) => (cur && cur.id === full.id ? full : cur));
+    } catch {
+      /* 拉取失败则保留列表项数据，content_text 显示为空 */
+    }
   }
 
   async function download(doc: DocumentPublic) {
@@ -802,7 +840,7 @@ export default function DocumentsPage() {
                         {t("action_download")}
                       </button>
                       <button
-                        onClick={() => setDetailDoc(d)}
+                        onClick={() => openDetail(d)}
                         className="mr-1 rounded bg-gray-100 px-2 py-1 text-xs text-gray-700 hover:bg-gray-200"
                       >
                         {t("action_detail")}
@@ -916,7 +954,7 @@ export default function DocumentsPage() {
         />
       )}
 
-      {previewDoc && previewUrl && (
+      {previewDoc && (previewUrl || previewMarkdown !== null) && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
           <div className="flex w-full max-w-4xl flex-col rounded-lg bg-white shadow-2xl" style={{ height: "85vh" }}>
             <div className="flex items-center justify-between border-b px-4 py-3">
@@ -939,21 +977,26 @@ export default function DocumentsPage() {
               </div>
             </div>
             <div className="flex-1 overflow-hidden">
-              {previewDoc.mime_type?.startsWith("image/") ? (
+              {previewMarkdown !== null ? (
+                // 解析类文档（PPT/Word/Excel 等）：渲染提取出的 Markdown
+                <div className="h-full overflow-y-auto px-6 py-4">
+                  <Markdown content={previewMarkdown} />
+                </div>
+              ) : previewDoc.mime_type?.startsWith("image/") ? (
                 <div className="flex h-full items-center justify-center overflow-auto p-4">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={previewUrl} alt={previewDoc.title} className="max-h-full max-w-full object-contain" />
+                  <img src={previewUrl!} alt={previewDoc.title} className="max-h-full max-w-full object-contain" />
                 </div>
               ) : previewDoc.mime_type === "application/pdf" ? (
                 <iframe
-                  src={previewUrl}
+                  src={previewUrl!}
                   className="h-full w-full border-0"
                   title={previewDoc.title}
                   sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
                 />
               ) : (
                 <iframe
-                  src={previewUrl}
+                  src={previewUrl!}
                   className="h-full w-full border-0"
                   title={previewDoc.title}
                   sandbox="allow-same-origin"
