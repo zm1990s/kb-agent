@@ -808,7 +808,7 @@
     "atTime": "時",
     "weekDays": { "0": "月曜日", "1": "火曜日", "2": "水曜日", "3": "木曜日", "4": "金曜日", "5": "土曜日", "6": "日曜日" },
     "utcNote": "（UTC）",
-    "initialMessage": "初期メッセージ",
+    "initialMessage": "ユーザープロンプト",
     "initialMessagePlaceholder": "Agentへの最初のメッセージ…",
     "systemPrompt": "システムプロンプト",
     "systemPromptPlaceholder": "省略可のシステムプロンプト…",

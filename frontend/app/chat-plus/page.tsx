@@ -628,6 +628,7 @@ export default function ChatPlusPage() {
         <ScheduledTaskPanel
           open={scheduledPanelOpen}
           onClose={() => setScheduledPanelOpen(false)}
+          onRun={loadConversations}
         />
 
         <main className="flex flex-1 flex-col overflow-hidden">
@@ -797,7 +798,7 @@ export default function ChatPlusPage() {
                 type="button"
                 onClick={() => setInteractive((v) => !v)}
                 title={t("interactiveModeTitle")}
-                className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-sm transition-colors ${
+                className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs transition-colors ${
                   interactive
                     ? "border-purple-400 bg-purple-50 text-purple-700"
                     : "border-gray-300 bg-white text-gray-600 hover:bg-gray-50"

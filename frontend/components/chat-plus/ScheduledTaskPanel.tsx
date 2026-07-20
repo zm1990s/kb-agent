@@ -33,6 +33,7 @@ interface ScheduledTask {
 interface Props {
   open: boolean;
   onClose: () => void;
+  onRun?: () => void;
 }
 
 const UNITS = ["minutes", "hours", "days"] as const;
@@ -87,7 +88,7 @@ function TimeSelect({
   );
 }
 
-export default function ScheduledTaskPanel({ open, onClose }: Props) {
+export default function ScheduledTaskPanel({ open, onClose, onRun }: Props) {
   const t = useTranslations("scheduledTask");
   const locale = useLocale();
   const { showConfirm } = useDialog();
@@ -203,6 +204,7 @@ export default function ScheduledTaskPanel({ open, onClose }: Props) {
     try {
       const updated = await api.post<ScheduledTask>(`/scheduled-tasks/${task.id}/run`, {});
       setTasks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+      onRun?.();
     } catch { /* 静默 */ }
     finally { setRunningId(null); }
   }
@@ -477,10 +479,10 @@ export default function ScheduledTaskPanel({ open, onClose }: Props) {
                       <button
                         onClick={() => toggleEnabled(task)}
                         title={t("enabled")}
-                        className={`relative h-5 w-9 rounded-full transition-colors ${task.enabled ? "bg-blue-500" : "bg-gray-300"}`}
+                        className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${task.enabled ? "bg-blue-500" : "bg-gray-300"}`}
                       >
                         <span
-                          className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${task.enabled ? "translate-x-4" : "translate-x-0.5"}`}
+                          className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${task.enabled ? "translate-x-4" : "translate-x-0.5"}`}
                         />
                       </button>
                       {/* 立即运行 */}

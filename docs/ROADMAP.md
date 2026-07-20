@@ -25,6 +25,8 @@
 | F24 | 会话标题实时推送 | `generate_conversation_title` 改为返回生成标题；写入 DB 后推 `title` SSE 事件；前端收到后直接更新侧边栏，消除竞态；聊天侧边栏折叠改为零宽度悬浮按钮 | ✅ 已交付 |
 | F25 | Skill 库（v2.0） | 平台级/空间级 Skill（SKILL.md 格式）；可见性控制（public / 空间私有）；用户组权限；Bundle 打包（zip，≤50 MB）；操作审计日志；内置图标搜索 Skill；RBAC 独立 skills 模块；migrations 025-026-030 | ✅ 已交付 |
 | F26 | 聊天+（v2.0） | 独立 `/chat-plus` 页面；Skill 作为系统提示；文件上传/下载；引用空间文档原文；后台生成任务（与 SSE 解耦）；**交互模式**（ask-user 协议 + 可点击选项）；会话间持久化工作目录；RBAC 独立 chatplus 模块；migrations 027-028-029 | ✅ 已交付 |
+| F27 | 会话导出 | 对话（普通 + 聊天+）导出为 Markdown / Word / PDF；PDF 使用 `reportlab` BaseDocTemplate 渲染（封面标题、代码块 indigo 竖线、引用块灰竖线、页脚页码）；Word 使用 `python-docx`；前端 ExportConversationModal 支持消息范围与格式选择；`POST /conversations/{id}/export` 端点 | ✅ 已交付 |
+| F28 | 定时任务（Scheduled Tasks） | 聊天+ 定时任务面板：调度类型 interval/daily/weekly/monthly，每次执行自动创建 chatplus 会话，工作目录 `chatplus/conv_xxx`，传入 `cwd=workdir`，收集输出文件；migrations 040 新增 `week_day`/`month_day` 列 | ✅ 已交付 |
 | M4 | Skill 代码框架 | SkillBase 抽象、registry、invoke、审批契约（可编程 skill 插拔，与 F25 用户侧 Skill库 不同） | 预留（未实现） |
 | M5 | SCM 示范 skill | PANW 配置生成，pending_approval→approve→下发 | 预留（未实现） |
 
@@ -165,6 +167,7 @@
 - **Phase 6c**：功能完善 F14–F17（Next.js 16 升级、文档重命名、上传 200MB 限制、按任务模型配置、5 语言 i18n）✅
 - **Phase 6d**：体验与权限 F18–F24（找回密码、任务 Header、thinking 流式、AI 引擎 tab、回收站、空间写权限、title 实时推送）✅
 - **Phase 6e**：v2.0 新模块 F25–F26（Skill 库、聊天+；RBAC 扩展至 9 模块；migrations 025–030）✅
+- **Phase 6f**：导出与定时任务 F27–F28（会话导出 PDF/Word/Markdown、聊天+ 定时任务 interval/daily/weekly/monthly；migration 040）✅
 - **Phase 7（未来）**：M4 Skill 代码框架 → M5 SCM skill
 
 每完成一个 Unit，建议 `git tag M<N>-U<N>-done`，方便回退。

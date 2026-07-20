@@ -52,7 +52,7 @@ export default function OutputFileChip({
   }
 
   return (
-    <div className="mt-2 flex flex-wrap gap-1.5">
+    <div className="flex flex-wrap gap-1.5">
       {files.map((f) => (
         // group：文件名 chip 常显；操作按钮在大屏悬浮时浮现、小屏常显（触屏可点）
         <div

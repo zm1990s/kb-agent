@@ -808,7 +808,7 @@
     "atTime": "點",
     "weekDays": { "0": "週一", "1": "週二", "2": "週三", "3": "週四", "4": "週五", "5": "週六", "6": "週日" },
     "utcNote": "（UTC 時間）",
-    "initialMessage": "初始訊息",
+    "initialMessage": "使用者提示詞",
     "initialMessagePlaceholder": "傳送給 Agent 的第一條訊息…",
     "systemPrompt": "系統提示詞",
     "systemPromptPlaceholder": "可選，注入的系統提示詞…",

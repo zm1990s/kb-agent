@@ -81,7 +81,9 @@ async def run_task(session: AsyncSession, task: ScheduledTask) -> None:
     from app.models.auth import User
     from app.models.chat import Conversation, Message
     from app.models.skill import Skill
+    from app.services.answer_service_plus import _list_workdir_files
     from app.services.skill_service import check_skill_access
+    from app.storage.base import get_storage
 
     # 加载用户
     user = await session.get(User, task.user_id)
@@ -133,16 +135,35 @@ async def run_task(session: AsyncSession, task: ScheduledTask) -> None:
     ))
     await session.flush()
 
-    # 调用 engine（同步等待，后台静默）
+    # 准备会话工作目录（与 Chat+ 相同路径规则）
+    storage = get_storage()
+    dir_prefix = f"chatplus/conv_{conv.id}"
+    workdir = await storage.resolve_dir(dir_prefix)
+    pre_files = _list_workdir_files(workdir)
+
+    # 调用 engine（带 cwd，触发 --dangerously-skip-permissions）
+    answer = "(执行失败，请查看日志)"
     try:
         engine = get_engine("claude_cli", audit_user=user.email)
-        result = await engine.complete(task.initial_message, system=skill_system)
+        result = await engine.complete(task.initial_message, system=skill_system,
+                                       cwd=workdir)
         answer = result.text.strip() if result.text else "(无输出)"
     except Exception:
         logger.exception("scheduled_task engine error task=%s conv=%s", task.id, conv.id)
-        answer = "(执行失败，请查看日志)"
 
-    # 保存助手回复
+    # 收集本次新增的输出文件
+    post_files = _list_workdir_files(workdir)
+    new_files = sorted(post_files - pre_files)
+    output_files: list[dict] = []
+    for relpath in new_files:
+        output_files.append({
+            "filename": relpath.rsplit("/", 1)[-1],
+            "relpath": relpath,
+            "storage_key": f"{dir_prefix}/{relpath}",
+            "conversation_id": str(conv.id),
+        })
+
+    # 保存助手回复（含输出文件）
     session.add(Message(
         id=uuid.uuid4(),
         conversation_id=conv.id,
@@ -150,7 +171,7 @@ async def run_task(session: AsyncSession, task: ScheduledTask) -> None:
         content=answer,
         sources=[],
         attachments=[],
-        output_files=[],
+        output_files=output_files,
     ))
 
     # 更新任务执行时间
@@ -158,7 +179,8 @@ async def run_task(session: AsyncSession, task: ScheduledTask) -> None:
     task.next_run_at = compute_next_run(task)
     session.add(task)
     await session.commit()
-    logger.info("scheduled_task done task=%s conv=%s", task.id, conv.id)
+    logger.info("scheduled_task done task=%s conv=%s files=%d",
+                task.id, conv.id, len(output_files))
 
 
 # ── CRUD ──────────────────────────────────────────────────────────────────────

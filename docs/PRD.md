@@ -65,6 +65,8 @@
 | F15 | 前端 | 国际化（i18n） | 5 语言支持（简体中文/繁体中文/English/日本語/한국어）；客户端切换无需刷新；localStorage 持久化；首次访问按浏览器语言自动匹配；NavBar 语言切换器 | 切换语言后全部 UI 文字即时更新；刷新保持语言选择；所有 window.confirm/prompt 替换为自定义 Modal | ✅ |
 | F25 | Skill 库 | Skill 创建与管理 | 平台级/空间级 Skill（SKILL.md 格式）；可见性控制（public / 空间私有）；用户组权限；Bundle 打包（zip，≤50 MB，≤500 文件）；操作审计日志；内置图标搜索 Skill | admin 可创建/编辑/删除；权限控制生效；Bundle 可上传下载；审计可查 | ✅ |
 | F26 | 聊天+ | 工作台与交互模式 | 独立 `/chat-plus` 页面；选择 Skill 作为系统提示；上传附件；引用空间文档原文（指定 doc_ids 或全量）；下载成果文件；后台生成任务（与 SSE 解耦）；**交互模式**（模型通过 `ask-user` 协议向用户澄清，前端渲染可点击选项）；会话间持久化工作目录；RBAC 独立 chatplus 模块 | 选 Skill 后 Skill 内容注入系统提示；交互选项可点击作答；后台任务可轮询状态；成果文件可下载 | ✅ |
+| F27 | 对话 | 会话导出 | 对话（普通 + 聊天+）可导出为 Markdown / Word (.docx) / PDF 三种格式；PDF 使用 `reportlab` BaseDocTemplate 渲染，含封面标题、蓝色分隔线、代码块 indigo 左竖线+浅色背景、引用块灰色左竖线、灰色页码页脚；Word 使用 `python-docx` 生成；导出端点 `POST /conversations/{id}/export`，权限校验 ws 成员；前端 ExportConversationModal 支持按消息范围选择、格式选择 | Markdown/Word/PDF 三格式均可下载；PDF 含页码；格式与消息内容完整对应 | ✅ |
+| F28 | 聊天+ | 定时任务 | 聊天+ 支持创建定时任务（Scheduled Tasks），自动定期向 Agent 发送配置好的「用户提示词」；调度类型：每 N 分钟（interval）/ 每天（daily）/ 每周（weekly，选周几）/ 每月（monthly，选日期）；支持选择时分（UTC）；每次执行自动创建独立 chatplus 会话，创建 `chatplus/conv_xxx` 持久工作目录，传入 `cwd=workdir` 触发 `--dangerously-skip-permissions`，收集输出文件；支持立即运行按钮；结果保存为普通 chatplus 会话可查看；RBAC 与 chatplus 模块绑定；migrations 040 | 定时触发按调度类型准时执行；每次执行创建新会话；输出文件可在会话中下载 | ✅ |
 
 ## 3. 明确的 Out of Scope（本次不做）
 - 向量检索 / pgvector（先不上；对话已改为「全空间结构化索引喂 Claude」智能问答，非向量召回）

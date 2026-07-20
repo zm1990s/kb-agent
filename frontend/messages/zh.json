@@ -809,7 +809,7 @@
     "atTime": "点",
     "weekDays": { "0": "周一", "1": "周二", "2": "周三", "3": "周四", "4": "周五", "5": "周六", "6": "周日" },
     "utcNote": "（UTC 时间）",
-    "initialMessage": "初始消息",
+    "initialMessage": "用户提示词",
     "initialMessagePlaceholder": "发给 Agent 的第一条消息…",
     "systemPrompt": "系统提示词",
     "systemPromptPlaceholder": "可选，注入的系统提示词…",

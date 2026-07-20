@@ -101,12 +101,12 @@ export default function MessageBubble({ role, content, sources, errorKey, onDown
             </div>
           </div>
         ) : (
-          <div className="relative pb-6">
+          <div className={`relative ${isUser ? "pb-6" : ""}`}>
             <div
-              className={`rounded-2xl px-4 py-3 text-sm leading-relaxed ${
+              className={`rounded-2xl py-3 pl-4 text-sm leading-relaxed ${
                 isUser
-                  ? "rounded-tr-sm bg-blue-600 text-white whitespace-pre-wrap"
-                  : "rounded-tl-sm bg-white text-gray-700 border border-gray-200 shadow-sm"
+                  ? "rounded-tr-sm bg-blue-600 pr-4 text-white whitespace-pre-wrap"
+                  : "rounded-tl-sm border border-gray-200 bg-white pr-10 text-gray-700 shadow-sm"
               }`}
             >
               {isUser
@@ -117,7 +117,11 @@ export default function MessageBubble({ role, content, sources, errorKey, onDown
               }
             </div>
             {/* 右下角操作按钮 */}
-            <div className="absolute bottom-0 right-0 flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+            <div
+              className={`absolute flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 ${
+                isUser ? "bottom-0 right-0" : "bottom-1 right-1"
+              }`}
+            >
               {isUser && onEdit && (
                 <button
                   onClick={startEdit}
