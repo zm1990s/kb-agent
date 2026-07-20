@@ -12,7 +12,7 @@
 - 文件存储: **MVP 用本地文件系统**（保持架构简单）；通过 `StorageProtocol` 抽象封装，未来可换云对象存储而不动业务层
 - 正文/归类: **交给 Claude CLI 直接读原文**（Word/PDF/图片/Excel/PPT 等常见格式 CLI 原生支持），归类时一趟调用同时产出 {分类, 摘要, 标签, 可搜正文 content_text}，MVP 不自己写解析库
 - Agent 引擎: **封装 Claude CLI 子进程**，通过 `EngineProtocol` 抽象层调用；预留 OpenClaw / Codex 等未来后端
-- 认证: **自建用户表 + 邮箱密码**，注册时按 **域名后缀白名单** 控制准入
+- 认证: **自建用户表 + 邮箱密码**，注册时按 **域名后缀白名单** 控制准入；access token（JWT，默认 60 分钟）+ sliding refresh token（httpOnly cookie，30 天，rotate on use）实现无感续期
 - 异步处理: 归类走 **后台任务**（含处理任务表 + 详细日志 + 失败可重试）
 - 前端: **Next.js（App Router）+ TypeScript + Tailwind**。**只对用户暴露一个端口**——Next.js 作统一入口，经 rewrites 把 `/api/*` 反代到后端 FastAPI，用户不直接访问后端端口
 - 部署: **云上部署**（本地开发用 Docker Compose；对象存储 MVP 暂用本地路径）
@@ -40,7 +40,7 @@ frontend/         # Next.js（App Router）+ TS + Tailwind，用户唯一入口
 infra/
   postgres/
     init.sql          # CREATE EXTENSION
-    migrations/       # 001_m1_auth … 016_constraints，按序应用
+    migrations/       # 001_m1_auth … 037_refresh_tokens，按序应用（backend 启动时 migrate.py 自动幂等执行）
 scripts/          # dev.sh / test.sh(独立库 kbagent_test) / lint.sh / e2e.sh
 docs/                 # PRD / DESIGN / ROADMAP / WORKFLOW / SECURITY
 prompts/              # 分步系统提示词
@@ -75,7 +75,7 @@ prompts/              # 分步系统提示词
 - 空间访问 = 个人成员 ∪ 所属组授权（`is_member`/`list_my_workspaces` 两者都要查）。
 - 自动入组规则：注册时 `sync_user_groups`；改规则后靠 `recompute-memberships` 全量重算。
 - 引擎工具：**已按决策放开 Claude 全部工具**（含 Bash，供 pdftotext 等）；容器以非 root 运行；提示词注入由外部 Guardrails 兜底。不要再收窄成 allowedTools 而破坏大文件抽取。
-- 引擎 env / hook（防密钥外泄，见 SECURITY #2/#10）：claude 子进程**必须**经 `_build_cli_env()` 白名单 env 启动（前缀透传 `ANTHROPIC_*`/`AWS_*`/`CLAUDE_*` + 系统变量，剥离 `JWT_SECRET`/`DATABASE_URL`/`SMTP_PASSWORD`/`ADMIN_PASSWORD`），**禁止**改回继承全量 `os.environ`；放开工具时**必须**经 `--settings` 注入 `backend/claude_hooks/`（PreToolUse 拦截 env 读取命令 + 写审计），**禁止**去掉 hook。新增 CLI 认证变量若不在 `ANTHROPIC_/AWS_/CLAUDE_` 前缀内，需同步加入 `_CLI_ENV_EXACT`。注：CLI 2.1.197 的 PostToolUse `updatedToolOutput` 实测无效，未做输出脱敏层；如需彻底隔离凭据走网关虚拟 key/出口代理。
+- 引擎 env / hook（防密钥外泄，见 SECURITY #2/#10）：claude 子进程**必须**经 `_build_cli_env()` 白名单 env 启动（前缀透传 `ANTHROPIC_*`/`AWS_*`/`CLAUDE_*` + 系统变量，剥离 `JWT_SECRET`/`DATABASE_URL`/`SMTP_PASSWORD`/`ADMIN_PASSWORD`），**禁止**改回继承全量 `os.environ`；放开工具时**必须**经 `--settings` 注入 `backend/claude_hooks/`，**禁止**去掉 hook。hook 分两层：PreToolUse（`pre_tool_use.py`）拦截 Bash/Write/Edit/MultiEdit 中的 env 读取模式（含内联 `-c` 和脚本文件内容静态分析，覆盖 Go/PHP/PowerShell 等多语言及多厂商凭据前缀）；PostToolUse（`post_tool_use.py`）对已写入文件做落盘脱敏（KEY=[REDACTED]）并审计 Bash 输出中的凭据值模式。新增 CLI 认证变量若不在 `ANTHROPIC_/AWS_/CLAUDE_` 前缀内，需同步加入 `_CLI_ENV_EXACT`。注：CLI 2.1.197 的 PostToolUse `updatedToolOutput` 实测无效，stdout 脱敏依赖落盘 hook；如需彻底隔离凭据走网关虚拟 key/出口代理。
 - 引擎超时：使用**闲置超时**（`ENGINE_IDLE_TIMEOUT_SEC`，默认 300s）——连续无输出时才计时，每收到输出块重置；已废弃固定总时长 `ENGINE_TIMEOUT_SEC`。
 - 提示词管理：4 个运行时可配置提示词（`answer_fetch_prompt / answer_prompt / classify_prompt / title_prompt`），DB 覆盖优先于代码默认。**修改代码默认值后，若 DB 有旧记录则不生效**，需 `DELETE FROM app_settings WHERE key='<key>'` 再重启。
 - 系统日志：`logs/kb-agent.log`（应用）+ `logs/access.log`（uvicorn HTTP），均 RotatingFileHandler（10MB×10）。
