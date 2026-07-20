@@ -19,7 +19,7 @@ export default function CaseEntryPage() {
   const editorRef = useRef<CaseEditorHandle>(null);
 
   const [title, setTitle] = useState("");
-  const [format, setFormat] = useState<"docx" | "pdf">("docx");
+  const format = "docx";
   const [defaultWs, setDefaultWs] = useState<CaseWorkspace | null>(null);
   const [wsLoaded, setWsLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -87,14 +87,6 @@ export default function CaseEntryPage() {
             placeholder={t("titlePlaceholder")}
             className="flex-1 min-w-[200px] rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-500"
           />
-          <select
-            value={format}
-            onChange={(e) => setFormat(e.target.value as "docx" | "pdf")}
-            className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
-          >
-            <option value="docx">{t("formatDocx")}</option>
-            <option value="pdf">{t("formatPdf")}</option>
-          </select>
           <button
             type="button"
             onClick={save}
