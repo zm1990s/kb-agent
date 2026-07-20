@@ -2,6 +2,7 @@
 
 import uuid
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -64,5 +65,15 @@ class ConversationUpdate(BaseModel):
 class SaveFileToLibrary(BaseModel):
     """把聊天+ 会话工作目录里的成果文件保存进文档库。"""
 
+    workspace_id: uuid.UUID
+    folder_id: uuid.UUID | None = None
+
+
+class ConversationExportRequest(BaseModel):
+    format: Literal["docx", "md"]
+    message_ids: list[uuid.UUID] | None = None  # None = 全部消息
+
+
+class ConversationExportToLibraryRequest(ConversationExportRequest):
     workspace_id: uuid.UUID
     folder_id: uuid.UUID | None = None

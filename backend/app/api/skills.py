@@ -101,7 +101,9 @@ async def create_skill(
         tags=body.tags,
         is_public=body.is_public,
     )
-    return SkillPublic.model_validate(skill)
+    pub = SkillPublic.model_validate(skill)
+    pub.can_edit = True
+    return pub
 
 
 @router.post("/upload", response_model=SkillPublic, status_code=status.HTTP_201_CREATED)
@@ -129,7 +131,9 @@ async def upload_skill(
         # 多文件包：原样保留整包，供调用时解包给 Agent
         bundle_data=data if parsed.get("has_bundle") else None,
     )
-    return SkillPublic.model_validate(skill)
+    pub = SkillPublic.model_validate(skill)
+    pub.can_edit = True
+    return pub
 
 
 _SKILL_FILE_SUFFIXES = (".md", ".zip", ".skill")
@@ -247,7 +251,9 @@ async def create_skill_from_conversation_file(
         # 多文件包：原样保留整包，供调用时解包给 Agent
         bundle_data=data if parsed.get("has_bundle") else None,
     )
-    return SkillPublic.model_validate(skill)
+    pub = SkillPublic.model_validate(skill)
+    pub.can_edit = True
+    return pub
 
 
 @router.get("/{skill_id}", response_model=SkillPublic)
@@ -304,7 +310,9 @@ async def update_skill(
         category=body.category,
         tags=body.tags,
     )
-    return SkillPublic.model_validate(skill)
+    pub = SkillPublic.model_validate(skill)
+    pub.can_edit = True
+    return pub
 
 
 @router.delete("/{skill_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -326,7 +334,9 @@ async def set_visibility(
     skill = await skill_service.set_skill_visibility(
         session, skill_id=skill_id, user=current_user, is_public=body.is_public
     )
-    return SkillPublic.model_validate(skill)
+    pub = SkillPublic.model_validate(skill)
+    pub.can_edit = True
+    return pub
 
 
 @router.post("/{skill_id}/permissions", response_model=SkillGroupPermissionPublic)
