@@ -125,6 +125,7 @@
     "edit_resend": "Edit and resend",
     "cancel": "Cancel",
     "resend": "Resend",
+    "copy": "Copy",
     "download_original": "Download source",
     "engine_unavailable": "Sorry, the AI engine is temporarily unavailable. Please try again later.",
     "format_error": "Sorry, there was a formatting issue with the response. Please try asking again.",

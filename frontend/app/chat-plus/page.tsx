@@ -576,6 +576,24 @@ export default function ChatPlusPage() {
     }
   }
 
+  async function handlePaste(e: React.ClipboardEvent<HTMLTextAreaElement>) {
+    const files = Array.from(e.clipboardData.files);
+    if (files.length === 0) return;
+    e.preventDefault();
+    const results: AttachedFile[] = [];
+    for (const file of files) {
+      try {
+        const form = new FormData();
+        form.append("file", file);
+        const r = await api.upload<AttachedFile>("/chat/plus/upload", form);
+        results.push(r);
+      } catch {
+        // 单文件失败不中断其余
+      }
+    }
+    if (results.length > 0) setAttachedFiles((prev) => [...prev, ...results]);
+  }
+
   return (
     <div className="flex h-screen flex-col bg-gray-50">
       <NavBar />
@@ -770,6 +788,7 @@ export default function ChatPlusPage() {
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={handleKeyDown}
+                  onPaste={handlePaste}
                   placeholder={t("inputPlaceholder")}
                   disabled={busy}
                   rows={1}

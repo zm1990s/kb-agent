@@ -32,7 +32,7 @@ type TaskHeadersConfig = Record<"classify" | "title" | "chat" | "whatsnew", Reco
 
 const TASK_KEYS = ["classify", "title", "chat", "whatsnew"] as const;
 
-type AISec = "agent" | "chat_engine" | "task_headers" | "engine_timeout";
+type AISec = "agent" | "chat_engine" | "task_headers";
 
 export default function AIEngineSettings() {
   const t = useTranslations("settings");
@@ -226,7 +226,6 @@ export default function AIEngineSettings() {
     ["agent", ta("ai_section_agent")],
     ["chat_engine", ta("ai_section_chat_engine")],
     ["task_headers", ta("ai_section_task_headers")],
-    ["engine_timeout", ta("ai_section_engine_timeout")],
   ];
 
   return (
@@ -316,6 +315,32 @@ export default function AIEngineSettings() {
           )}
           {taskModelMsg && <p className="mt-2 text-xs text-green-600">{taskModelMsg}</p>}
         </div>
+
+        <hr className="my-4 border-gray-100" />
+
+        {/* 引擎空闲超时 */}
+        <h2 className="mb-1 text-sm font-medium">{ta("engine_timeout_title")}</h2>
+        <p className="mb-3 text-xs text-gray-400">{ta("engine_timeout_desc", { current: engineIdleTimeout })}</p>
+        <form onSubmit={saveEngineTimeout} className="flex flex-wrap items-end gap-3">
+          <div>
+            <label className="mb-1 block text-xs text-gray-500">{ta("engine_timeout_label")}</label>
+            <input
+              type="number"
+              min={30}
+              max={3600}
+              value={engineIdleTimeoutInput}
+              onChange={(e) => setEngineIdleTimeoutInput(Number(e.target.value))}
+              className="w-28 rounded border px-3 py-2 text-sm"
+            />
+          </div>
+          <button
+            type="submit"
+            className="rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700"
+          >
+            {ta("engine_timeout_save")}
+          </button>
+        </form>
+        {engineTimeoutMsg && <p className="mt-2 text-xs text-green-600">{engineTimeoutMsg}</p>}
       </section>}
 
       {/* 对话引擎 */}
@@ -436,32 +461,6 @@ export default function AIEngineSettings() {
           ))}
         </div>
         {taskHeadersMsg && <p className="mt-3 text-xs text-green-600">{taskHeadersMsg}</p>}
-      </section>}
-
-      {/* 引擎空闲超时 */}
-      {activeSec === "engine_timeout" && <section className="rounded border bg-white p-4">
-        <h2 className="mb-1 text-sm font-medium">{ta("engine_timeout_title")}</h2>
-        <p className="mb-3 text-xs text-gray-400">{ta("engine_timeout_desc", { current: engineIdleTimeout })}</p>
-        <form onSubmit={saveEngineTimeout} className="flex flex-wrap items-end gap-3">
-          <div>
-            <label className="mb-1 block text-xs text-gray-500">{ta("engine_timeout_label")}</label>
-            <input
-              type="number"
-              min={30}
-              max={3600}
-              value={engineIdleTimeoutInput}
-              onChange={(e) => setEngineIdleTimeoutInput(Number(e.target.value))}
-              className="w-28 rounded border px-3 py-2 text-sm"
-            />
-          </div>
-          <button
-            type="submit"
-            className="rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700"
-          >
-            {ta("engine_timeout_save")}
-          </button>
-        </form>
-        {engineTimeoutMsg && <p className="mt-2 text-xs text-green-600">{engineTimeoutMsg}</p>}
       </section>}
 
       {error && <p className="text-sm text-red-600">{error}</p>}
