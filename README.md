@@ -7,7 +7,9 @@
 [![Tech Stack](https://img.shields.io/badge/Stack-Next.js%2016%20%7C%20FastAPI%20%7C%20PostgreSQL%2016-3b82f6)](#)
 [![License](https://img.shields.io/badge/License-MIT-10b981)](#)
 
----
+<h2 align="center"><a href="README.md">中文</a> · <a href="README.en.md">English</a></h2>
+
+
 
 ## 一句话定位
 
