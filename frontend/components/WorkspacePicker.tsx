@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { api } from "@/lib/api";
 import type { Workspace } from "@/lib/types";
@@ -16,6 +16,9 @@ export default function WorkspacePicker({ value, onChange, onWorkspaceChange }: 
   const t = useTranslations("workspacePicker");
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [loading, setLoading] = useState(true);
+  // ref 存最新回调，避免把函数引用加入 useEffect 依赖引发循环
+  const onWorkspaceChangeRef = useRef(onWorkspaceChange);
+  onWorkspaceChangeRef.current = onWorkspaceChange;
 
   useEffect(() => {
     api
@@ -26,8 +29,11 @@ export default function WorkspacePicker({ value, onChange, onWorkspaceChange }: 
         // value=null 表示"自动"模式，保持不变；仅在缓存 ID 已失效时重置为 null（自动模式）
         if (value !== null) {
           const valid = ws.some((w) => w.id === value);
-          if (!valid) onChange(null);
+          if (!valid) { onChange(null); return; }
         }
+        // 页面初始加载时（value 已命中某空间），通知父组件当前角色
+        const current = value ? ws.find((w) => w.id === value) : undefined;
+        if (current) onWorkspaceChangeRef.current?.(current);
       })
       .finally(() => setLoading(false));
   }, [onChange, value]); // eslint-disable-line react-hooks/exhaustive-deps

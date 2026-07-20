@@ -102,7 +102,8 @@ async def list_my_workspaces(
     for ws, role in direct.all():
         seen[ws.id] = (ws, role)
 
-    # 组授权（个人成员已存在则不覆盖）
+    # 组授权：与个人成员角色取最高（owner > editor > viewer）
+    _rank = {"owner": 3, "editor": 2, "viewer": 1}
     via_group = await session.execute(
         select(Workspace, WorkspaceGroupGrant.role_in_ws)
         .join(WorkspaceGroupGrant, WorkspaceGroupGrant.workspace_id == Workspace.id)
@@ -110,7 +111,8 @@ async def list_my_workspaces(
         .where(GroupMember.user_id == user.id)
     )
     for ws, role in via_group.all():
-        seen.setdefault(ws.id, (ws, role))
+        if ws.id not in seen or _rank.get(role, 0) > _rank.get(seen[ws.id][1], 0):
+            seen[ws.id] = (ws, role)
 
     return list(seen.values())
 

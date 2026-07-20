@@ -889,7 +889,7 @@ class CaseWorkspaceIn(BaseModel):
 
 @router.get("/case-default-workspace", response_model=CaseWorkspaceOut)
 async def get_case_default_workspace(
-    _admin: User = Depends(require_admin),
+    _user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> CaseWorkspaceOut:
     """返回 Case 录入的默认保存空间；未配置返回 null。"""
