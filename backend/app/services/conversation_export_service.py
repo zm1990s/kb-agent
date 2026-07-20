@@ -393,68 +393,138 @@ def _build_pdf(title: str, messages: list[MessagePublic], date_str: str) -> byte
     from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
     from reportlab.lib.units import mm
     from reportlab.platypus import (
+        BaseDocTemplate,
+        Frame,
         HRFlowable,
         ListFlowable,
         ListItem,
+        PageTemplate,
         Paragraph,
-        SimpleDocTemplate,
         Spacer,
+        Table,
+        TableStyle,
     )
 
     font = _ensure_cjk_font()
     styles = getSampleStyleSheet()
+    page_w, page_h = A4
+    lm = rm = 22 * mm
+    tm = 22 * mm
+    bm = 20 * mm  # extra for page-number footer
 
+    # ── page footer (page number) ────────────────────────────────────────────
+    def _draw_footer(canvas: object, doc: object) -> None:
+        canvas.saveState()  # type: ignore[attr-defined]
+        canvas.setFont(font, 8)  # type: ignore[attr-defined]
+        canvas.setFillColor(colors.HexColor("#9CA3AF"))  # type: ignore[attr-defined]
+        canvas.drawCentredString(  # type: ignore[attr-defined]
+            page_w / 2, 10 * mm, str(doc.page)
+        )
+        canvas.restoreState()  # type: ignore[attr-defined]
+
+    # ── styles ───────────────────────────────────────────────────────────────
     def st(name: str, **kw: object) -> ParagraphStyle:
         return ParagraphStyle(name, parent=styles["Normal"],
                               fontName=kw.pop("fontName", font), **kw)
 
-    title_st = st("ExTitle", fontSize=18, leading=24, spaceAfter=4, alignment=1)
-    meta_st = st("ExMeta", fontSize=9, leading=12, textColor=colors.grey,
+    title_st = st("ExTitle", fontSize=22, leading=28,
+                  textColor=colors.HexColor("#1E293B"),
+                  spaceAfter=3, alignment=1)
+    meta_st = st("ExMeta", fontSize=9, leading=13,
+                 textColor=colors.HexColor("#6B7280"),
                  spaceAfter=10, alignment=1)
-    label_q_st = st("ExLabelQ", fontSize=11, leading=14, textColor=colors.HexColor("#1D4ED8"),
-                    spaceBefore=10, spaceAfter=4)
-    label_a_st = st("ExLabelA", fontSize=11, leading=14, textColor=colors.HexColor("#065F46"),
-                    spaceBefore=10, spaceAfter=4)
-    body_st = st("ExBody", fontSize=11, leading=16, spaceAfter=4)
-    code_st = st("ExCode", fontSize=9, leading=13, fontName="Courier",
-                 backColor=colors.HexColor("#F3F4F6"), leftIndent=8, spaceAfter=6)
-    src_st = st("ExSrc", fontSize=9, leading=12, textColor=colors.grey, spaceAfter=4)
+    label_q_st = st("ExLabelQ", fontSize=10, leading=14,
+                    textColor=colors.HexColor("#1D4ED8"),
+                    spaceBefore=16, spaceAfter=3, bold=1)
+    label_a_st = st("ExLabelA", fontSize=10, leading=14,
+                    textColor=colors.HexColor("#065F46"),
+                    spaceBefore=16, spaceAfter=3, bold=1)
+    body_st = st("ExBody", fontSize=11, leading=17,
+                 textColor=colors.HexColor("#1F2937"), spaceAfter=5)
+    code_inner_st = st("ExCodeInner", fontSize=9, leading=14,
+                       fontName="Courier",
+                       textColor=colors.HexColor("#374151"), spaceAfter=0)
+    src_st = st("ExSrc", fontSize=8, leading=12,
+                textColor=colors.HexColor("#9CA3AF"),
+                spaceBefore=2, spaceAfter=4)
+    bq_inner_st = st("ExBQInner", fontSize=10, leading=15,
+                     textColor=colors.HexColor("#4B5563"), spaceAfter=0)
+    h_sizes = [15, 13, 12, 11, 10, 10]
+    h_leads = [20, 17, 16, 15, 14, 14]
     h_styles = {
-        i: st(f"ExH{i}", fontSize=max(16 - i * 2, 10), leading=max(20 - i * 2, 14),
-              spaceBefore=8, spaceAfter=4)
-        for i in range(1, 7)
+        i + 1: st(f"ExH{i + 1}", fontSize=h_sizes[i], leading=h_leads[i],
+                  textColor=colors.HexColor("#111827"),
+                  spaceBefore=10, spaceAfter=4)
+        for i in range(6)
     }
-    bq_st = st("ExBQ", fontSize=10, leading=14, leftIndent=12,
-               textColor=colors.HexColor("#555555"), spaceAfter=4)
 
+    # ── helpers for decorated blocks ─────────────────────────────────────────
+    usable_w = page_w - lm - rm
+
+    def _code_flowable(text: str) -> Table:
+        para = Paragraph(_pdf_esc(text), code_inner_st)
+        t = Table([[None, para]], colWidths=[3, usable_w - 3])
+        t.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#F8FAFC")),
+            ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#6366F1")),
+            ("LEFTPADDING", (1, 0), (1, -1), 10),
+            ("RIGHTPADDING", (1, 0), (1, -1), 6),
+            ("TOPPADDING", (0, 0), (-1, -1), 5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ]))
+        return t
+
+    def _bq_flowable(text: str) -> Table:
+        para = Paragraph(_md_inline_to_rl(text), bq_inner_st)
+        t = Table([[None, para]], colWidths=[3, usable_w - 3])
+        t.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#D1D5DB")),
+            ("LEFTPADDING", (1, 0), (1, -1), 10),
+            ("RIGHTPADDING", (1, 0), (1, -1), 4),
+            ("TOPPADDING", (0, 0), (-1, -1), 3),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ]))
+        return t
+
+    # ── document + frame ─────────────────────────────────────────────────────
     buf = io.BytesIO()
-    doc = SimpleDocTemplate(buf, pagesize=A4,
-                            leftMargin=20 * mm, rightMargin=20 * mm,
-                            topMargin=20 * mm, bottomMargin=20 * mm)
+    doc = BaseDocTemplate(buf, pagesize=A4,
+                          leftMargin=lm, rightMargin=rm,
+                          topMargin=tm, bottomMargin=bm)
+    frame = Frame(lm, bm, usable_w, page_h - tm - bm, id="main")
+    doc.addPageTemplates([PageTemplate(id="pg", frames=[frame],
+                                       onPage=_draw_footer)])
+
+    # ── header block ─────────────────────────────────────────────────────────
     flow: list = [
         Paragraph(_pdf_esc(title), title_st),
         Paragraph(f"导出时间：{date_str}", meta_st),
-        HRFlowable(width="100%", thickness=0.5, color=colors.lightgrey, spaceAfter=8),
+        HRFlowable(width="100%", thickness=1,
+                   color=colors.HexColor("#3B82F6"), spaceAfter=10),
     ]
 
+    # ── messages ─────────────────────────────────────────────────────────────
     for msg in messages:
-        label = "「提问」" if msg.role == "user" else "「回答」"
-        flow.append(Paragraph(label, label_q_st if msg.role == "user" else label_a_st))
+        flow.append(Paragraph(
+            "「提问」" if msg.role == "user" else "「回答」",
+            label_q_st if msg.role == "user" else label_a_st,
+        ))
 
         if msg.role == "user":
-            # User messages: plain text, preserve line breaks
             for line in msg.content.splitlines():
                 if line.strip():
                     flow.append(Paragraph(_pdf_esc(line), body_st))
         else:
-            # AI messages: parse Markdown
             lines = msg.content.splitlines()
             i = 0
             in_code = False
             code_lines: list[str] = []
 
             def flush_code(buf_lines: list[str]) -> None:
-                flow.append(Paragraph(_pdf_esc("\n".join(buf_lines)), code_st))
+                flow.append(_code_flowable("\n".join(buf_lines)))
+                flow.append(Spacer(1, 4))
 
             while i < len(lines):
                 line = lines[i]
@@ -475,21 +545,24 @@ def _build_pdf(title: str, messages: list[MessagePublic], date_str: str) -> byte
                 hm = re.match(r"^(#{1,6})\s+(.*)", line)
                 if hm:
                     lvl = min(len(hm.group(1)), 6)
-                    flow.append(Paragraph(_md_inline_to_rl(hm.group(2).strip()), h_styles[lvl]))
+                    flow.append(
+                        Paragraph(_md_inline_to_rl(hm.group(2).strip()), h_styles[lvl])
+                    )
                     i += 1
                     continue
                 if re.match(r"^(\*{3,}|-{3,}|_{3,})\s*$", line):
                     flow.append(HRFlowable(width="100%", thickness=0.5,
-                                           color=colors.lightgrey, spaceAfter=4))
+                                           color=colors.HexColor("#E5E7EB"), spaceAfter=4))
                     i += 1
                     continue
                 if line.startswith("> "):
-                    flow.append(Paragraph(_md_inline_to_rl(line[2:]), bq_st))
+                    flow.append(_bq_flowable(line[2:]))
+                    flow.append(Spacer(1, 3))
                     i += 1
                     continue
-                bm = re.match(r"^(\s*)[-*+]\s+(.*)", line)
-                if bm:
-                    items = [ListItem(Paragraph(_md_inline_to_rl(bm.group(2)), body_st))]
+                bm2 = re.match(r"^(\s*)[-*+]\s+(.*)", line)
+                if bm2:
+                    items = [ListItem(Paragraph(_md_inline_to_rl(bm2.group(2)), body_st))]
                     i += 1
                     while i < len(lines):
                         nm2 = re.match(r"^(\s*)[-*+]\s+(.*)", lines[i])
@@ -518,15 +591,16 @@ def _build_pdf(title: str, messages: list[MessagePublic], date_str: str) -> byte
                 if line.strip() == "":
                     i += 1
                     continue
-                # normal paragraph — collect until blank/block
                 chunk = [line]
                 i += 1
-                while i < len(lines) and lines[i].strip() \
-                        and not lines[i].startswith("#") \
-                        and not lines[i].startswith("```") \
-                        and not lines[i].startswith("> ") \
-                        and not re.match(r"^(\s*)[-*+]\s+", lines[i]) \
-                        and not re.match(r"^(\s*)\d+[.)]\s+", lines[i]):
+                while (
+                    i < len(lines) and lines[i].strip()
+                    and not lines[i].startswith("#")
+                    and not lines[i].startswith("```")
+                    and not lines[i].startswith("> ")
+                    and not re.match(r"^(\s*)[-*+]\s+", lines[i])
+                    and not re.match(r"^(\s*)\d+[.)]\s+", lines[i])
+                ):
                     chunk.append(lines[i])
                     i += 1
                 flow.append(Paragraph(_md_inline_to_rl(" ".join(chunk)), body_st))
@@ -534,19 +608,18 @@ def _build_pdf(title: str, messages: list[MessagePublic], date_str: str) -> byte
             if in_code and code_lines:
                 flush_code(code_lines)
 
-        # Sources
+        # sources
         sources: list = getattr(msg, "sources", []) or []
         if sources and msg.role == "assistant":
-            titles = " · ".join(
+            src_titles = " · ".join(
                 s.get("title", "") if isinstance(s, dict) else getattr(s, "title", "")
                 for s in sources
             )
-            if titles:
-                flow.append(Paragraph(f"来源：{_pdf_esc(titles)}", src_st))
+            if src_titles:
+                flow.append(Paragraph(f"↗ 来源：{_pdf_esc(src_titles)}", src_st))
 
-        flow.append(HRFlowable(width="100%", thickness=0.5,
-                               color=colors.lightgrey, spaceAfter=6))
-        flow.append(Spacer(1, 2))
+        # subtle inter-message spacer (no HR to avoid visual noise)
+        flow.append(Spacer(1, 8))
 
     doc.build(flow)
     return buf.getvalue()
