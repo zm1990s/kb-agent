@@ -207,7 +207,8 @@
   },
   "workspacePicker": {
     "loading": "워크스페이스 로딩 중…",
-    "no_workspaces": "사용 가능한 워크스페이스 없음"
+    "no_workspaces": "사용 가능한 워크스페이스 없음",
+    "auto": "자동"
   },
   "folderTree": {
     "collapse": "접기",

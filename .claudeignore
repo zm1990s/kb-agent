@@ -1,0 +1,19 @@
+# 构建产物与依赖——体积大且无需 AI 读取
+node_modules/
+.next/
+frontend/node_modules/
+frontend/.next/
+
+# Python 缓存
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+
+# 运行时数据
+/data/
+/backend/logs/
+/backend/storage/

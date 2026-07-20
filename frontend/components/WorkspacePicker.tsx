@@ -7,7 +7,7 @@ import type { Workspace } from "@/lib/types";
 
 interface Props {
   value: string | null;
-  onChange: (id: string) => void;
+  onChange: (id: string | null) => void;
   onWorkspaceChange?: (ws: Workspace) => void;
 }
 
@@ -23,11 +23,13 @@ export default function WorkspacePicker({ value, onChange, onWorkspaceChange }: 
       .then((ws) => {
         setWorkspaces(ws);
         if (ws.length === 0) return;
-        // 若缓存的 value 不在列表中（如 DB 重建后旧 ID 失效），自动切换到第一个
-        const valid = ws.some((w) => w.id === value);
-        if (!valid) onChange(ws[0].id);
-        // 通知父组件当前选中的空间对象（含 role_in_ws）
-        const current = ws.find((w) => w.id === (valid ? value : ws[0].id));
+        // value=null 表示"自动"模式，保持不变；仅在缓存 ID 已失效时重置为 null（自动模式）
+        if (value !== null) {
+          const valid = ws.some((w) => w.id === value);
+          if (!valid) onChange(null);
+        }
+        // 通知父组件当前选中的空间对象（仅有明确选择时）
+        const current = value ? ws.find((w) => w.id === value) : undefined;
         if (current) onWorkspaceChange?.(current);
       })
       .finally(() => setLoading(false));
@@ -41,12 +43,13 @@ export default function WorkspacePicker({ value, onChange, onWorkspaceChange }: 
     <select
       value={value ?? ""}
       onChange={(e) => {
-        onChange(e.target.value);
-        const ws = workspaces.find((w) => w.id === e.target.value);
+        onChange(e.target.value || null);
+        const ws = e.target.value ? workspaces.find((w) => w.id === e.target.value) : undefined;
         if (ws) onWorkspaceChange?.(ws);
       }}
       className="rounded border px-2 py-1.5 text-sm"
     >
+      <option value="">{t("auto")}</option>
       {workspaces.map((w) => (
         <option key={w.id} value={w.id}>
           {w.name}

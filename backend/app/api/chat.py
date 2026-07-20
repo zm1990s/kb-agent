@@ -55,7 +55,7 @@ from app.services.chat_service import (
 )
 from app.services.settings_service import get_max_upload_mb
 from app.services.usage_service import record_event
-from app.services.workspace_service import is_member
+from app.services.workspace_service import is_member, locate_workspace_by_query
 
 logger = logging.getLogger(__name__)
 
@@ -115,15 +115,22 @@ async def chat(
 ) -> ChatResponse:
     # 聊天功能准入（chat 模块权限）+ 空间成员资格（越权校验 SECURITY #4）
     await _require_module(session, current_user, "chat")
-    if not await is_member(
-        session, workspace_id=body.workspace_id, user_id=current_user.id
-    ):
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "无权访问该空间")
+    # workspace_id=None 时自动定位；有明确空间时校验成员资格
+    if body.workspace_id is None:
+        target_ws: uuid.UUID | list[uuid.UUID] = await locate_workspace_by_query(
+            session, user=current_user, query=body.message
+        )
+    else:
+        if not await is_member(session, workspace_id=body.workspace_id, user_id=current_user.id):
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "无权访问该空间")
+        target_ws = body.workspace_id
 
+    # 会话绑定单个空间（取第一个或指定值）
+    conv_ws = target_ws[0] if isinstance(target_ws, list) else target_ws
     conv = await get_or_create_conversation(
         session,
         conversation_id=body.conversation_id,
-        workspace_id=body.workspace_id,
+        workspace_id=conv_ws if conv_ws else None,
         user_id=current_user.id,
     )
     # 先取历史（不含本轮提问），供 Agent 理解上下文
@@ -133,12 +140,15 @@ async def chat(
         session, conversation_id=conv.id, role="user", content=body.message
     )
 
-    result = await answer_question(
-        session,
-        workspace_id=body.workspace_id,
-        question=body.message,
-        history=history,
-    )
+    if not target_ws:
+        result = AnswerResult(answer="", sources=[], error_key="no_docs")
+    else:
+        result = await answer_question(
+            session,
+            workspace_id=target_ws,
+            question=body.message,
+            history=history,
+        )
 
     await add_message(
         session,
@@ -151,7 +161,7 @@ async def chat(
     logger.info(
         "audit chat user=%s workspace=%s conversation=%s q_len=%d a_len=%d",
         current_user.id,
-        body.workspace_id,
+        conv_ws,
         conv.id,
         len(body.message),
         len(result.answer),
@@ -163,7 +173,7 @@ async def chat(
                 s,
                 action="chat",
                 user_id=current_user.id,
-                workspace_id=body.workspace_id,
+                workspace_id=conv_ws,
                 meta={
                     "conversation_id": str(conv.id),
                     "question": body.message,
@@ -187,16 +197,21 @@ async def chat_stream(
 ) -> StreamingResponse:
     """SSE 流式对话：先推送 Agent 工作阶段，最后推送答案+来源。"""
     await _require_module(session, current_user, "chat")
-    if not await is_member(
-        session, workspace_id=body.workspace_id, user_id=current_user.id
-    ):
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "无权访问该空间")
+    if body.workspace_id is None:
+        target_ws: uuid.UUID | list[uuid.UUID] = await locate_workspace_by_query(
+            session, user=current_user, query=body.message
+        )
+    else:
+        if not await is_member(session, workspace_id=body.workspace_id, user_id=current_user.id):
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "无权访问该空间")
+        target_ws = body.workspace_id
 
+    conv_ws = target_ws[0] if isinstance(target_ws, list) else target_ws
     is_new_conv = body.conversation_id is None
     conv = await get_or_create_conversation(
         session,
         conversation_id=body.conversation_id,
-        workspace_id=body.workspace_id,
+        workspace_id=conv_ws if conv_ws else None,
         user_id=current_user.id,
         source="chat",
     )
@@ -209,10 +224,18 @@ async def chat_stream(
         return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
 
     async def gen():
+        if not target_ws:
+            yield sse("done", {
+                "answer": "",
+                "sources": [],
+                "conversation_id": str(conv.id),
+                "error_key": "no_docs",
+            })
+            return
         final: AnswerResult | None = None
         async for item in answer_question_streamed(
             session,
-            workspace_id=body.workspace_id,
+            workspace_id=target_ws,
             question=body.message,
             history=history,
         ):
@@ -250,7 +273,7 @@ async def chat_stream(
         logger.info(
             "audit chat_stream user=%s workspace=%s conversation=%s q_len=%d a_len=%d",
             current_user.id,
-            body.workspace_id,
+            target_ws,
             conv.id,
             len(body.message),
             len(final.answer),
@@ -260,7 +283,7 @@ async def chat_stream(
                 audit_session,
                 action="chat",
                 user_id=current_user.id,
-                workspace_id=body.workspace_id,
+                workspace_id=target_ws,
                 meta={
                     "conversation_id": str(conv.id),
                     "question": body.message,
@@ -591,6 +614,7 @@ async def list_conversation_files(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "会话不存在")
     await _require_module(session, current_user, _module_for_source(conv.source))
 
+    from app.services.answer_service_plus import _is_noise
     from app.storage.base import get_storage
     storage = get_storage()
     workdir = await storage.resolve_dir(f"chatplus/conv_{conversation_id}")
@@ -599,8 +623,9 @@ async def list_conversation_files(
         if not entry.is_file():
             continue
         rel = entry.relative_to(workdir).as_posix()
-        # 排除注入的 Skill 附属文件目录（非本会话产物）
-        if rel == "skills" or rel.startswith("skills/"):
+        # 排除注入目录（skills/、context/）与编程/依赖临时文件（node_modules 等），
+        # 复用输出文件 diff 的同一套噪声判定，保持面板与成果文件列表一致。
+        if _is_noise(rel):
             continue
         st = entry.stat()
         files.append({

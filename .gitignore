@@ -16,6 +16,10 @@ venv/
 # 运行时数据目录（postgres、文档存储、日志）不进库
 /data/
 
+# Node.js
+node_modules/
+.next/
+
 # 编辑器 / 系统
 .DS_Store
 .idea/

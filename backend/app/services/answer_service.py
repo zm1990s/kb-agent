@@ -59,14 +59,15 @@ def _format_history(history: list[tuple[str, str]] | None) -> str:
 
 
 async def _load_index(
-    session: AsyncSession, workspace_id: uuid.UUID
+    session: AsyncSession, workspace_id: uuid.UUID | list[uuid.UUID]
 ) -> list[tuple[Document, str | None]]:
-    """加载空间内所有 ready 文档及其分类名（最近优先，带上限保护）。"""
+    """加载一个或多个空间内所有 ready 文档及其分类名（最近优先，带上限保护）。"""
+    ws_ids = workspace_id if isinstance(workspace_id, list) else [workspace_id]
     stmt = (
         select(Document, Category.name)
         .outerjoin(Category, Category.id == Document.category_id)
         .where(
-            Document.workspace_id == workspace_id,
+            Document.workspace_id.in_(ws_ids),
             Document.status == "ready",
             Document.deleted_at.is_(None),
         )
@@ -77,7 +78,7 @@ async def _load_index(
     if len(rows) > MAX_INDEX_DOCS:
         logger.warning(
             "workspace %s 文档数超过索引上限 %d，本次问答按最近优先截断",
-            workspace_id,
+            ws_ids,
             MAX_INDEX_DOCS,
         )
         rows = rows[:MAX_INDEX_DOCS]
@@ -161,7 +162,7 @@ class ThinkingChunk:
 async def answer_question_streamed(
     session: AsyncSession,
     *,
-    workspace_id: uuid.UUID,
+    workspace_id: uuid.UUID | list[uuid.UUID],
     question: str,
     category_id: uuid.UUID | None = None,
     history: list[tuple[str, str]] | None = None,
@@ -304,7 +305,7 @@ async def answer_question_streamed(
 async def answer_question(
     session: AsyncSession,
     *,
-    workspace_id: uuid.UUID,
+    workspace_id: uuid.UUID | list[uuid.UUID],
     question: str,
     category_id: uuid.UUID | None = None,
     history: list[tuple[str, str]] | None = None,

@@ -240,3 +240,37 @@ async def get_ws_role(
             best = role
 
     return best
+
+
+async def locate_workspace_by_query(
+    session: AsyncSession,
+    *,
+    user: User,
+    query: str,
+    top_k: int = 3,
+) -> list[uuid.UUID]:
+    """对用户所有可访问空间跑全文检索，返回命中文档最多的空间 ID 列表。
+
+    - 有 FTS 命中 → 返回 [best_workspace_id]（最相关的单个空间）
+    - 无 FTS 命中 → 返回所有可访问空间 ID（让 LLM 在全量文档中作答）
+    - 无可访问空间 → 返回 []
+    """
+    from app.services.search_service import search_documents  # 延迟 import 避免循环
+
+    ws_list = await list_my_workspaces(session, user=user)
+    if not ws_list:
+        return []
+
+    best_id: uuid.UUID | None = None
+    best_count = 0
+    for ws, _ in ws_list:
+        docs = await search_documents(session, workspace_id=ws.id, query=query, limit=top_k)
+        if len(docs) > best_count:
+            best_count = len(docs)
+            best_id = ws.id
+
+    if best_id is not None:
+        return [best_id]
+
+    # FTS 无命中：检索所有可访问空间，让 LLM 自行判断文档相关性
+    return [ws.id for ws, _ in ws_list]

@@ -207,7 +207,8 @@
   },
   "workspacePicker": {
     "loading": "Loading workspaces…",
-    "no_workspaces": "No workspaces available"
+    "no_workspaces": "No workspaces available",
+    "auto": "Auto"
   },
   "folderTree": {
     "collapse": "Collapse",

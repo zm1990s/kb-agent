@@ -109,9 +109,8 @@ export default function ChatPage() {
     loadConversations();
   }, [workspaceId, loadConversations]);
 
-  // 持久化到 sessionStorage
+  // 持久化到 sessionStorage（workspaceId=null 表示"自动"，也需持久化）
   useEffect(() => {
-    if (!workspaceId) return;
     try {
       sessionStorage.setItem(SESSION_KEY, JSON.stringify({ workspaceId, conversationId, turns }));
     } catch {}
@@ -121,10 +120,12 @@ export default function ChatPage() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [turns, stage, busy]);
 
-  // 随空间切换拉取该空间引导问题（未配置时后端回退全局默认）
+  // 随空间切换拉取该空间引导问题（未配置时后端回退全局默认；自动模式直接拉全局默认）
   useEffect(() => {
-    if (!workspaceId) { setSuggestedQuestions([]); return; }
-    api.get<{ questions: string[] }>(`/settings/workspaces/${workspaceId}/suggested-questions`)
+    const url = workspaceId
+      ? `/settings/workspaces/${workspaceId}/suggested-questions`
+      : `/settings/suggested-questions`;
+    api.get<{ questions: string[] }>(url)
       .then((r) => setSuggestedQuestions(r.questions))
       .catch(() => setSuggestedQuestions([]));
   }, [workspaceId]);
@@ -167,7 +168,7 @@ export default function ChatPage() {
   if (!ready) return null;
 
   async function sendMessage(message: string, historyOverride?: Turn[]) {
-    if (!message || !workspaceId || busy) return;
+    if (!message || busy) return;
     setError(null);
     setInterrupted(false);
     setBusy(true);
@@ -412,8 +413,8 @@ export default function ChatPage() {
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder={workspaceId ? t("ask_placeholder") : t("select_workspace_placeholder")}
-                  disabled={!workspaceId || busy}
+                  placeholder={t("ask_placeholder")}
+                  disabled={busy}
                   rows={1}
                   className="flex-1 resize-none bg-transparent text-sm text-gray-900 placeholder-gray-400 outline-none disabled:opacity-60"
                   style={{ minHeight: "1.5rem", maxHeight: "10rem" }}
@@ -432,7 +433,7 @@ export default function ChatPage() {
                 ) : (
                   <button
                     type="submit"
-                    disabled={!workspaceId || !input.trim()}
+                    disabled={!input.trim()}
                     className="shrink-0 rounded-lg bg-blue-600 p-2 text-white hover:bg-blue-700 disabled:bg-gray-300 disabled:text-gray-500 transition-colors"
                   >
                     <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">

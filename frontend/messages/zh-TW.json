@@ -207,7 +207,8 @@
   },
   "workspacePicker": {
     "loading": "載入空間…",
-    "no_workspaces": "暫無可用空間"
+    "no_workspaces": "暫無可用空間",
+    "auto": "自動"
   },
   "folderTree": {
     "collapse": "收合",

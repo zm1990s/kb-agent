@@ -207,7 +207,8 @@
   },
   "workspacePicker": {
     "loading": "ワークスペースを読み込み中…",
-    "no_workspaces": "利用可能なワークスペースがありません"
+    "no_workspaces": "利用可能なワークスペースがありません",
+    "auto": "自動"
   },
   "folderTree": {
     "collapse": "折りたたむ",

@@ -7,7 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class ChatRequest(BaseModel):
-    workspace_id: uuid.UUID
+    workspace_id: uuid.UUID | None = None  # None = 自动定位到最相关空间
     message: str = Field(min_length=1, max_length=4000)
     conversation_id: uuid.UUID | None = None
 
