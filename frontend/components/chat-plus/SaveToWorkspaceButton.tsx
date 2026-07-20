@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { useTranslations } from "next-intl";
 import { api, ApiError } from "@/lib/api";
 import FolderTree, { buildTree } from "@/components/FolderTree";
@@ -62,7 +62,7 @@ export default function SaveToWorkspaceButton({
     setOpen(true);
   }
 
-  async function onWorkspaceChange(ws: Workspace) {
+  const onWorkspaceChange = useCallback(async (ws: Workspace) => {
     setWsRole(ws.role_in_ws);
     setFolderId(null);
     setLoadingFolders(true);
@@ -74,7 +74,16 @@ export default function SaveToWorkspaceButton({
     } finally {
       setLoadingFolders(false);
     }
-  }
+  }, []);
+
+  const handleWsChange = useCallback((id: string | null) => {
+    setWsId(id);
+    if (id === null) {
+      setWsRole(null);
+      setFolders([]);
+      setFolderId(null);
+    }
+  }, []);
 
   const canSaveHere = wsId !== null && (wsRole === "owner" || wsRole === "editor");
 
@@ -128,14 +137,7 @@ export default function SaveToWorkspaceButton({
                   <span className="mb-1 block text-gray-700">{t("saveToLibrarySelectWs")}</span>
                   <WorkspacePicker
                     value={wsId}
-                    onChange={(id) => {
-                      setWsId(id);
-                      if (id === null) {
-                        setWsRole(null);
-                        setFolders([]);
-                        setFolderId(null);
-                      }
-                    }}
+                    onChange={handleWsChange}
                     onWorkspaceChange={onWorkspaceChange}
                   />
                 </div>
