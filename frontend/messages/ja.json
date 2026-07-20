@@ -118,7 +118,24 @@
     "stage_thinking_phase2": "Agent が回答を整理しています…",
     "stage_done": "完了",
     "stage_no_docs": "このスペースにドキュメントがありません",
-    "thinking_label": "AI が思考中…"
+    "thinking_label": "AI が思考中…",
+    "export": "エクスポート",
+    "exportModal_title": "会話をエクスポート",
+    "exportModal_selectAll": "すべて選択",
+    "exportModal_deselectAll": "すべて解除",
+    "exportModal_format_docx": "Word (.docx)",
+    "exportModal_format_md": "Markdown (.md)",
+    "exportModal_format_pdf": "PDF (.pdf)",
+    "exportModal_download": "ダウンロード",
+    "exportModal_saveToLib": "ライブラリに保存",
+    "exportModal_saving": "保存中…",
+    "exportModal_saved": "保存済み — 処理中",
+    "exportModal_noMessages": "メッセージを1件以上選択してください",
+    "exportModal_workspace": "対象スペース",
+    "exportModal_folder": "対象フォルダ（任意）",
+    "exportModal_confirm": "保存確認",
+    "exportModal_noPermission": "書き込み権限がありません",
+    "exportModal_saveFailed": "保存に失敗しました。再試行してください"
   },
   "messageBubble": {
     "me": "自分",
@@ -711,7 +728,8 @@
     "requestFailed": "リクエストに失敗しました。再試行してください",
     "reconnecting": "接続が中断されました。再接続しています…",
     "reconnectPending": "接続が切断されました。タスクはバックグラウンドで実行中です。後で戻って確認してください",
-    "reconnectFailed": "再接続に失敗しました。タスクはバックグラウンドで実行中の可能性があります。後で戻って確認してください"
+    "reconnectFailed": "再接続に失敗しました。タスクはバックグラウンドで実行中の可能性があります。後で戻って確認してください",
+    "export": "エクスポート"
   },
   "chatComponents": {
     "selectSkill": "スキルを選択",

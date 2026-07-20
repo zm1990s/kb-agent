@@ -16,6 +16,8 @@ from app.schemas.chat import (
     ChatRequest,
     ChatResponse,
     ConversationCreate,
+    ConversationExportRequest,
+    ConversationExportToLibraryRequest,
     ConversationHistory,
     ConversationSummary,
     ConversationUpdate,
@@ -400,6 +402,105 @@ async def get_conversation(
         conversation_id=conv.id,
         messages=[MessagePublic.model_validate(m) for m in msgs],
     )
+
+
+@router.post("/conversations/{conversation_id}/export")
+async def export_conversation(
+    conversation_id: uuid.UUID,
+    body: ConversationExportRequest,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> Response:
+    """导出对话为 Word 或 Markdown 文件（直接下载）。"""
+    from urllib.parse import quote
+
+    from app.services.conversation_export_service import build_export
+
+    conv = await get_conversation_for_user(
+        session, conversation_id=conversation_id, user_id=current_user.id
+    )
+    if conv is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "会话不存在")
+    await _require_module(session, current_user, _module_for_source(conv.source))
+
+    msgs = await list_messages(session, conversation_id=conv.id)
+    title = conv.title or "对话记录"
+    data, mime, filename = build_export(
+        title,
+        [MessagePublic.model_validate(m) for m in msgs],
+        body.format,
+        message_ids=body.message_ids,
+    )
+    return Response(
+        content=data,
+        media_type=mime,
+        headers={
+            "Content-Disposition": f"attachment; filename*=UTF-8''{quote(filename)}",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+
+
+@router.post(
+    "/conversations/{conversation_id}/export-to-library",
+    response_model=None,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def export_conversation_to_library(
+    conversation_id: uuid.UUID,
+    body: ConversationExportToLibraryRequest,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """导出对话并存入文档库（同普通上传，走 AI 分类流程）。"""
+    from app.schemas.document import DocumentUploadAccepted
+    from app.services.conversation_export_service import build_export
+    from app.services.document_service import upload_document
+    from app.services.folder_service import get_folder_in_workspace
+    from app.services.workspace_service import get_ws_role
+    from app.tasks.worker import enqueue_classification
+
+    conv = await get_conversation_for_user(
+        session, conversation_id=conversation_id, user_id=current_user.id
+    )
+    if conv is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "会话不存在")
+    await _require_module(session, current_user, _module_for_source(conv.source))
+
+    # 目标空间写权限
+    role = await get_ws_role(session, workspace_id=body.workspace_id, user_id=current_user.id)
+    if role not in ("owner", "editor") and not current_user.is_admin:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "无权写入该空间")
+
+    # 目录归属校验
+    if body.folder_id is not None:
+        folder = await get_folder_in_workspace(
+            session, folder_id=body.folder_id, workspace_id=body.workspace_id
+        )
+        if folder is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "目录不存在")
+
+    msgs = await list_messages(session, conversation_id=conv.id)
+    title = conv.title or "对话记录"
+    data, mime, filename = build_export(
+        title,
+        [MessagePublic.model_validate(m) for m in msgs],
+        body.format,
+        message_ids=body.message_ids,
+    )
+
+    doc, task = await upload_document(
+        session,
+        workspace_id=body.workspace_id,
+        filename=filename,
+        mime_type=mime,
+        data=data,
+        uploaded_by=current_user.id,
+        folder_id=body.folder_id,
+    )
+    if task:
+        enqueue_classification(task.id)
+    return DocumentUploadAccepted(id=doc.id, status=doc.status, task_id=task.id if task else None)
 
 
 @router.delete("/conversations/{conversation_id}", status_code=status.HTTP_204_NO_CONTENT)

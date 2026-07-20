@@ -65,6 +65,21 @@ def _extract_plain_text(doc: dict) -> str:
 
 
 # ── DOCX 生成 ───────────────────────────────────────────────────────────────
+_DOCX_FONT = "Microsoft YaHei"
+
+
+def _set_doc_font(doc: object, font_name: str = _DOCX_FONT) -> None:
+    """设置 docx 文档默认字体（ASCII + 东亚字体槽），使中文正确渲染。"""
+    from docx.oxml.ns import qn
+
+    rPr = doc.styles["Normal"].element.get_or_add_rPr()
+    rFonts = rPr.get_or_add_rFonts()
+    rFonts.set(qn("w:ascii"), font_name)
+    rFonts.set(qn("w:hAnsi"), font_name)
+    rFonts.set(qn("w:eastAsia"), font_name)
+    rFonts.set(qn("w:cs"), font_name)
+
+
 def _run_inline(paragraph, node: dict) -> None:
     """把内联节点写入 docx 段落，应用 bold/italic marks。"""
     for child in node.get("content", []) or []:
@@ -84,6 +99,7 @@ def _build_docx(title: str, doc: dict) -> bytes:
     from docx.shared import Inches
 
     d = DocxDocument()
+    _set_doc_font(d)
     if title:
         d.add_heading(title, level=0)
 

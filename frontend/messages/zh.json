@@ -118,7 +118,24 @@
     "stage_thinking_phase2": "Agent 正在组织回答…",
     "stage_done": "完成",
     "stage_no_docs": "空间暂无文档",
-    "thinking_label": "AI 深度思考中…"
+    "thinking_label": "AI 深度思考中…",
+    "export": "导出",
+    "exportModal_title": "导出对话",
+    "exportModal_selectAll": "全选",
+    "exportModal_deselectAll": "取消全选",
+    "exportModal_format_docx": "Word (.docx)",
+    "exportModal_format_md": "Markdown (.md)",
+    "exportModal_format_pdf": "PDF (.pdf)",
+    "exportModal_download": "下载",
+    "exportModal_saveToLib": "存入文档库",
+    "exportModal_saving": "保存中…",
+    "exportModal_saved": "已存入库，正在归类",
+    "exportModal_noMessages": "请至少选择一条消息",
+    "exportModal_workspace": "目标空间",
+    "exportModal_folder": "目标目录（可选）",
+    "exportModal_confirm": "确认存入",
+    "exportModal_noPermission": "无写入权限",
+    "exportModal_saveFailed": "保存失败，请重试"
   },
   "messageBubble": {
     "me": "我",
@@ -711,7 +728,8 @@
     "requestFailed": "请求失败，请重试",
     "reconnecting": "连接中断，正在重连…",
     "reconnectPending": "连接中断，任务仍在后台运行，可稍后切回查看",
-    "reconnectFailed": "重连失败，任务可能仍在后台运行，请稍后切回查看"
+    "reconnectFailed": "重连失败，任务可能仍在后台运行，请稍后切回查看",
+    "export": "导出"
   },
   "chatComponents": {
     "selectSkill": "选择 Skill",

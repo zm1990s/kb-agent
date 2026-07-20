@@ -70,7 +70,7 @@ class SaveFileToLibrary(BaseModel):
 
 
 class ConversationExportRequest(BaseModel):
-    format: Literal["docx", "md"]
+    format: Literal["docx", "md", "pdf"]
     message_ids: list[uuid.UUID] | None = None  # None = 全部消息
 
 

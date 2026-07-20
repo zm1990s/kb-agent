@@ -118,7 +118,24 @@
     "stage_thinking_phase2": "Agent가 답변을 구성하고 있습니다…",
     "stage_done": "완료",
     "stage_no_docs": "이 스페이스에 문서가 없습니다",
-    "thinking_label": "AI 사고 중…"
+    "thinking_label": "AI 사고 중…",
+    "export": "내보내기",
+    "exportModal_title": "대화 내보내기",
+    "exportModal_selectAll": "전체 선택",
+    "exportModal_deselectAll": "전체 해제",
+    "exportModal_format_docx": "Word (.docx)",
+    "exportModal_format_md": "Markdown (.md)",
+    "exportModal_format_pdf": "PDF (.pdf)",
+    "exportModal_download": "다운로드",
+    "exportModal_saveToLib": "라이브러리에 저장",
+    "exportModal_saving": "저장 중…",
+    "exportModal_saved": "저장됨 — 처리 중",
+    "exportModal_noMessages": "메시지를 하나 이상 선택하세요",
+    "exportModal_workspace": "대상 스페이스",
+    "exportModal_folder": "대상 폴더 (선택사항)",
+    "exportModal_confirm": "저장 확인",
+    "exportModal_noPermission": "쓰기 권한 없음",
+    "exportModal_saveFailed": "저장 실패, 다시 시도해 주세요"
   },
   "messageBubble": {
     "me": "나",
@@ -711,7 +728,8 @@
     "requestFailed": "요청 실패, 다시 시도하세요",
     "reconnecting": "연결이 중단되어 다시 연결 중…",
     "reconnectPending": "연결이 끊어졌습니다. 작업은 백그라운드에서 계속 실행 중이며, 나중에 다시 돌아와 확인할 수 있습니다",
-    "reconnectFailed": "재연결 실패. 작업이 백그라운드에서 계속 실행 중일 수 있으니 나중에 다시 돌아와 확인하세요"
+    "reconnectFailed": "재연결 실패. 작업이 백그라운드에서 계속 실행 중일 수 있으니 나중에 다시 돌아와 확인하세요",
+    "export": "내보내기"
   },
   "chatComponents": {
     "selectSkill": "스킬 선택",

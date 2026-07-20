@@ -118,7 +118,24 @@
     "stage_thinking_phase2": "Agent is composing the answer…",
     "stage_done": "Done",
     "stage_no_docs": "No documents in this workspace",
-    "thinking_label": "AI is thinking…"
+    "thinking_label": "AI is thinking…",
+    "export": "Export",
+    "exportModal_title": "Export Conversation",
+    "exportModal_selectAll": "Select All",
+    "exportModal_deselectAll": "Deselect All",
+    "exportModal_format_docx": "Word (.docx)",
+    "exportModal_format_md": "Markdown (.md)",
+    "exportModal_format_pdf": "PDF (.pdf)",
+    "exportModal_download": "Download",
+    "exportModal_saveToLib": "Save to Library",
+    "exportModal_saving": "Saving…",
+    "exportModal_saved": "Saved — processing",
+    "exportModal_noMessages": "Select at least one message",
+    "exportModal_workspace": "Target Workspace",
+    "exportModal_folder": "Target Folder (optional)",
+    "exportModal_confirm": "Confirm Save",
+    "exportModal_noPermission": "No write permission",
+    "exportModal_saveFailed": "Save failed, please try again"
   },
   "messageBubble": {
     "me": "Me",
@@ -711,7 +728,8 @@
     "requestFailed": "Request failed, please retry",
     "reconnecting": "Connection interrupted, reconnecting…",
     "reconnectPending": "Connection lost. The task is still running in the background — switch back later to view it.",
-    "reconnectFailed": "Reconnect failed. The task may still be running in the background — switch back later to view it."
+    "reconnectFailed": "Reconnect failed. The task may still be running in the background — switch back later to view it.",
+    "export": "Export"
   },
   "chatComponents": {
     "selectSkill": "Select Skill",

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import ConversationSidebar from "@/components/ConversationSidebar";
+import ExportConversationModal from "@/components/ExportConversationModal";
 import Markdown from "@/components/Markdown";
 import MessageBubble from "@/components/MessageBubble";
 import NavBar from "@/components/NavBar";
@@ -75,6 +76,7 @@ export default function ChatPlusPage() {
   const [error, setError] = useState<string | null>(null);
   // 正在后台生成的会话 id 集合（侧边栏指示器；后端 /chat/plus/active 轮询）
   const [activeIds, setActiveIds] = useState<Set<string>>(new Set());
+  const [exportOpen, setExportOpen] = useState(false);
 
   // 是否有 skills:write（控制「存为 Skill」显隐；后端仍是唯一防线）
   const [canWriteSkill, setCanWriteSkill] = useState(false);
@@ -622,6 +624,26 @@ export default function ChatPlusPage() {
         />
 
         <main className="flex flex-1 flex-col overflow-hidden">
+          {conversationId && (
+            <div className="flex items-center justify-end border-b border-gray-100 bg-white px-4 py-1.5">
+              <button
+                onClick={() => setExportOpen(true)}
+                className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs text-gray-600 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 transition-colors"
+              >
+                <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+                {t("export")}
+              </button>
+            </div>
+          )}
+          {exportOpen && conversationId && (
+            <ExportConversationModal
+              conversationId={conversationId}
+              conversationTitle={conversations.find((c) => c.id === conversationId)?.title ?? null}
+              onClose={() => setExportOpen(false)}
+            />
+          )}
           {/* Messages */}
           <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-6 space-y-4">
             {turns.length === 0 && !busy && (

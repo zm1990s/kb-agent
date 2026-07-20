@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import ConversationSidebar from "@/components/ConversationSidebar";
+import ExportConversationModal from "@/components/ExportConversationModal";
 import Markdown from "@/components/Markdown";
 import MessageBubble from "@/components/MessageBubble";
 import NavBar from "@/components/NavBar";
@@ -50,6 +51,7 @@ export default function ChatPage() {
   const [error, setError] = useState<string | null>(null);
   const [interrupted, setInterrupted] = useState(false);
   const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>([]);
+  const [exportOpen, setExportOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -307,7 +309,25 @@ export default function ChatPage() {
       <div className="flex items-center gap-3 border-b border-gray-200 bg-white px-4 py-2 shadow-sm">
         <span className="text-sm text-gray-500">{t("workspace_label")}</span>
         <WorkspacePicker value={workspaceId} onChange={setWorkspaceId} />
+        {conversationId && (
+          <button
+            onClick={() => setExportOpen(true)}
+            className="ml-auto flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs text-gray-600 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 transition-colors"
+          >
+            <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
+            </svg>
+            {t("export")}
+          </button>
+        )}
       </div>
+      {exportOpen && conversationId && (
+        <ExportConversationModal
+          conversationId={conversationId}
+          conversationTitle={conversations.find((c) => c.id === conversationId)?.title ?? null}
+          onClose={() => setExportOpen(false)}
+        />
+      )}
 
       <div className="flex flex-1 overflow-hidden">
         <ConversationSidebar
