@@ -125,8 +125,12 @@ async def chat(
             raise HTTPException(status.HTTP_403_FORBIDDEN, "无权访问该空间")
         target_ws = body.workspace_id
 
-    # 会话绑定单个空间（取第一个或指定值）
-    conv_ws = target_ws[0] if isinstance(target_ws, list) else target_ws
+    # 会话绑定单个空间（取第一个或指定值）。
+    # 自动定位无可访问空间时返回 []，须安全取值避免 [][0] IndexError（否则 500 且不记日志）。
+    if isinstance(target_ws, list):
+        conv_ws = target_ws[0] if target_ws else None
+    else:
+        conv_ws = target_ws
     conv = await get_or_create_conversation(
         session,
         conversation_id=body.conversation_id,
@@ -167,6 +171,9 @@ async def chat(
         len(result.answer),
     )
 
+    # 自动定位可能命中多个空间，workspace_id 列只记首个；meta 保留完整归因
+    ws_all = [str(w) for w in target_ws] if isinstance(target_ws, list) else [str(target_ws)]
+
     async def _log_chat() -> None:
         async with SessionLocal() as s:
             await record_event(
@@ -178,6 +185,7 @@ async def chat(
                     "conversation_id": str(conv.id),
                     "question": body.message,
                     "answer": result.answer,
+                    "workspaces": ws_all,
                 },
             )
 
@@ -206,7 +214,13 @@ async def chat_stream(
             raise HTTPException(status.HTTP_403_FORBIDDEN, "无权访问该空间")
         target_ws = body.workspace_id
 
-    conv_ws = target_ws[0] if isinstance(target_ws, list) else target_ws
+    # 自动定位无可访问空间时返回 []，须安全取值避免 [][0] IndexError（否则 500 且不记日志）。
+    if isinstance(target_ws, list):
+        conv_ws = target_ws[0] if target_ws else None
+    else:
+        conv_ws = target_ws
+    # 自动定位可能命中多个空间，workspace_id 列只记首个；meta 保留完整归因
+    ws_all = [str(w) for w in target_ws] if isinstance(target_ws, list) else [str(target_ws)]
     is_new_conv = body.conversation_id is None
     conv = await get_or_create_conversation(
         session,
@@ -296,6 +310,7 @@ async def chat_stream(
                         "conversation_id": str(conv.id),
                         "question": body.message,
                         "answer": final.answer,
+                        "workspaces": ws_all,
                     },
                 )
         except Exception:
