@@ -102,6 +102,9 @@
     "ask_placeholder": "輸入問題… (Enter 傳送，Shift+Enter 換行)",
     "select_workspace_placeholder": "請先選擇空間",
     "stop_generating": "停止生成",
+    "reconnecting": "連線中斷，正在重連…",
+    "reconnectPending": "連線中斷，任務仍在背景執行，可稍後切回查看",
+    "reconnectFailed": "重連失敗，任務可能仍在背景執行，請稍後切回查看",
     "ask_title": "向知識庫提問",
     "ask_subtitle": "AI 會根據文件智慧回答並附上原文來源",
     "load_failed": "載入對話失敗",
@@ -827,5 +830,4 @@
     "empty": "暫無定時任務",
     "noFileNote": "注意：定時任務不支援檔案產出，如需檔案請在任務完成後繼續對話"
   }
-}
 }

@@ -2,6 +2,7 @@
 
 import json
 import logging
+import time
 import uuid
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFile, status
@@ -40,7 +41,9 @@ from app.services.chat_generation import (
 from app.services.chat_generation import (
     GenerationInProgress,
     list_active,
+    list_active_details,
     request_cancel,
+    start_chat_generation,
     start_generation,
     subscribe,
     unsubscribe,
@@ -68,6 +71,16 @@ router = APIRouter(tags=["chat"])
 
 def _sse(event: str, data: dict) -> str:
     return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
+
+
+def _generation_meta(state) -> dict:
+    # elapsed_seconds 基于服务器单调时钟，前端据此以本机时钟反推锚点，
+    # 免疫客户端/服务端墙钟偏移（详见 list_active_details 注释）。
+    return {
+        "conversation_id": str(state.conversation_id),
+        "started_at": state.started_at_epoch,
+        "elapsed_seconds": max(0.0, time.monotonic() - state.started_at),
+    }
 
 
 async def _relay(sub):
@@ -207,7 +220,10 @@ async def chat_stream(
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> StreamingResponse:
-    """SSE 流式对话：先推送 Agent 工作阶段，最后推送答案+来源。"""
+    """SSE 流式对话：生成跑在 detached 任务里（断连不中止），本请求只订阅转发。
+
+    对齐聊天+：切走菜单不再掐断生成，返回时可经 GET /chat/stream/{id} 重连续看。
+    """
     await _require_module(session, current_user, "chat")
     if body.workspace_id is None:
         target_ws: uuid.UUID | list[uuid.UUID] = await locate_workspace_by_query(
@@ -238,107 +254,90 @@ async def chat_stream(
         session, conversation_id=conv.id, role="user", content=body.message
     )
 
-    def sse(event: str, data: dict) -> str:
-        return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
-
-    async def gen():
-        if not target_ws:
-            yield sse("done", {
-                "answer": "",
-                "sources": [],
-                "conversation_id": str(conv.id),
-                "error_key": "no_docs",
-            })
-            return
-        final: AnswerResult | None = None
-        async for item in answer_question_streamed(
-            session,
-            workspace_id=target_ws,
+    # 空间为空 / 无归属空间也照常起任务：answer_question_streamed 内部产出 no_docs
+    try:
+        start_chat_generation(
+            conversation_id=conv.id,
+            user_id=current_user.id,
+            is_new_conv=is_new_conv,
             question=body.message,
             history=history,
-        ):
-            if isinstance(item, Stage):
-                yield sse("stage", {
-                    "stage": item.stage,
-                    "message_key": item.message_key,
-                    "message_params": item.message_params,
-                })
-            elif isinstance(item, ThinkingChunk):
-                yield sse("thinking", {"text": item.text})
-            elif isinstance(item, TokenChunk):
-                yield sse("token", {"text": item.text})
-            elif isinstance(item, AnswerResult):
-                final = item
-        if final is None:
-            final = AnswerResult(answer="", sources=[], error_key="no_answer")
-        # 先发 done，让前端立即收到答案，不阻塞在后续 DB 写入和标题生成
-        done_payload: dict = {
-            "answer": final.answer,
-            "sources": final.sources,
-            "conversation_id": str(conv.id),
-        }
-        if final.error_key:
-            done_payload["error_key"] = final.error_key
-        yield sse("done", done_payload)
-        # done 已发，后续收尾（落库/审计/标题）各自兜底：任一失败都不得中断 SSE 流，
-        # 否则前端会在答案已显示后误报「请求失败」。分别 try 避免一个失败拖垮其余。
-        try:
-            # 落库助手消息（done 已发，后续延迟不影响用户体验）
-            await add_message(
-                session,
-                conversation_id=conv.id,
-                role="assistant",
-                content=final.answer,
-                sources=final.sources,
-            )
-        except Exception:
-            logger.exception(
-                "chat_stream 落库助手消息失败 conversation=%s（答案已推送）", conv.id
-            )
-        logger.info(
-            "audit chat_stream user=%s workspace=%s conversation=%s q_len=%d a_len=%d",
-            current_user.id,
-            conv_ws,
-            conv.id,
-            len(body.message),
-            len(final.answer),
+            workspace_id=target_ws,
+            conv_ws=conv_ws,
+            ws_all=ws_all,
         )
-        try:
-            async with SessionLocal() as audit_session:
-                await record_event(
-                    audit_session,
-                    action="chat",
-                    user_id=current_user.id,
-                    workspace_id=conv_ws,
-                    meta={
-                        "conversation_id": str(conv.id),
-                        "question": body.message,
-                        "answer": final.answer,
-                        "workspaces": ws_all,
-                    },
-                )
-        except Exception:
-            logger.exception("chat_stream 写用量审计失败 conversation=%s", conv.id)
-        # 新会话：生成标题，写入 DB 后推送 title 事件让前端直接更新侧边栏。
-        # generate_conversation_title 内部已 try 兜底，这里再包一层防 title 推送异常。
-        if is_new_conv:
-            try:
-                async with SessionLocal() as bg_session:
-                    title = await generate_conversation_title(
-                        bg_session,
-                        conversation_id=conv.id,
-                        first_message=body.message,
-                    )
-                if title:
-                    yield sse("title", {"conversation_id": str(conv.id), "title": title})
-            except Exception:
-                logger.exception("chat_stream 生成/推送标题失败 conversation=%s", conv.id)
+    except GenerationInProgress:
+        raise HTTPException(status.HTTP_409_CONFLICT, "该会话正在生成中") from None
+
+    sub = subscribe(conv.id, current_user.id)
+    if sub is None:  # 理论上不会发生（刚 start）；兜底
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "生成任务不存在")
+
+    async def _relay_with_meta():
+        yield _sse("meta", _generation_meta(sub[0]))
+        async for chunk in _relay(sub):
+            yield chunk
 
     return StreamingResponse(
-        gen(),
+        _relay_with_meta(),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+@router.get("/chat/stream/{conversation_id}")
+async def chat_reconnect(
+    conversation_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> StreamingResponse:
+    """重连正在跑（或刚跑完、终态保留窗口内）的普通对话生成流。
+
+    先补发已累积答案，再接实时增量。非 owner / 不存在 → 404。
+    """
+    await _require_module(session, current_user, "chat")
+    sub = subscribe(conversation_id, current_user.id)
+    if sub is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "没有进行中的生成")
+
+    async def _relay_with_meta():
+        yield _sse("meta", _generation_meta(sub[0]))
+        async for chunk in _relay(sub):
+            yield chunk
+
+    return StreamingResponse(
+        _relay_with_meta(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@router.get("/chat/active")
+async def chat_active(
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """当前用户正在生成中的普通对话会话（侧边栏指示器 + 重连恢复计时）。"""
+    await _require_module(session, current_user, "chat")
+    return {
+        "conversation_ids": [
+            str(cid) for cid in list_active(current_user.id, source="chat")
+        ],
+        "generations": list_active_details(current_user.id, source="chat"),
+    }
+
+
+@router.post("/chat/stop/{conversation_id}")
+async def chat_stop(
+    conversation_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """停止按钮：取消该会话的生成；不在跑 / 非 owner → 404。"""
+    await _require_module(session, current_user, "chat")
+    if not request_cancel(conversation_id, current_user.id):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "没有进行中的生成")
+    return {"ok": True}
 
 
 @router.get("/conversations", response_model=list[ConversationSummary])
@@ -651,7 +650,7 @@ async def chat_plus_stream(
 
     async def _relay_with_meta():
         # 首发 meta 事件带上 conversation_id：新会话在 done 之前断流也能重连。
-        yield _sse("meta", {"conversation_id": str(conv.id)})
+        yield _sse("meta", _generation_meta(sub[0]))
         async for chunk in _relay(sub):
             yield chunk
 
@@ -676,8 +675,14 @@ async def chat_plus_reconnect(
     sub = subscribe(conversation_id, current_user.id)
     if sub is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "没有进行中的生成")
+
+    async def _relay_with_meta():
+        yield _sse("meta", _generation_meta(sub[0]))
+        async for chunk in _relay(sub):
+            yield chunk
+
     return StreamingResponse(
-        _relay(sub),
+        _relay_with_meta(),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
@@ -690,7 +695,11 @@ async def chat_plus_active(
 ) -> dict:
     """当前用户正在生成中的会话 id 列表（侧边栏指示器轮询用）。"""
     await _require_module(session, current_user, "chatplus")
-    return {"conversation_ids": [str(cid) for cid in list_active(current_user.id)]}
+    generations = list_active_details(current_user.id)
+    return {
+        "conversation_ids": [str(cid) for cid in list_active(current_user.id)],
+        "generations": generations,
+    }
 
 
 @router.post("/chat/plus/stop/{conversation_id}")

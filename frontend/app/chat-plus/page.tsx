@@ -53,6 +53,23 @@ interface DonePayload {
   error_key?: string;
 }
 
+interface StreamMetaPayload {
+  conversation_id: string;
+  started_at?: number;
+  elapsed_seconds?: number;
+}
+
+interface ActiveGeneration {
+  conversation_id: string;
+  started_at: number;
+  elapsed_seconds?: number;
+}
+
+interface ActiveGenerationsResponse {
+  conversation_ids: string[];
+  generations?: ActiveGeneration[];
+}
+
 type StreamBlock =
   | { type: "thinking"; text: string }
   | { type: "text"; text: string };
@@ -62,6 +79,21 @@ const SESSION_KEY = "chat_plus_state";
 // SSE 中断后自动重连：最多 3 次，退避 1s / 2s / 4s
 const RECONNECT_BACKOFF_MS = [1000, 2000, 4000];
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const epochSecondsToMs = (seconds: number) => Math.max(0, seconds * 1000);
+// 由服务器「已运行秒数」反推一个基于本机时钟的起点锚点：
+// 之后计时全程用 Date.now() - anchor（同一时钟），免疫客户端/服务端墙钟偏移。
+// 无 elapsed_seconds 时回退到服务器绝对 started_at（旧后端兼容，可能有偏移）。
+const startAnchorMs = (g: { started_at?: number; elapsed_seconds?: number }): number | null => {
+  if (typeof g.elapsed_seconds === "number") {
+    return Date.now() - Math.max(0, g.elapsed_seconds) * 1000;
+  }
+  if (typeof g.started_at === "number") return epochSecondsToMs(g.started_at);
+  return null;
+};
+const activeResponseIds = (r: ActiveGenerationsResponse) =>
+  r.generations && r.generations.length > 0
+    ? r.generations.map((g) => g.conversation_id)
+    : r.conversation_ids;
 
 export default function ChatPlusPage() {
   const t = useTranslations("chatPlus");
@@ -77,6 +109,8 @@ export default function ChatPlusPage() {
   const [error, setError] = useState<string | null>(null);
   // 正在后台生成的会话 id 集合（侧边栏指示器；后端 /chat/plus/active 轮询）
   const [activeIds, setActiveIds] = useState<Set<string>>(new Set());
+  const [activeStartedAtById, setActiveStartedAtById] = useState<Record<string, number>>({});
+  const [generationStartedAtMs, setGenerationStartedAtMs] = useState<number | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const [scheduledPanelOpen, setScheduledPanelOpen] = useState(false);
 
@@ -171,8 +205,17 @@ export default function ChatPlusPage() {
     let cancelled = false;
     async function poll() {
       try {
-        const r = await api.get<{ conversation_ids: string[] }>("/chat/plus/active");
-        if (!cancelled) setActiveIds(new Set(r.conversation_ids));
+        const r = await api.get<ActiveGenerationsResponse>("/chat/plus/active");
+        if (cancelled) return;
+        const generations = r.generations ?? [];
+        setActiveIds(new Set(activeResponseIds(r)));
+        setActiveStartedAtById(
+          Object.fromEntries(
+            generations
+              .map((g) => [g.conversation_id, startAnchorMs(g)] as const)
+              .filter((e): e is readonly [string, number] => e[1] !== null)
+          )
+        );
       } catch {
         /* 忽略瞬时失败 */
       }
@@ -195,6 +238,7 @@ export default function ChatPlusPage() {
     if (activeIds.size === 0) return;
     mountReconnectDoneRef.current = true;
     if (conversationId && activeIds.has(conversationId) && !busy) {
+      setGenerationStartedAtMs(activeStartedAtById[conversationId] ?? null);
       reconnectStream(conversationId);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -219,12 +263,17 @@ export default function ChatPlusPage() {
   }, [turns, busy]);
 
   useEffect(() => {
-    if (!busy) { setElapsed(0); return; }
-    setElapsed(0);
-    const start = Date.now();
-    const id = setInterval(() => setElapsed(Math.floor((Date.now() - start) / 1000)), 1000);
+    if (!busy) {
+      setElapsed(0);
+      setGenerationStartedAtMs(null);
+      return;
+    }
+    const start = generationStartedAtMs ?? Date.now();
+    const update = () => setElapsed(Math.max(0, Math.floor((Date.now() - start) / 1000)));
+    update();
+    const id = setInterval(update, 1000);
     return () => clearInterval(id);
-  }, [busy]);
+  }, [busy, generationStartedAtMs]);
 
   useEffect(() => {
     const el = textareaRef.current;
@@ -274,6 +323,7 @@ export default function ChatPlusPage() {
     }
     // 若该会话仍在后台生成，重连实时流续看答案
     if (activeIds.has(id)) {
+      setGenerationStartedAtMs(activeStartedAtById[id] ?? null);
       reconnectStream(id);
     }
   }
@@ -326,7 +376,11 @@ export default function ChatPlusPage() {
       // 聊天+ 不再展示三步动画，忽略 stage 事件
       if (event === "meta") {
         // 首发事件带 conversation_id：新会话在 done 之前断流也能重连
-        const d = data as { conversation_id: string };
+        const d = data as StreamMetaPayload;
+        const anchor = startAnchorMs(d);
+        if (anchor !== null) {
+          setGenerationStartedAtMs(anchor);
+        }
         setConversationId(d.conversation_id);
         setConversations((prev) => {
           if (prev.some((c) => c.id === d.conversation_id)) return prev;
@@ -441,6 +495,9 @@ export default function ChatPlusPage() {
   // 断流不再直接报「失败」：只要后端仍在跑就自动接回，Thinking 由 catchup 连续补发。
   async function reconnectStream(convId: string, attempt = 0) {
     setError(null);
+    if (activeStartedAtById[convId] !== undefined) {
+      setGenerationStartedAtMs(activeStartedAtById[convId]);
+    }
     setBusy(true);
     setPendingOutputFiles([]);
     // 不在此清空 streamingBlocks（避免留白）；改由 handler 收到首个流块时幂等重建
@@ -475,8 +532,8 @@ export default function ChatPlusPage() {
       }
       // 重试用尽：确认后端是否仍在跑
       try {
-        const r = await api.get<{ conversation_ids: string[] }>("/chat/plus/active");
-        if (r.conversation_ids.includes(convId)) {
+        const r = await api.get<ActiveGenerationsResponse>("/chat/plus/active");
+        if (activeResponseIds(r).includes(convId)) {
           // 仍在跑，但连不上：提示可稍后切回，不误报致命失败
           setError(t("reconnectPending"));
         } else {
@@ -502,6 +559,7 @@ export default function ChatPlusPage() {
   async function sendMessage(message: string, currentAttachments?: AttachedFile[]) {
     if (!message || busy) return;
     setError(null);
+    setGenerationStartedAtMs(Date.now());
     setBusy(true);
     setPendingOutputFiles([]);
 

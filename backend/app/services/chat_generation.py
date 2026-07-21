@@ -14,17 +14,31 @@ import asyncio
 import logging
 import time
 import uuid
+from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 from app.core.db import SessionLocal
 from app.models.auth import User
-from app.services.answer_service import AnswerResult, ThinkingChunk, TokenChunk
+from app.services.answer_service import (
+    AnswerResult,
+    Stage,
+    ThinkingChunk,
+    TokenChunk,
+    answer_question_streamed,
+)
 from app.services.answer_service_plus import (
     OutputFilesResult,
     answer_question_plus_streamed,
 )
 from app.services.chat_service import add_message, generate_conversation_title
 from app.services.usage_service import record_event
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
+
+# 生成器工厂：绑好各自参数，产出 Thinking/Token/AnswerResult/OutputFiles/Stage 项
+StreamFactory = Callable[["AsyncSession", "GenerationState"], AsyncIterator]
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +58,14 @@ class GenerationState:
     conversation_id: uuid.UUID
     user_id: uuid.UUID
     is_new_conv: bool
+    # 来源：区分普通对话（chat）与聊天+（chatplus）。驱动 record_event 的 action，
+    # 并让 /chat/active 与 /chat/plus/active 各自只列自己来源的会话。
+    source: str = "chatplus"
+    # 为 true 时把 Stage 广播为 stage 事件（普通对话需要）；false 时忽略（聊天+ 现状）。
+    forward_stage: bool = False
+    # 审计元信息：workspace_id 记单个（首个）空间；extra_meta 合并进 record_event 的 meta。
+    event_workspace_id: uuid.UUID | None = None
+    extra_meta: dict = field(default_factory=dict)
     status: str = "running"  # running | done | error | cancelled
     subscribers: set[asyncio.Queue] = field(default_factory=set)
     # 按序累积的流式块（thinking / token 交替，同类合并）；供重连补发。
@@ -54,6 +76,7 @@ class GenerationState:
     task: asyncio.Task | None = None
     cancel_requested: bool = False
     started_at: float = field(default_factory=time.monotonic)
+    started_at_epoch: float = field(default_factory=time.time)
 
 
 _registry: dict[uuid.UUID, GenerationState] = {}
@@ -73,12 +96,31 @@ def is_active(conversation_id: uuid.UUID) -> bool:
     return st is not None and st.status == "running"
 
 
-def list_active(user_id: uuid.UUID) -> list[uuid.UUID]:
-    """该用户当前仍在 running 的会话 id 列表（侧边栏指示器用）。"""
+def list_active(user_id: uuid.UUID, source: str = "chatplus") -> list[uuid.UUID]:
+    """该用户当前仍在 running 的会话 id 列表（侧边栏指示器用），按来源过滤。"""
     return [
         cid
         for cid, st in _registry.items()
-        if st.user_id == user_id and st.status == "running"
+        if st.user_id == user_id and st.status == "running" and st.source == source
+    ]
+
+
+def list_active_details(user_id: uuid.UUID, source: str = "chatplus") -> list[dict]:
+    """该用户当前 running 会话详情（按来源过滤），用于前端重连后恢复真实运行时长。
+
+    elapsed_seconds 用服务器单调时钟算出「已运行秒数」，供前端以本机时钟
+    反推锚点（Date.now() - elapsed*1000），避免客户端/服务端墙钟偏移导致
+    显示时长失真。started_at 绝对值一并保留（无害，供调试/回退）。
+    """
+    now = time.monotonic()
+    return [
+        {
+            "conversation_id": str(cid),
+            "started_at": st.started_at_epoch,
+            "elapsed_seconds": max(0.0, now - st.started_at),
+        }
+        for cid, st in _registry.items()
+        if st.user_id == user_id and st.status == "running" and st.source == source
     ]
 
 
@@ -184,45 +226,20 @@ async def _run_generation(
     state: GenerationState,
     *,
     question: str,
-    history: list[tuple[str, str]] | None,
-    workspace_id: uuid.UUID | None,
-    doc_ids: list[uuid.UUID] | None,
-    all_docs: bool,
-    skill_ids: list[uuid.UUID] | None,
-    attachment_keys: list[str] | None,
-    attachment_names: dict[str, str] | None,
-    interactive: bool = False,
-    use_original_docs: bool = False,
+    stream_factory: "StreamFactory",
 ) -> None:
-    """detached 任务主体：跑生成、广播事件、完成落库。"""
+    """detached 任务主体：跑生成、广播事件、完成落库。
+
+    与来源无关：stream_factory 是一个绑好各自参数的异步生成器工厂，产出
+    ThinkingChunk / TokenChunk / AnswerResult / OutputFilesResult / Stage。
+    普通对话（forward_stage=True）会把 Stage 实时广播为 stage 事件；Stage 不
+    进 stream_blocks，故晚到的重连不会补发过期 stage（终态 done 已取代）。
+    """
     final: AnswerResult | None = None
     output_files: list[dict] = []
     async with SessionLocal() as session:
-        # 在本会话重取 User，避免跨会话 lazy-load（check_skill_access 会加载组关系）
-        user = await session.get(User, state.user_id)
-        if user is None:
-            logger.error("生成任务找不到用户 user=%s", state.user_id)
-            state.status = "error"
-            for q in list(state.subscribers):
-                q.put_nowait(_END)
-            _schedule_removal(state.conversation_id)
-            return
         try:
-            async for item in answer_question_plus_streamed(
-                session,
-                workspace_id=workspace_id,
-                conversation_id=state.conversation_id,
-                user=user,
-                question=question,
-                history=history,
-                doc_ids=doc_ids,
-                all_docs=all_docs,
-                skill_ids=skill_ids,
-                attachment_keys=attachment_keys,
-                attachment_names=attachment_names,
-                interactive=interactive,
-                use_original_docs=use_original_docs,
-            ):
+            async for item in stream_factory(session, state):
                 if isinstance(item, ThinkingChunk):
                     _broadcast(state, "thinking", {"text": item.text})
                 elif isinstance(item, TokenChunk):
@@ -231,7 +248,14 @@ async def _run_generation(
                     final = item
                 elif isinstance(item, OutputFilesResult):
                     output_files = item.files
-                # Stage 不广播（前端本就忽略）
+                elif isinstance(item, Stage):
+                    if state.forward_stage:
+                        # 仅实时广播、不进 stream_blocks（不参与 catchup 补发）
+                        _broadcast(state, "stage", {
+                            "stage": item.stage,
+                            "message_key": item.message_key,
+                            "message_params": item.message_params,
+                        })
         except asyncio.CancelledError:
             # 客户端点了停止：子进程已由生成器 finally 杀掉；落库已累积的部分答案
             # （只取 token 块，thinking 不落库）
@@ -250,7 +274,7 @@ async def _run_generation(
             _schedule_removal(state.conversation_id)
             raise  # re-raise，让任务真正结束
         except Exception:
-            logger.exception("chat+ 生成失败 conv=%s", state.conversation_id)
+            logger.exception("%s 生成失败 conv=%s", state.source, state.conversation_id)
             state.status = "error"
             evt = {
                 "answer": "",
@@ -286,16 +310,17 @@ async def _run_generation(
             except Exception:
                 logger.exception("助手消息落库失败 conv=%s", state.conversation_id)
 
-            # 用量统计：与 /chat 一致记一条事件（聊天+ 用 action="chatplus"）
+            # 用量统计：action 取自来源（chat / chatplus）；extra_meta 合并（如空间归因）
             await record_event(
                 session,
-                action="chatplus",
+                action=state.source,
                 user_id=state.user_id,
-                workspace_id=workspace_id,
+                workspace_id=state.event_workspace_id,
                 meta={
                     "conversation_id": str(state.conversation_id),
                     "question": question,
                     "answer": final.answer,
+                    **state.extra_meta,
                 },
             )
 
@@ -320,6 +345,18 @@ async def _run_generation(
                 _schedule_removal(state.conversation_id)
 
 
+def _spawn(state: GenerationState, question: str, stream_factory: "StreamFactory") -> GenerationState:
+    """登记 state 并起 detached 任务；调用方已确保 conversation 未在跑。"""
+    _registry[state.conversation_id] = state
+    task = asyncio.create_task(
+        _run_generation(state, question=question, stream_factory=stream_factory)
+    )
+    state.task = task
+    _bg_tasks.add(task)
+    task.add_done_callback(_bg_tasks.discard)
+    return state
+
+
 def start_generation(
     *,
     conversation_id: uuid.UUID,
@@ -336,7 +373,7 @@ def start_generation(
     interactive: bool = False,
     use_original_docs: bool = False,
 ) -> GenerationState:
-    """启动一个 detached 生成任务；该会话已在跑则抛 GenerationInProgress。
+    """启动一个聊天+ detached 生成任务；该会话已在跑则抛 GenerationInProgress。
 
     检查 + 登记之间无 await，单线程 asyncio 下原子。
     """
@@ -350,15 +387,23 @@ def start_generation(
         conversation_id=conversation_id,
         user_id=user_id,
         is_new_conv=is_new_conv,
+        source="chatplus",
+        forward_stage=False,
+        event_workspace_id=workspace_id,
     )
-    _registry[conversation_id] = state
 
-    task = asyncio.create_task(
-        _run_generation(
-            state,
+    async def _factory(session, st):
+        # 在本任务会话重取 User，避免跨会话 lazy-load（check_skill_access 加载组关系）
+        user = await session.get(User, st.user_id)
+        if user is None:
+            raise RuntimeError(f"生成任务找不到用户 user={st.user_id}")
+        async for item in answer_question_plus_streamed(
+            session,
+            workspace_id=workspace_id,
+            conversation_id=st.conversation_id,
+            user=user,
             question=question,
             history=history,
-            workspace_id=workspace_id,
             doc_ids=doc_ids,
             all_docs=all_docs,
             skill_ids=skill_ids,
@@ -366,9 +411,49 @@ def start_generation(
             attachment_names=attachment_names,
             interactive=interactive,
             use_original_docs=use_original_docs,
-        )
+        ):
+            yield item
+
+    return _spawn(state, question, _factory)
+
+
+def start_chat_generation(
+    *,
+    conversation_id: uuid.UUID,
+    user_id: uuid.UUID,
+    is_new_conv: bool,
+    question: str,
+    history: list[tuple[str, str]] | None,
+    workspace_id: uuid.UUID | list[uuid.UUID] | None,
+    conv_ws: uuid.UUID | None,
+    ws_all: list[str],
+) -> GenerationState:
+    """启动一个普通对话 detached 生成任务；该会话已在跑则抛 GenerationInProgress。
+
+    workspace_id 可为单空间 / 空间列表（自动定位）/ None；conv_ws 为审计记录用
+    的单一空间；ws_all 为完整空间归因（写入 meta.workspaces）。
+    """
+    if is_active(conversation_id):
+        raise GenerationInProgress()
+
+    state = GenerationState(
+        conversation_id=conversation_id,
+        user_id=user_id,
+        is_new_conv=is_new_conv,
+        source="chat",
+        forward_stage=True,
+        event_workspace_id=conv_ws,
+        extra_meta={"workspaces": ws_all},
     )
-    state.task = task
-    _bg_tasks.add(task)
-    task.add_done_callback(_bg_tasks.discard)
-    return state
+
+    async def _factory(session, st):
+        # 空列表按 None 处理，复用 answer_question_streamed 的 no_docs 分支
+        async for item in answer_question_streamed(
+            session,
+            workspace_id=workspace_id or None,
+            question=question,
+            history=history,
+        ):
+            yield item
+
+    return _spawn(state, question, _factory)
