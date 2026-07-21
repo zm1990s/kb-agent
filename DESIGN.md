@@ -16,6 +16,7 @@
              ▼               ▼               ▼    ▼
       classify_service  search_service   doc_service   engine/ (唯一LLM出口)
       (调 engine 归类总结) (PG全文检索)   (存取元数据)   ClaudeCliEngine → `claude` 子进程
+                                                       CodexCliEngine  → `codex exec` 子进程
              │               │               │
              └───────────────┴───────┬───────┘
                                      ▼
@@ -34,12 +35,25 @@
 # app/engine/base.py
 class EngineProtocol(Protocol):
     async def complete(self, prompt: str, *, files: list[Path] | None = None,
-                       system: str | None = None) -> EngineResult: ...
+                       system: str | None = None, cwd: Path | None = None) -> EngineResult: ...
+    async def complete_streaming(...) -> AsyncGenerator[ThinkingChunk | TextChunk, None]: ...
 
-# MVP 实现：ClaudeCliEngine —— 以子进程方式调用 `claude` CLI（受控、超时、限制工作目录）
-# 未来实现：OpenClawEngine / CodexEngine —— 同一 Protocol，配置项 ENGINE_BACKEND 切换
+# 已实现：
+#   ClaudeCliEngine  — `claude` 子进程（Anthropic API / Bedrock / 网关）
+#   CodexCliEngine   — `codex exec` 子进程（Azure OpenAI，CODEX_HOME/config.toml 配置 provider）
+#   OpenAICompatEngine — openai SDK 直连（对话引擎专用，不支持文件/cwd）
+# 预留：OpenClawEngine 等后端 —— 同一 Protocol，ENGINE_BACKEND 切换
 ```
-约束：所有对 LLM 的调用都经 `EngineProtocol`，业务层不得感知底层是 CLI 还是 SDK。
+约束：所有对 LLM 的调用都经 `EngineProtocol`，业务层不得感知底层是哪种引擎。
+
+引擎工厂：
+- `get_engine(backend, model, audit_user, idle_timeout_sec)` — Agent 引擎（支持文件/cwd）
+- `get_chat_engine(session, extra_headers, model_key)` — 对话引擎（读 `chat_engine_backend`，支持 openai_compat）
+
+安全：
+- 子进程通过 `_build_cli_env()` 白名单 env 启动，剥离 `JWT_SECRET`/`DATABASE_URL` 等敏感变量。
+- Claude CLI 经 `--settings backend/claude_hooks/` 注入 pre/post hook（防密钥外泄）。
+- Codex CLI 经 `CODEX_HOME` 注入配置目录（含 hooks.json）。
 
 ## 前端架构（单端口入口）
 
@@ -57,8 +71,10 @@ class EngineProtocol(Protocol):
 - **鉴权**：登录拿 JWT，前端 `lib/auth` 存取；`lib/api` 统一在请求头注入 `Authorization: Bearer`。路由守卫拦截未登录访问。
 - **角色显隐**：建空间/建分类等全局管理功能仅对全局 admin 显示；文档写操作（上传/删除/重命名/替换/reprocess/回收站/恢复）对空间 **owner / editor** 也显示（`get_ws_role()` 解析有效角色：全局 admin → owner；个人 WorkspaceMember 角色；组 WorkspaceGroupGrant 角色取最高）。仅体验层，后端通过 `_require_ws_write()` 强制校验。
 - **页面**：①登录/注册 ②对话查询（答案 + 每条来源的原文下载链接）③**聊天+**（Skill 驱动工作台，文件上传/下载/交互模式/后台生成）④**Skill 库**（创建/编辑/权限/Bundle）⑤文档管理（上传、归类状态、列表、下载）⑥管理后台（空间授权及配置/用户管理）⑦系统设置（通用/提示词/AI 引擎/空间管理/用户管理，左侧导航+右侧面板布局）⑧数据统计 ⑨新动态 ⑩账户设置。
-- **引擎选择**：管理员在系统设置切换 Agent 引擎，选择持久化于 `app_settings`（键 `engine_backend`），归类/问答运行时按此解析。Claude CLI 可用；Codex / OpenClaw 前端灰显、后端拒绝（`available=false`），为未来预留。
-- **按任务模型配置**：系统设置独立配置归类/对话/新动态/会话标题所用模型，持久化于 `app_settings`（键 `model::classify` / `model::chat` / `model::whatsnew` / `model::title`），engine 调用时按 key 读取；未设则使用引擎默认模型。
+- **引擎选择**：管理员在系统设置切换 Default Agent Engine（`engine_backend`），归类/问答/聊天+ 运行时按此解析。Claude CLI 和 Codex CLI 均可用；OpenClaw 等为未来预留。
+- **对话引擎（Chat Engine）**：独立于 Agent 引擎，专供普通对话检索使用，支持 `claude_cli` / `openai_compat` / `codex`，持久化于 `chat_engine_backend`。
+- **聊天+ 引擎覆盖**：聊天+ 工作台支持按轮次切换引擎（`engine_override` 字段），仅允许 `claude_cli` / `codex`，不允许 `openai_compat`（无文件/cwd 能力）。
+- **按引擎任务模型配置**：Claude CLI 和 Codex CLI 各有 4 个任务模型 key，共 8 个：`model::classify` / `model::chat` / `model::whatsnew` / `model::title`（Claude），`model::codex::classify` / `model::codex::chat` / `model::codex::whatsnew` / `model::codex::title`（Codex），持久化于 `app_settings`。`GET /settings/models` 返回 8 条，各带 `engine` 标记，前端按当前 Agent 引擎过滤显示。Codex 任务模型通过 `-m` 参数传给 `codex exec`；provider/endpoint 仍由 `CODEX_HOME/config.toml` 决定。
 - **按任务 HTTP Header 配置**：系统设置支持为四类 LLM 任务（归类/标题生成/对话路由/对话回答）各自配置 HTTP Header，存于 `app_settings`（键 `task_headers::classify` / `task_headers::title` / `task_headers::chat_route` / `task_headers::chat_answer`），默认 `{"x-task": "<task_name>"}`。仅对 OpenAI 兼容引擎生效（ClaudeCliEngine 静默忽略），用于 Portkey 等网关路由标签。
 - **国际化**：`next-intl` 客户端 i18n；5 语言（`zh` / `zh-TW` / `en` / `ja` / `ko`）；locale 存 `localStorage`，首次访问按 `navigator.language` 匹配；NavBar 右上角语言切换器；`IntlProvider`（动态加载 `messages/*.json`）+ `LocaleContext`；所有 `window.confirm`/`window.prompt` 替换为 `DialogProvider` 提供的 Promise-based 自定义 Modal。
 - **技术版本**：Next.js 16.2.10 + React 19。
@@ -153,7 +169,7 @@ class StorageProtocol(Protocol):
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | GET/PUT | /settings/engine | 查/设引擎后端（Claude 可用；Codex/OpenClaw 灰显） |
-| GET/PUT | /settings/models | 查/设各任务模型（`classify` / `chat` / `whatsnew` / `title`，每个 task 独立，持久化 `model::*` key） |
+| GET/PUT | /settings/models | 查/设各任务模型（8 条，Claude × 4 + Codex × 4，各带 `engine` 标记，持久化 `model::*` / `model::codex::*` key） |
 | GET | /settings/task-headers | 查四个任务的 HTTP Header 配置（`classify` / `title` / `chat_route` / `chat_answer`） |
 | PUT | /settings/task-headers/{task} | 设单个任务的 HTTP Header（body: `{"headers": {...}}`，需 admin；仅 OpenAI 兼容引擎生效） |
 | GET/POST | /auth/allowed-domains | 注册域名白名单（DB 维护） |
@@ -322,7 +338,7 @@ class StorageProtocol(Protocol):
 ### 增强批次新增表（migration 005–020）
 - **folders**（F1/F2）：`id, workspace_id(FK), name, parent_id(FK self, ON DELETE CASCADE), created_at`；`documents.folder_id`（FK, ON DELETE SET NULL）。用户手动目录树，与分类/标签解耦。
 - **allowed_domains**（M1-U9）：`id, domain(UNIQUE), created_at`。注册白名单迁到 DB。
-- **app_settings**（MF-U7）：`key(PK), value, updated_at`。如 `engine_backend`。
+- **app_settings**（MF-U7）：`key(PK), value, updated_at`。如 `engine_backend` / `chat_engine_backend` / `model::*` / `model::codex::*`。
 - **groups**（F5）：`id, name(UNIQUE), description, created_at`。
 - **group_rules**（F5）：`id, group_id(FK), field(email_domain/email/role), op(equals/endswith/contains), value`。
 - **group_members**（F5）：`(group_id, user_id)` PK。
@@ -351,7 +367,7 @@ class StorageProtocol(Protocol):
 - **不上向量库 / Agent 式索引问答**：以原文为准、减少幻觉。对话不做关键词硬匹配，而是把**整个空间的结构化索引**（标题/分类/标签/摘要）喂给 Claude，由它理解意图、组织答案、按编号挑相关文档（服务端映射回真实文档，防 ID 幻觉）。文档量上千后再评估 pgvector。
 - **RBAC 绑用户组 + admin 绕过**：权限挂在组上（组→模块→读写），用户取所属组并集最高；空间访问 = 个人成员 ∪ 组授权。admin 绕过一切，避免把管理员锁在外面。
 - **引擎认证经 .env 透传**：支持 API key / 公司网关 / AWS Bedrock，凭据不硬编码；引擎后端由管理员在系统设置持久化选择。
-- **封装 Claude CLI 而非直连 SDK**：复用 CLI 的 agent 能力与工具生态；用 `EngineProtocol` 隔离，未来平滑接入 OpenClaw/Codex。
+- **封装 CLI 而非直连 SDK**：Claude CLI 复用其 agent 能力与工具生态；Codex CLI 借助 `codex exec --json` 的 JSONL 流式协议；两者均经 `EngineProtocol` 隔离，未来平滑接入 OpenClaw 等后端。
 - **workspace 作为隔离边界**：Partner 与内部数据天然分空间，权限模型简单可审计，避免行级复杂 ACL。
 - **本地存储 + 存储抽象**：用户要求先不上云对象存储、保持简单。用 `StorageProtocol` 隔离，本地实现 `LocalStorage`，未来换 S3/OSS 不动业务层。
 - **归类交给 Claude CLI 读原文**：常见格式 CLI 原生支持，MVP 免自建解析管线；一趟产出可搜正文 `content_text` 供全文检索。

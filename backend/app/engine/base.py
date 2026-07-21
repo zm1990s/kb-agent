@@ -99,7 +99,14 @@ def get_engine(
             "openai_compat 引擎须通过 get_chat_engine() 获取（需要 DB session）"
         )
 
-    # 预留：openclaw / codex 等未来后端
+    if resolved == "codex":
+        from app.engine.codex_cli import CodexCliEngine
+
+        return CodexCliEngine(
+            model=model, audit_user=audit_user, idle_timeout_sec=idle_timeout_sec
+        )
+
+    # 预留：openclaw 等未来后端
     raise NotImplementedError(f"未实现的引擎后端: {resolved!r}")
 
 
@@ -138,6 +145,12 @@ async def get_chat_engine(
             model=model,
             extra_headers=extra_headers,
         )
+
+    if backend == "codex":
+        from app.services.settings_service import MODEL_CODEX_CHAT_KEY
+        model = await get_task_model(session, model_key or MODEL_CODEX_CHAT_KEY)
+        idle_timeout = await get_engine_idle_timeout_sec(session)
+        return get_engine("codex", model=model, idle_timeout_sec=idle_timeout)
 
     # 默认 claude_cli（extra_headers 静默忽略）
     model = await get_task_model(session, model_key or MODEL_CHAT_KEY)

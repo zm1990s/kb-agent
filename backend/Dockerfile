@@ -13,6 +13,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Claude Code CLI（归类/问答的 LLM 引擎；认证凭据在运行时经环境变量注入）
 RUN npm install -g @anthropic-ai/claude-code
 
+# OpenAI Codex CLI（可选对话引擎；认证凭据在运行时经 OPENAI_API_KEY 注入）
+RUN npm install -g @openai/codex
+
 # 先装依赖以利用层缓存
 COPY pyproject.toml ./
 RUN pip install --no-cache-dir --upgrade pip && \

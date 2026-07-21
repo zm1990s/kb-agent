@@ -373,6 +373,7 @@ def start_generation(
     attachment_names: dict[str, str] | None = None,
     interactive: bool = False,
     use_original_docs: bool = False,
+    engine_override: str = "",
 ) -> GenerationState:
     """启动一个聊天+ detached 生成任务；该会话已在跑则抛 GenerationInProgress。
 
@@ -412,6 +413,7 @@ def start_generation(
             attachment_names=attachment_names,
             interactive=interactive,
             use_original_docs=use_original_docs,
+            engine_override=engine_override,
         ):
             yield item
 

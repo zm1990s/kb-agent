@@ -593,6 +593,8 @@ class ChatPlusRequest(BaseModel):
     use_original_docs: bool = False
     # 附件：携带展示元数据（filename/size）；引擎侧只用 storage_key
     attachments: list[ChatPlusAttachment] | None = None
+    # 引擎覆盖：空字符串或不传则跟随 Default Agent Engine；可选 "claude_cli" / "codex"
+    engine_override: str = ""
 
 
 class ConversationSettingsUpdate(BaseModel):
@@ -661,6 +663,7 @@ async def chat_plus_stream(
             attachment_names=attachment_names or None,
             interactive=body.interactive,
             use_original_docs=body.use_original_docs,
+            engine_override=body.engine_override or "",
         )
     except GenerationInProgress:
         raise HTTPException(status.HTTP_409_CONFLICT, "该会话正在生成中") from None

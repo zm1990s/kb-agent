@@ -13,7 +13,7 @@ async def test_get_engine_config_lists_catalog(client, seed_user):
     assert body["current"] == "claude_cli"  # 默认
     ids = {o["id"]: o for o in body["options"]}
     assert ids["claude_cli"]["available"] is True
-    assert ids["codex"]["available"] is False
+    assert ids["codex"]["available"] is True
     assert ids["openclaw"]["available"] is False
 
 
@@ -28,7 +28,7 @@ async def test_set_engine_available_ok(client, seed_user):
 
 async def test_set_engine_unavailable_400(client, seed_user):
     _, admin = await seed_user("admin")
-    for bad in ("codex", "openclaw", "nonsense"):
+    for bad in ("openclaw", "nonsense"):
         resp = await client.put(
             "/settings/engine", json={"backend": bad}, headers=admin
         )
@@ -57,3 +57,13 @@ async def test_engine_selection_persists(client, seed_user, db_session):
     await client.put("/settings/engine", json={"backend": "claude_cli"}, headers=admin)
     # 直接从 DB 读，确认持久化
     assert await get_engine_backend(db_session) == "claude_cli"
+
+
+async def test_set_engine_codex_ok(client, seed_user):
+    """codex 已实现，切换应返回 200。"""
+    _, admin = await seed_user("admin")
+    resp = await client.put(
+        "/settings/engine", json={"backend": "codex"}, headers=admin
+    )
+    assert resp.status_code == 200
+    assert resp.json()["current"] == "codex"

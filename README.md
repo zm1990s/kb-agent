@@ -61,7 +61,7 @@
    │
    ├─ 前端 Next.js 16 + React 19 + Tailwind CSS
    ├─ 后端 FastAPI + PostgreSQL（全文检索 + GIN 索引）
-   ├─ Agent 引擎：Claude CLI（支持 Anthropic API / Bedrock / 网关）
+   ├─ Agent 引擎：Claude CLI / Codex CLI（EngineProtocol 抽象，支持多后端切换）
    ├─ 文件存储：本地/云对象存储（StorageProtocol 抽象）
    └─ 部署：Docker Compose（开发/生产双模式）
 ```
@@ -86,7 +86,7 @@
 | Backend | Python 3.12 + FastAPI (async) + Pydantic v2 |
 | Frontend | Next.js 16.2.10 + React 19 + TypeScript + Tailwind CSS |
 | Database | PostgreSQL 16（全文检索 tsvector + GIN 索引，零向量库依赖） |
-| Agent Engine | Claude CLI 子进程封装（EngineProtocol，支持 API Key / Bedrock / 网关） |
+| Agent Engine | Claude CLI / Codex CLI 子进程封装（EngineProtocol，支持多后端切换） |
 | File Storage | 本地文件系统（StorageProtocol 抽象，可替换云对象存储） |
 | Deployment | Docker Compose（开发 / 生产双模式） |
 
@@ -133,7 +133,7 @@ cp .env.example .env
 
 | 变量 | 说明 | 默认值 |
 |------|------|--------|
-| `ENGINE_BACKEND` | 引擎类型，当前支持 `claude_cli` | `claude_cli` |
+| `ENGINE_BACKEND` | 引擎类型：`claude_cli`（默认）/ `codex` | `claude_cli` |
 | `CLAUDE_CLI_PATH` | Claude CLI 可执行路径 | `claude` |
 | `CLAUDE_MODEL` | 指定模型（留空使用 CLI 默认） | 无 |
 | `ENGINE_IDLE_TIMEOUT_SEC` | 空闲超时秒数 | `300` |
@@ -145,6 +145,14 @@ Claude CLI 认证方式三选一：
 | `ANTHROPIC_API_KEY` | 方式一：Anthropic 官方 API key |
 | `ANTHROPIC_BASE_URL` + `ANTHROPIC_AUTH_TOKEN` | 方式二：自定义网关（如 Portkey） |
 | `CLAUDE_CODE_USE_BEDROCK` + AWS 相关密钥 | 方式三：AWS Bedrock |
+
+Codex CLI（`ENGINE_BACKEND=codex` 时生效）：
+
+| 变量 | 说明 | 默认值 |
+|------|------|--------|
+| `CODEX_CLI_PATH` | Codex CLI 可执行路径 | `codex` |
+| `CODEX_CONFIG_DIR` | 配置目录（含 `config.toml` / `hooks.json`） | `/app/codex_config` |
+| `OPENAI_API_KEY` | Azure OpenAI API key | 无 |
 
 #### 文件存储
 
@@ -241,12 +249,12 @@ backend/app/
   models/     # SQLAlchemy ORM 模型
   schemas/    # Pydantic 请求/响应 schema
   core/       # 配置、DB 连接、鉴权中间件
-  engine/     # 【唯一 LLM 出口】EngineProtocol + ClaudeCliEngine
+  engine/     # 【唯一 LLM 出口】EngineProtocol + ClaudeCliEngine + CodexCliEngine
   storage/    # StorageProtocol + LocalStorage
   tasks/      # 后台任务：归类 worker、任务状态与重试
 infra/postgres/
   init.sql        # CREATE EXTENSION
-  migrations/     # 001…030，启动时自动顺序执行
+  migrations/     # 001…041，启动时自动顺序执行
 docs/             # PRD / DESIGN / ROADMAP / WORKFLOW / SECURITY
 ```
 

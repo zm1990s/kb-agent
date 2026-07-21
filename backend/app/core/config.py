@@ -41,6 +41,11 @@ class Settings(BaseSettings):
         "/app/claude_hooks/settings.json", alias="CLAUDE_HOOKS_SETTINGS"
     )
 
+    # Codex CLI 引擎配置
+    codex_cli_path: str = Field("codex", alias="CODEX_CLI_PATH")
+    # CODEX_HOME：挂载的配置目录（含 config.toml / hooks.json）
+    codex_config_dir: str = Field("/app/codex_config", alias="CODEX_CONFIG_DIR")
+
     # ── 上传限制 ────────────────────────────────────────
     max_upload_mb: int = Field(200, alias="MAX_UPLOAD_MB")
 

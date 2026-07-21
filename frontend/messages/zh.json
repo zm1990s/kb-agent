@@ -452,6 +452,8 @@
     "chat_engine_backend_label": "引擎后端",
     "chat_engine_claude_cli": "Claude CLI",
     "chat_engine_openai_compat": "OpenAI 兼容（Ollama / vLLM / OpenAI / Azure）",
+    "chat_engine_codex": "Codex CLI",
+    "chat_engine_codex_hint": "Codex 引擎通过 CODEX_HOME 目录中的 config.toml 配置，无需在此填写额外参数。",
     "openai_base_url_label": "Base URL",
     "openai_api_key_label": "API Key",
     "openai_api_key_set": "已配置（留空保持不变）",
@@ -498,7 +500,8 @@
     "case_workspace_desc": "Case 录入生成的文档将自动保存到此空间。未设置时用户无法使用 Case 录入。",
     "case_workspace_none": "（未设置）",
     "case_workspace_saved": "已保存",
-    "case_workspace_save": "保存"
+    "case_workspace_save": "保存",
+    "task_model_codex_hint": "模型名传给 -m 参数；provider/endpoint 仍由 CODEX_HOME/config.toml 决定。"
   },
   "caseEntry": {
     "title": "Case 录入",
@@ -738,7 +741,9 @@
     "reconnectFailed": "重连失败，任务可能仍在后台运行，请稍后切回查看",
     "export": "导出",
     "interactiveMode": "交互模式",
-    "interactiveModeTitle": "交互模式：需要澄清时弹出选项让你选择"
+    "interactiveModeTitle": "交互模式：需要澄清时弹出选项让你选择",
+    "engineOverrideTitle": "引擎覆盖：本轮强制使用指定引擎（不影响系统默认）",
+    "engineOverrideDefault": "默认引擎"
   },
   "chatComponents": {
     "selectSkill": "选择 Skill",
@@ -806,12 +811,24 @@
     "weekly": "每周",
     "monthly": "每月",
     "intervalValue": "每",
-    "units": { "minutes": "分钟", "hours": "小时", "days": "天" },
+    "units": {
+      "minutes": "分钟",
+      "hours": "小时",
+      "days": "天"
+    },
     "dailyAt": "每天",
     "weekDayLabel": "每周",
     "monthDayLabel": "每月",
     "atTime": "点",
-    "weekDays": { "0": "周一", "1": "周二", "2": "周三", "3": "周四", "4": "周五", "5": "周六", "6": "周日" },
+    "weekDays": {
+      "0": "周一",
+      "1": "周二",
+      "2": "周三",
+      "3": "周四",
+      "4": "周五",
+      "5": "周六",
+      "6": "周日"
+    },
     "utcNote": "（UTC 时间）",
     "initialMessage": "用户提示词",
     "initialMessagePlaceholder": "发给 Agent 的第一条消息…",

@@ -17,6 +17,7 @@ interface TaskModel {
   key: string;
   label: string;
   model: string | null;
+  engine?: string;
 }
 interface TaskModelsConfig {
   default_model: string;
@@ -280,41 +281,57 @@ export default function AIEngineSettings() {
         </div>
         {engineMsg && <p className="mt-2 text-xs text-green-600">{engineMsg}</p>}
 
-        {/* 任务级模型配置（子菜单） */}
-        <div className="mt-4 rounded border border-gray-100 bg-gray-50 p-3">
-          <h3 className="mb-1 text-xs font-medium text-gray-700">{t("task_model_title")}</h3>
-          <p className="mb-3 text-xs text-gray-400">
-            {t("task_model_desc", { default: taskModels ? taskModels.default_model : t("task_model_loading") })}
-          </p>
-          {taskModels ? (
-            <div className="space-y-3">
-              {taskModels.tasks.map((task) => (
-                <div key={task.key} className="flex items-center gap-2">
-                  <label className="w-36 flex-shrink-0 text-xs text-gray-600">
-                    {{ classify: t("task_classify"), chat: t("task_chat"), whatsnew: t("task_whatsnew"), title: t("task_title") }[task.key.split("::")[1]] ?? task.key}
-                  </label>
-                  <input
-                    value={taskModelInputs[task.key] ?? ""}
-                    onChange={(e) =>
-                      setTaskModelInputs((prev) => ({ ...prev, [task.key]: e.target.value }))
-                    }
-                    placeholder={taskModels.default_model}
-                    className="flex-1 rounded border bg-white px-3 py-1.5 text-sm font-mono focus:border-blue-400 focus:outline-none"
-                  />
-                  <button
-                    onClick={() => saveTaskModel(task.key)}
-                    className="rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700"
-                  >
-                    {t("whatsnew_save")}
-                  </button>
+        {/* 任务级模型配置（按当前引擎过滤） */}
+        {(() => {
+          const currentEngine = engine?.current ?? "claude_cli";
+          const isCodex = currentEngine === "codex";
+          const engineLabel = isCodex ? "Codex CLI" : "Claude CLI";
+          const visibleTasks = taskModels?.tasks.filter(
+            (t) => (t.engine ?? "claude_cli") === currentEngine
+          ) ?? [];
+          return (
+            <div className="mt-4 rounded border border-gray-100 bg-gray-50 p-3">
+              <h3 className="mb-1 text-xs font-medium text-gray-700">
+                {t("task_model_title")}（{engineLabel}）
+              </h3>
+              {isCodex ? (
+                <p className="mb-3 text-xs text-gray-400">{t("task_model_codex_hint")}</p>
+              ) : (
+                <p className="mb-3 text-xs text-gray-400">
+                  {t("task_model_desc", { default: taskModels ? taskModels.default_model : t("task_model_loading") })}
+                </p>
+              )}
+              {taskModels ? (
+                <div className="space-y-3">
+                  {visibleTasks.map((task) => (
+                    <div key={task.key} className="flex items-center gap-2">
+                      <label className="w-36 flex-shrink-0 text-xs text-gray-600">
+                        {{ classify: t("task_classify"), chat: t("task_chat"), whatsnew: t("task_whatsnew"), title: t("task_title") }[task.key.split("::").pop() ?? ""] ?? task.key}
+                      </label>
+                      <input
+                        value={taskModelInputs[task.key] ?? ""}
+                        onChange={(e) =>
+                          setTaskModelInputs((prev) => ({ ...prev, [task.key]: e.target.value }))
+                        }
+                        placeholder={isCodex ? "" : taskModels.default_model}
+                        className="flex-1 rounded border bg-white px-3 py-1.5 text-sm font-mono focus:border-blue-400 focus:outline-none"
+                      />
+                      <button
+                        onClick={() => saveTaskModel(task.key)}
+                        className="rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700"
+                      >
+                        {t("whatsnew_save")}
+                      </button>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              ) : (
+                <p className="text-sm text-gray-400">{t("task_model_loading")}</p>
+              )}
+              {taskModelMsg && <p className="mt-2 text-xs text-green-600">{taskModelMsg}</p>}
             </div>
-          ) : (
-            <p className="text-sm text-gray-400">{t("task_model_loading")}</p>
-          )}
-          {taskModelMsg && <p className="mt-2 text-xs text-green-600">{taskModelMsg}</p>}
-        </div>
+          );
+        })()}
 
         <hr className="my-4 border-gray-100" />
 
@@ -357,8 +374,14 @@ export default function AIEngineSettings() {
             >
               <option value="claude_cli">{t("chat_engine_claude_cli")}</option>
               <option value="openai_compat">{t("chat_engine_openai_compat")}</option>
+              <option value="codex">{t("chat_engine_codex")}</option>
             </select>
           </div>
+          {chatEngineInput.chat_engine_backend === "codex" && (
+            <p className="text-xs text-gray-500 rounded border border-gray-100 bg-gray-50 px-3 py-2">
+              {t("chat_engine_codex_hint")}
+            </p>
+          )}
           {chatEngineInput.chat_engine_backend === "openai_compat" && (
             <div className="space-y-2 rounded border border-gray-100 bg-gray-50 p-3">
               <div>

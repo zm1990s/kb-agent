@@ -452,6 +452,8 @@
     "chat_engine_backend_label": "エンジンバックエンド",
     "chat_engine_claude_cli": "Claude CLI",
     "chat_engine_openai_compat": "OpenAI 互換（Ollama / vLLM / OpenAI / Azure）",
+    "chat_engine_codex": "Codex CLI",
+    "chat_engine_codex_hint": "Codex エンジンは CODEX_HOME の config.toml で設定されます。追加フィールドは不要です。",
     "openai_base_url_label": "ベース URL",
     "openai_api_key_label": "API キー",
     "openai_api_key_set": "設定済み（空白のまま変更しない）",
@@ -498,7 +500,8 @@
     "case_workspace_desc": "ケース入力で作成した文書はこのワークスペースに保存されます。未設定の場合ケース入力は利用できません。",
     "case_workspace_none": "（未設定）",
     "case_workspace_saved": "保存しました",
-    "case_workspace_save": "保存"
+    "case_workspace_save": "保存",
+    "task_model_codex_hint": "モデル名は -m フラグに渡されます。provider/endpoint は引き続き CODEX_HOME/config.toml で制御されます。"
   },
   "caseEntry": {
     "title": "ケース入力",
@@ -738,7 +741,9 @@
     "reconnectFailed": "再接続に失敗しました。タスクはバックグラウンドで実行中の可能性があります。後で戻って確認してください",
     "export": "エクスポート",
     "interactiveMode": "インタラクティブモード",
-    "interactiveModeTitle": "インタラクティブモード：確認が必要なとき、選択肢を表示します"
+    "interactiveModeTitle": "インタラクティブモード：確認が必要なとき、選択肢を表示します",
+    "engineOverrideTitle": "エンジン上書き：このターンのみ指定エンジンを強制使用（システムデフォルトは変更しない）",
+    "engineOverrideDefault": "デフォルトエンジン"
   },
   "chatComponents": {
     "selectSkill": "スキルを選択",
@@ -806,12 +811,24 @@
     "weekly": "毎週",
     "monthly": "毎月",
     "intervalValue": "毎",
-    "units": { "minutes": "分", "hours": "時間", "days": "日" },
+    "units": {
+      "minutes": "分",
+      "hours": "時間",
+      "days": "日"
+    },
     "dailyAt": "毎日",
     "weekDayLabel": "毎週",
     "monthDayLabel": "毎月",
     "atTime": "時",
-    "weekDays": { "0": "月曜日", "1": "火曜日", "2": "水曜日", "3": "木曜日", "4": "金曜日", "5": "土曜日", "6": "日曜日" },
+    "weekDays": {
+      "0": "月曜日",
+      "1": "火曜日",
+      "2": "水曜日",
+      "3": "木曜日",
+      "4": "金曜日",
+      "5": "土曜日",
+      "6": "日曜日"
+    },
     "utcNote": "（UTC）",
     "initialMessage": "ユーザープロンプト",
     "initialMessagePlaceholder": "Agentへの最初のメッセージ…",

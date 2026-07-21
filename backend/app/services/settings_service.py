@@ -21,6 +21,12 @@ MODEL_CLASSIFY_KEY = "model::classify"
 MODEL_CHAT_KEY = "model::chat"
 MODEL_WHATSNEW_KEY = "model::whatsnew"
 MODEL_TITLE_KEY = "model::title"
+
+# Codex 引擎独立的任务模型 key（存 -m 参数值，空表示不传 -m，使用 config.toml 的 model）
+MODEL_CODEX_CLASSIFY_KEY = "model::codex::classify"
+MODEL_CODEX_CHAT_KEY = "model::codex::chat"
+MODEL_CODEX_WHATSNEW_KEY = "model::codex::whatsnew"
+MODEL_CODEX_TITLE_KEY = "model::codex::title"
 WHATSNEW_HOUR_KEY = "whatsnew_schedule_hour"
 WHATSNEW_HOUR_DEFAULT = 2  # 凌晨 2 点
 
@@ -172,7 +178,7 @@ class EngineOption:
 # 引擎目录：唯一真相源，前端据此渲染（未实现的置灰）。
 ENGINE_CATALOG: list[EngineOption] = [
     EngineOption(id="claude_cli", label="Claude CLI", available=True),
-    EngineOption(id="codex", label="Codex（未实现）", available=False),
+    EngineOption(id="codex", label="Codex CLI", available=True),
     EngineOption(id="openclaw", label="OpenClaw（未实现）", available=False),
 ]
 
@@ -212,7 +218,10 @@ async def set_engine_backend(session: AsyncSession, backend: str) -> None:
 
 # ── 任务级模型配置 ──────────────────────────────────────────────────────────
 
-_TASK_MODEL_KEYS = {MODEL_CLASSIFY_KEY, MODEL_CHAT_KEY, MODEL_WHATSNEW_KEY, MODEL_TITLE_KEY}
+_TASK_MODEL_KEYS = {
+    MODEL_CLASSIFY_KEY, MODEL_CHAT_KEY, MODEL_WHATSNEW_KEY, MODEL_TITLE_KEY,
+    MODEL_CODEX_CLASSIFY_KEY, MODEL_CODEX_CHAT_KEY, MODEL_CODEX_WHATSNEW_KEY, MODEL_CODEX_TITLE_KEY,
+}
 
 
 async def get_task_model(session: AsyncSession, key: str) -> str | None:
@@ -232,6 +241,14 @@ async def set_task_model(session: AsyncSession, key: str, model: str) -> None:
         if row is not None:
             await session.delete(row)
             await session.commit()
+
+
+async def get_task_model_for_engine(
+    session: AsyncSession, task: str, engine: str
+) -> str | None:
+    """按引擎取任务模型：codex 走 model::codex::<task>，其余走 model::<task>。"""
+    key = f"model::codex::{task}" if engine == "codex" else f"model::{task}"
+    return await get_task_model(session, key)
 
 
 # ── 提示词管理 ──────────────────────────────────────────────────────────────
@@ -448,7 +465,7 @@ OPENAI_BASE_URL_KEY = "openai_base_url"
 OPENAI_API_KEY_KEY = "openai_api_key"
 OPENAI_MODEL_KEY = "openai_model"
 
-_CHAT_ENGINE_IDS = {"claude_cli", "openai_compat"}
+_CHAT_ENGINE_IDS = {"claude_cli", "openai_compat", "codex"}
 
 
 async def get_chat_engine_backend(session: AsyncSession) -> str:

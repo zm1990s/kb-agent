@@ -452,6 +452,8 @@
     "chat_engine_backend_label": "Engine backend",
     "chat_engine_claude_cli": "Claude CLI",
     "chat_engine_openai_compat": "OpenAI-compatible (Ollama / vLLM / OpenAI / Azure)",
+    "chat_engine_codex": "Codex CLI",
+    "chat_engine_codex_hint": "Codex engine is configured via config.toml in CODEX_HOME directory. No extra fields needed here.",
     "openai_base_url_label": "Base URL",
     "openai_api_key_label": "API Key",
     "openai_api_key_set": "Already set (leave blank to keep unchanged)",
@@ -498,7 +500,8 @@
     "case_workspace_desc": "Documents created via Case Entry are saved to this workspace. Case Entry is unavailable until this is set.",
     "case_workspace_none": "(not set)",
     "case_workspace_saved": "Saved",
-    "case_workspace_save": "Save"
+    "case_workspace_save": "Save",
+    "task_model_codex_hint": "Model name is passed to the -m flag; provider/endpoint is still controlled by CODEX_HOME/config.toml."
   },
   "caseEntry": {
     "title": "Case Entry",
@@ -738,7 +741,9 @@
     "reconnectFailed": "Reconnect failed. The task may still be running in the background — switch back later to view it.",
     "export": "Export",
     "interactiveMode": "Interactive Mode",
-    "interactiveModeTitle": "Interactive mode: shows options for you to choose when clarification is needed"
+    "interactiveModeTitle": "Interactive mode: shows options for you to choose when clarification is needed",
+    "engineOverrideTitle": "Engine override: force a specific engine for this turn (does not change system default)",
+    "engineOverrideDefault": "Default engine"
   },
   "chatComponents": {
     "selectSkill": "Select Skill",
@@ -806,12 +811,24 @@
     "weekly": "Weekly",
     "monthly": "Monthly",
     "intervalValue": "Every",
-    "units": { "minutes": "min", "hours": "hr", "days": "day" },
+    "units": {
+      "minutes": "min",
+      "hours": "hr",
+      "days": "day"
+    },
     "dailyAt": "Daily at",
     "weekDayLabel": "Every",
     "monthDayLabel": "Every month on day",
     "atTime": "at",
-    "weekDays": { "0": "Mon", "1": "Tue", "2": "Wed", "3": "Thu", "4": "Fri", "5": "Sat", "6": "Sun" },
+    "weekDays": {
+      "0": "Mon",
+      "1": "Tue",
+      "2": "Wed",
+      "3": "Thu",
+      "4": "Fri",
+      "5": "Sat",
+      "6": "Sun"
+    },
     "utcNote": "(UTC)",
     "initialMessage": "User Prompt",
     "initialMessagePlaceholder": "First message to send to the Agent…",

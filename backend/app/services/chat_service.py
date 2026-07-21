@@ -208,11 +208,14 @@ async def generate_conversation_title(
     from app.services.settings_service import (
         TASK_HEADERS_TITLE_KEY,
         TITLE_PROMPT_KEY,
+        get_chat_engine_backend,
         get_prompt,
         get_task_headers,
     )
 
+    _engine_backend = "unknown"
     try:
+        _engine_backend = await get_chat_engine_backend(session)
         headers = await get_task_headers(session, TASK_HEADERS_TITLE_KEY)
         engine = await get_chat_engine(session, extra_headers=headers)
         prompt_tpl = await get_prompt(session, TITLE_PROMPT_KEY)
@@ -226,5 +229,5 @@ async def generate_conversation_title(
                 await session.commit()
                 return title
     except Exception:
-        logger.exception("generate_conversation_title failed conversation=%s", conversation_id)
+        logger.exception("generate_conversation_title failed engine=%s conversation=%s", _engine_backend, conversation_id)
     return None

@@ -61,7 +61,7 @@ Users / Admins
    │
    ├─ Frontend: Next.js 16 + React 19 + Tailwind CSS
    ├─ Backend: FastAPI + PostgreSQL (full-text search + GIN indexes)
-   ├─ Agent Engine: Claude CLI (supports Anthropic API / Bedrock / gateway)
+   ├─ Agent Engine: Claude CLI / Codex CLI (EngineProtocol abstraction, supports multiple backends)
    ├─ File Storage: local / cloud object storage (StorageProtocol abstraction)
    └─ Deployment: Docker Compose (dev / production dual modes)
 ```
@@ -86,7 +86,7 @@ Users / Admins
 | Backend | Python 3.12 + FastAPI (async) + Pydantic v2 |
 | Frontend | Next.js 16.2.10 + React 19 + TypeScript + Tailwind CSS |
 | Database | PostgreSQL 16 (full-text search tsvector + GIN indexes, zero vector DB dependency) |
-| Agent Engine | Claude CLI subprocess wrapper (EngineProtocol, supports API Key / Bedrock / gateway) |
+| Agent Engine | Claude CLI / Codex CLI subprocess wrapper (EngineProtocol abstraction, supports multiple backends) |
 | File Storage | Local filesystem (StorageProtocol abstraction, swappable to cloud object storage) |
 | Deployment | Docker Compose (dev / production dual modes) |
 
@@ -133,7 +133,7 @@ The table below lists the meaning and default values of the core variables:
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `ENGINE_BACKEND` | Engine type; currently supports `claude_cli` | `claude_cli` |
+| `ENGINE_BACKEND` | Engine type: `claude_cli` (default) / `codex` | `claude_cli` |
 | `CLAUDE_CLI_PATH` | Claude CLI executable path | `claude` |
 | `CLAUDE_MODEL` | Specify model (leave blank to use CLI default) | None |
 | `ENGINE_IDLE_TIMEOUT_SEC` | Idle timeout in seconds | `300` |
@@ -145,6 +145,14 @@ Claude CLI authentication options (choose one):
 | `ANTHROPIC_API_KEY` | Option 1: Anthropic official API key |
 | `ANTHROPIC_BASE_URL` + `ANTHROPIC_AUTH_TOKEN` | Option 2: Custom gateway (e.g., Portkey) |
 | `CLAUDE_CODE_USE_BEDROCK` + AWS credentials | Option 3: AWS Bedrock |
+
+Codex CLI (applies when `ENGINE_BACKEND=codex`):
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `CODEX_CLI_PATH` | Codex CLI executable path | `codex` |
+| `CODEX_CONFIG_DIR` | Config directory (contains `config.toml` / `hooks.json`) | `/app/codex_config` |
+| `OPENAI_API_KEY` | Azure OpenAI API key | None |
 
 #### File Storage
 
@@ -241,12 +249,12 @@ backend/app/
   models/     # SQLAlchemy ORM models
   schemas/    # Pydantic request/response schemas
   core/       # Configuration, DB connection, auth middleware
-  engine/     # [Single LLM exit] EngineProtocol + ClaudeCliEngine
+  engine/     # [Single LLM exit] EngineProtocol + ClaudeCliEngine + CodexCliEngine
   storage/    # StorageProtocol + LocalStorage
   tasks/      # Background tasks: categorization worker, task status, and retries
 infra/postgres/
   init.sql        # CREATE EXTENSION
-  migrations/     # 001…030, executed automatically in order on startup
+  migrations/     # 001…041, executed automatically in order on startup
 docs/             # PRD / DESIGN / ROADMAP / WORKFLOW / SECURITY
 ```
 

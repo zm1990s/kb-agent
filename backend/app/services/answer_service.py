@@ -171,7 +171,17 @@ async def answer_question_streamed(
 
     供 SSE 端点消费；answer_question() 是它的收敛封装。
     """
-    logger.info("answer start workspace=%s question_len=%d", workspace_id, len(question))
+    from app.services.settings_service import (
+        ANSWER_FETCH_PROMPT_KEY,
+        ANSWER_PROMPT_KEY,
+        TASK_HEADERS_CHAT_KEY,
+        get_chat_engine_backend,
+        get_prompt,
+        get_task_headers,
+    )
+
+    _engine_backend = await get_chat_engine_backend(session)
+    logger.info("answer start engine=%s workspace=%s question_len=%d", _engine_backend, workspace_id, len(question))
     yield Stage("indexing", "stage_indexing_start")
     index = await _load_index(session, workspace_id)
 
@@ -183,15 +193,6 @@ async def answer_question_streamed(
     if index:
         yield Stage("indexing", "stage_indexing_loaded", {"count": len(index)})
     catalog = _build_catalog(index) if index else "（本空间暂无已归类文档）"
-
-    from app.services.settings_service import (
-        ANSWER_FETCH_PROMPT_KEY,
-        ANSWER_PROMPT_KEY,
-        TASK_HEADERS_CHAT_KEY,
-        get_prompt,
-        get_task_headers,
-    )
-
     yield Stage("thinking", "stage_thinking_phase1")
     engine = await get_chat_engine(
         session, extra_headers=await get_task_headers(session, TASK_HEADERS_CHAT_KEY)
@@ -208,7 +209,7 @@ async def answer_question_streamed(
             )
         )
     except EngineError as exc:
-        logger.error("phase1 engine 调用失败 workspace=%s: %s", workspace_id, exc)
+        logger.error("phase1 engine 调用失败 | engine=%s | workspace=%s: %s", _engine_backend, workspace_id, exc)
         yield Stage("done", "stage_done")
         yield AnswerResult(answer="engine_unavailable", sources=[], error_key="engine_unavailable")
         return
@@ -285,7 +286,7 @@ async def answer_question_streamed(
             r = await engine.complete(phase2_prompt)
             answer = r.text.strip()
     except EngineError as exc:
-        logger.error("phase2 engine 调用失败 workspace=%s: %s", workspace_id, exc)
+        logger.error("phase2 engine 调用失败 | engine=%s | workspace=%s: %s", _engine_backend, workspace_id, exc)
         yield Stage("done", "stage_done")
         yield AnswerResult(
             answer="engine_unavailable", sources=[], error_key="engine_unavailable"
@@ -296,8 +297,8 @@ async def answer_question_streamed(
 
     error_key: str | None = None if answer else "no_answer"
     if not answer:
-        logger.warning("phase2 输出为空 workspace=%s", workspace_id)
-    logger.info("answer done workspace=%s sources=%d", workspace_id, len(sources))
+        logger.warning("phase2 输出为空 engine=%s workspace=%s", _engine_backend, workspace_id)
+    logger.info("answer done engine=%s workspace=%s sources=%d", _engine_backend, workspace_id, len(sources))
     yield Stage("done", "stage_done")
     yield AnswerResult(answer=answer, sources=sources, error_key=error_key)
 

@@ -45,6 +45,7 @@ services:
       - AWS_SECRET_ACCESS_KEY
       - AWS_SESSION_TOKEN
       - AWS_REGION
+      - OPENAI_API_KEY
       - LOG_DIR=/app/logs
     expose:
       - "8000"
@@ -52,6 +53,7 @@ services:
       - ./data/documents:/app/local_storage
       - ./data/logs:/app/logs
       - ./infra:/app/infra:ro
+      - ./data/codex:/app/codex_config
 
   frontend:
     build:

@@ -14,6 +14,10 @@ from app.services.settings_service import (
     ENGINE_CATALOG,
     MODEL_CHAT_KEY,
     MODEL_CLASSIFY_KEY,
+    MODEL_CODEX_CHAT_KEY,
+    MODEL_CODEX_CLASSIFY_KEY,
+    MODEL_CODEX_TITLE_KEY,
+    MODEL_CODEX_WHATSNEW_KEY,
     MODEL_TITLE_KEY,
     MODEL_WHATSNEW_KEY,
     PROMPT_CATALOG,
@@ -489,6 +493,22 @@ _TASK_MODEL_LABELS: dict[str, str] = {
     MODEL_CHAT_KEY: "对话问答模型",
     MODEL_WHATSNEW_KEY: "新动态摘要模型",
     MODEL_TITLE_KEY: "会话标题模型",
+    MODEL_CODEX_CLASSIFY_KEY: "文档归类模型",
+    MODEL_CODEX_CHAT_KEY: "对话问答模型",
+    MODEL_CODEX_WHATSNEW_KEY: "新动态摘要模型",
+    MODEL_CODEX_TITLE_KEY: "会话标题模型",
+}
+
+# 每个 key 归属的引擎（前端按此过滤）
+_TASK_MODEL_ENGINE: dict[str, str] = {
+    MODEL_CLASSIFY_KEY: "claude_cli",
+    MODEL_CHAT_KEY: "claude_cli",
+    MODEL_WHATSNEW_KEY: "claude_cli",
+    MODEL_TITLE_KEY: "claude_cli",
+    MODEL_CODEX_CLASSIFY_KEY: "codex",
+    MODEL_CODEX_CHAT_KEY: "codex",
+    MODEL_CODEX_WHATSNEW_KEY: "codex",
+    MODEL_CODEX_TITLE_KEY: "codex",
 }
 
 
@@ -496,6 +516,7 @@ class TaskModelOut(BaseModel):
     key: str
     label: str
     model: str | None
+    engine: str = "claude_cli"
 
 
 class TaskModelsOut(BaseModel):
@@ -520,6 +541,7 @@ async def get_task_models(
             key=key,
             label=label,
             model=await get_task_model(session, key),
+            engine=_TASK_MODEL_ENGINE.get(key, "claude_cli"),
         ))
     return TaskModelsOut(default_model=default, tasks=tasks)
 

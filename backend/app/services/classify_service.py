@@ -138,7 +138,10 @@ async def run_classification(session: AsyncSession, task_id: uuid.UUID) -> None:
     task.attempts += 1
     _append_log(task, "start", f"第 {task.attempts} 次尝试")
     await session.commit()
-    logger.info("classify start doc=%s attempt=%d", doc.id, task.attempts)
+    from app.services.settings_service import CLASSIFY_PROMPT_KEY, get_engine_backend, get_engine_idle_timeout_sec, get_prompt, get_task_model_for_engine
+
+    _engine_backend = await get_engine_backend(session)
+    logger.info("classify start engine=%s doc=%s attempt=%d", _engine_backend, doc.id, task.attempts)
 
     try:
         # 候选分类
@@ -147,18 +150,14 @@ async def run_classification(session: AsyncSession, task_id: uuid.UUID) -> None:
         )
         cat_names = [n for (n,) in cats_result.all()]
 
-        from app.services.settings_service import CLASSIFY_PROMPT_KEY, get_prompt
         prompt_tpl = await get_prompt(session, CLASSIFY_PROMPT_KEY)
         prompt = prompt_tpl.format(
             categories=", ".join(cat_names) if cat_names else "（无预定义分类）",
         )
 
-        # 文档归类始终使用 Claude CLI（需要 --add-dir 读取本地文件）
-        from app.services.settings_service import MODEL_CLASSIFY_KEY, get_engine_idle_timeout_sec, get_task_model
-
         engine = get_engine(
-            "claude_cli",
-            model=await get_task_model(session, MODEL_CLASSIFY_KEY),
+            _engine_backend,
+            model=await get_task_model_for_engine(session, "classify", _engine_backend),
             idle_timeout_sec=await get_engine_idle_timeout_sec(session),
         )
         from app.storage.base import get_storage

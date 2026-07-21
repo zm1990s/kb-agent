@@ -11,7 +11,7 @@
 - 数据库: **PostgreSQL 16**（元数据 + 全文检索 `tsvector`）；**MVP 不引入向量库**（检索走结构化元数据 + 关键词，把原文交给 LLM 回答以降低幻觉）
 - 文件存储: **MVP 用本地文件系统**（保持架构简单）；通过 `StorageProtocol` 抽象封装，未来可换云对象存储而不动业务层
 - 正文/归类: **交给 Claude CLI 直接读原文**（Word/PDF/图片/Excel/PPT 等常见格式 CLI 原生支持），归类时一趟调用同时产出 {分类, 摘要, 标签, 可搜正文 content_text}，MVP 不自己写解析库
-- Agent 引擎: **封装 Claude CLI 子进程**，通过 `EngineProtocol` 抽象层调用；预留 OpenClaw / Codex 等未来后端
+- Agent 引擎: **封装 CLI 子进程**，通过 `EngineProtocol` 抽象层调用；已实现 `ClaudeCliEngine`（`claude` 子进程）和 `CodexCliEngine`（`codex exec` 子进程）；预留 OpenClaw 等未来后端
 - 认证: **自建用户表 + 邮箱密码**，注册时按 **域名后缀白名单** 控制准入；access token（JWT，默认 60 分钟）+ sliding refresh token（httpOnly cookie，30 天，rotate on use）实现无感续期
 - 异步处理: 归类走 **后台任务**（含处理任务表 + 详细日志 + 失败可重试）
 - 前端: **Next.js（App Router）+ TypeScript + Tailwind**。**只对用户暴露一个端口**——Next.js 作统一入口，经 rewrites 把 `/api/*` 反代到后端 FastAPI，用户不直接访问后端端口
@@ -26,7 +26,7 @@ backend/
     models/       # SQLAlchemy ORM 模型
     schemas/      # Pydantic 请求/响应 schema
     core/         # 配置、DB 连接、鉴权中间件、异常处理
-    engine/       # 【唯一 LLM 出口】EngineProtocol + ClaudeCliEngine，未来加 OpenClawEngine/CodexEngine
+    engine/       # 【唯一 LLM 出口】EngineProtocol + ClaudeCliEngine + CodexCliEngine，预留 OpenClawEngine
     skills/       # 【预留】skill 插拔框架：SkillBase 抽象 + registry
     storage/      # StorageProtocol + LocalStorage（MVP 本地路径），未来加 S3/OSS 实现
     tasks/        # 后台任务：归类 worker、任务状态与重试

@@ -254,6 +254,7 @@ async def answer_question_plus_streamed(
     attachment_names: dict[str, str] | None = None,
     interactive: bool = False,
     use_original_docs: bool = False,
+    engine_override: str = "",
 ):
     """聊天+ 流式问答生成器：复刻 Claude Desktop 直连体验。
 
@@ -432,10 +433,14 @@ async def answer_question_plus_streamed(
     pre_files = _list_workdir_files(workdir)
 
     yield Stage("thinking", "stage_thinking_phase2")
-    # 聊天+ 固定用 Claude CLI：需要文件读写/工作目录能力，
-    # 不受「对话引擎」设置（openai_compat 无这些能力）影响。
+    # 聊天+ 跟随 Default Agent Engine（claude_cli / codex），不用对话引擎（openai_compat 无文件能力）。
+    # engine_override 非空时用用户本轮指定的引擎，否则读系统默认 Agent Engine。
     # 传入用户邮箱，供 CLI hook 在拦截 env 读取时写入安全审计。
-    engine = get_engine("claude_cli", audit_user=user.email)
+    from app.services.settings_service import get_engine_backend, get_task_model_for_engine
+    _resolved_engine = engine_override if engine_override in ("claude_cli", "codex") else await get_engine_backend(session)
+    logger.info("plus start engine=%s conversation=%s", _resolved_engine, conversation_id)
+    _chat_model = await get_task_model_for_engine(session, "chat", _resolved_engine)
+    engine = get_engine(_resolved_engine, model=_chat_model, audit_user=user.email)
 
     try:
         if hasattr(engine, "complete_streaming"):
@@ -458,7 +463,7 @@ async def answer_question_plus_streamed(
             r = await engine.complete(prompt, system=skill_system, cwd=workdir)
             answer = r.text.strip()
     except EngineError as exc:
-        logger.error("plus engine 调用失败 workspace=%s: %s", workspace_id, exc)
+        logger.error("plus engine 调用失败 | engine=%s | workspace=%s: %s", _resolved_engine, workspace_id, exc)
         yield Stage("done", "stage_done")
         yield AnswerResult(
             answer="engine_unavailable", sources=[], error_key="engine_unavailable"
@@ -480,6 +485,7 @@ async def answer_question_plus_streamed(
         })
 
     error_key: str | None = None if answer else "no_answer"
+    logger.info("plus done engine=%s conversation=%s output_files=%d", _resolved_engine, conversation_id, len(output_files))
     yield Stage("done", "stage_done")
     yield AnswerResult(answer=answer, sources=[], error_key=error_key)
     if output_files:
