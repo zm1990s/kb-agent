@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import NavBar from "@/components/NavBar";
 import Markdown from "@/components/Markdown";
@@ -58,10 +58,11 @@ export default function WhatsNewPage() {
 
   // 订阅状态
   const [sub, setSub] = useState<Subscription | null>(null);
-  const [subLoading, setSubLoading] = useState(true);
   const [subFreq, setSubFreq] = useState("weekly");
   const [subSaving, setSubSaving] = useState(false);
   const [subMsg, setSubMsg] = useState("");
+  const [subOpen, setSubOpen] = useState(false);
+  const subBtnRef = useRef<HTMLDivElement>(null);
 
   async function load() {
     setLoading(true);
@@ -76,15 +77,12 @@ export default function WhatsNewPage() {
   }
 
   async function loadSub() {
-    setSubLoading(true);
     try {
       const data = await api.get<Subscription>("/whatsnew/subscription");
       setSub(data);
       setSubFreq(data.frequency);
     } catch {
       setSub(null);
-    } finally {
-      setSubLoading(false);
     }
   }
 
@@ -156,6 +154,16 @@ export default function WhatsNewPage() {
     }
   }
 
+  useEffect(() => {
+    function handle(e: MouseEvent) {
+      if (subBtnRef.current && !subBtnRef.current.contains(e.target as Node)) {
+        setSubOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handle);
+    return () => document.removeEventListener("mousedown", handle);
+  }, []);
+
   if (!ready) return null;
 
   return (
@@ -175,6 +183,78 @@ export default function WhatsNewPage() {
                 {triggering ? t("triggering") : t("trigger")}
               </button>
             )}
+            {/* 订阅按钮 */}
+            <div className="relative" ref={subBtnRef}>
+              <button
+                onClick={() => { setSubOpen((v) => !v); setSubMsg(""); }}
+                className="flex items-center gap-1.5 rounded border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                </svg>
+                {t("subscription")}
+                {sub && (
+                  <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
+                )}
+              </button>
+              {subOpen && (
+                <div className="absolute right-0 top-full z-50 mt-1 w-72 rounded-lg border border-gray-200 bg-white shadow-lg">
+                  <div className="border-b border-gray-100 px-4 py-2.5">
+                    <p className="text-sm font-medium text-gray-800">{t("subscription")}</p>
+                  </div>
+                  <div className="space-y-3 p-4">
+                    <div>
+                      <p className="mb-1 text-xs text-gray-500">{t("sub_email")}</p>
+                      <p className="truncate text-sm text-gray-700">{myEmail}</p>
+                      <p className="mt-0.5 text-xs text-gray-400">{t("sub_email_hint")}</p>
+                    </div>
+                    <div>
+                      <p className="mb-1 text-xs text-gray-500">{t("sub_frequency")}</p>
+                      <select
+                        value={subFreq}
+                        onChange={(e) => setSubFreq(e.target.value)}
+                        className="w-full rounded border border-gray-200 px-2 py-1.5 text-sm focus:border-blue-400 focus:outline-none"
+                      >
+                        {FREQ_OPTIONS.map((o) => (
+                          <option key={o.value} value={o.value}>{o.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                    {sub && (
+                      <p className="text-xs text-gray-400">
+                        {t("sub_current", { freq: FREQ_OPTIONS.find((o) => o.value === sub.frequency)?.label ?? sub.frequency })}
+                        {sub.last_sent_at
+                          ? t("sub_last_sent", { date: formatDate(sub.last_sent_at) })
+                          : t("sub_never_sent")}
+                      </p>
+                    )}
+                    <div className="flex gap-2 pt-1">
+                      <button
+                        onClick={handleSubSave}
+                        disabled={subSaving}
+                        className="flex-1 rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700 disabled:opacity-50"
+                      >
+                        {subSaving ? t("sub_save") : sub ? t("sub_update") : t("sub_subscribe")}
+                      </button>
+                      {sub && (
+                        <button
+                          onClick={handleSubDelete}
+                          disabled={subSaving}
+                          className="rounded border border-red-200 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50"
+                        >
+                          {t("sub_unsubscribe")}
+                        </button>
+                      )}
+                    </div>
+                    {subMsg && (
+                      <p className={`text-xs ${subMsg.includes("失败") || subMsg.toLowerCase().includes("fail") ? "text-red-600" : "text-green-600"}`}>
+                        {subMsg}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
             <button
               onClick={load}
               className="rounded border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100"
@@ -277,87 +357,6 @@ export default function WhatsNewPage() {
           </div>
         )}
 
-        {/* 邮件订阅区块 */}
-        <div className="mt-10 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-          <div className="border-b border-gray-100 bg-gray-50 px-5 py-3">
-            <h2 className="font-medium text-gray-800">{t("subscription")}</h2>
-          </div>
-          <div className="p-5">
-            {subLoading ? (
-              <p className="text-sm text-gray-400">{t("loading")}</p>
-            ) : (
-              <div className="space-y-4">
-                {/* 收件邮箱（只读） */}
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-gray-500">
-                    {t("sub_email")}
-                  </label>
-                  <input
-                    type="text"
-                    value={myEmail}
-                    readOnly
-                    className="w-full rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-500 cursor-not-allowed"
-                  />
-                  <p className="mt-0.5 text-xs text-gray-400">{t("sub_email_hint")}</p>
-                </div>
-
-                {/* 频率选择 */}
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-gray-500">
-                    {t("sub_frequency")}
-                  </label>
-                  <select
-                    value={subFreq}
-                    onChange={(e) => setSubFreq(e.target.value)}
-                    className="w-full rounded border border-gray-200 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none"
-                  >
-                    {FREQ_OPTIONS.map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* 当前订阅状态 */}
-                {sub && (
-                  <p className="text-xs text-gray-400">
-                    {t("sub_current", { freq: FREQ_OPTIONS.find((o) => o.value === sub.frequency)?.label ?? sub.frequency })}
-                    {sub.last_sent_at
-                      ? t("sub_last_sent", { date: formatDate(sub.last_sent_at) })
-                      : t("sub_never_sent")}
-                  </p>
-                )}
-
-                {/* 操作按钮 */}
-                <div className="flex gap-2">
-                  <button
-                    onClick={handleSubSave}
-                    disabled={subSaving}
-                    className="rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700 disabled:opacity-50"
-                  >
-                    {subSaving ? t("sub_save") : sub ? t("sub_update") : t("sub_subscribe")}
-                  </button>
-                  {sub && (
-                    <button
-                      onClick={handleSubDelete}
-                      disabled={subSaving}
-                      className="rounded border border-red-200 px-4 py-2 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50"
-                    >
-                      {t("sub_unsubscribe")}
-                    </button>
-                  )}
-                </div>
-
-                {subMsg && (
-                  <p className={`text-sm ${subMsg.includes("失败") ? "text-red-600" : "text-green-600"}`}>
-                    {subMsg}
-                  </p>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
       </main>
     </div>
   );
