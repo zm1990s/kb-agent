@@ -42,8 +42,9 @@ StreamFactory = Callable[["AsyncSession", "GenerationState"], AsyncIterator]
 
 logger = logging.getLogger(__name__)
 
-# 终态保留窗口（秒）：让刚返回的客户端还能读到 done / 补发，之后清出注册表
-_GRACE_SEC = 30
+# 终态保留窗口（秒）：让刚返回的客户端还能读到 done / 补发，之后清出注册表。
+# 设为 300s：用户切换菜单再返回常超过 30s，延长窗口让 catchup 兜底更可靠。
+_GRACE_SEC = 300
 
 # 队列哨兵：推给订阅者表示流结束
 _END = object()

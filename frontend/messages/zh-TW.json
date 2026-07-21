@@ -253,7 +253,8 @@
     "delete_confirm": "刪除對話「{title}」？",
     "collapse": "收起側邊欄",
     "expand": "展開側邊欄",
-    "generating": "生成中…"
+    "generating": "生成中…",
+    "scheduled_tasks": "定時任務"
   },
   "account": {
     "title": "帳戶管理",
@@ -726,6 +727,7 @@
     "emptyHint": "支援 Skill 注入、文件篩選、檔案上傳與輸出下載",
     "thinking": "思考中",
     "thinkingDots": "思考中…",
+    "thinkingProcess": "思考過程",
     "inputPlaceholder": "輸入訊息（Shift+Enter 換行）…",
     "stopGenerating": "停止生成",
     "retry": "重試",

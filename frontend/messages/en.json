@@ -727,6 +727,7 @@
     "emptyHint": "Supports skill injection, document filtering, file upload, and output download",
     "thinking": "Thinking",
     "thinkingDots": "Thinking…",
+    "thinkingProcess": "Thought process",
     "inputPlaceholder": "Type a message (Shift+Enter for newline)…",
     "stopGenerating": "Stop generating",
     "retry": "Retry",

@@ -111,6 +111,8 @@ export default function ChatPlusPage() {
   const [activeIds, setActiveIds] = useState<Set<string>>(new Set());
   const [activeStartedAtById, setActiveStartedAtById] = useState<Record<string, number>>({});
   const [generationStartedAtMs, setGenerationStartedAtMs] = useState<number | null>(null);
+  // 首次 active 轮询已返回（驱动挂载重连 effect 重跑，含 activeIds 为空的 finished-while-away 场景）
+  const [firstPollDone, setFirstPollDone] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [scheduledPanelOpen, setScheduledPanelOpen] = useState(false);
 
@@ -146,19 +148,43 @@ export default function ChatPlusPage() {
   const reconnectFreshRef = useRef(false);
   // 追踪最新 conversation_id，供异步 catch 读取（新会话经 meta 事件中途才知晓）
   const conversationIdRef = useRef<string | null>(null);
+  // 从 sessionStorage 恢复出的会话正处于「生成中」快照——用于挂载后判定是否需重连
+  const restoredBusyConvRef = useRef<string | null>(null);
+  // 首次 /chat/plus/active 轮询是否已返回（重连判定须等它，避免误判 finished-while-away）
+  const firstPollDoneRef = useRef(false);
+  // 挂载恢复是否已完成：持久化 effect 必须等它为 true 才写 sessionStorage，
+  // 否则 mount 首帧（streamingBlocks 尚为初始 []）会用空值覆写掉刚要恢复的快照。
+  const restoredRef = useRef(false);
 
   useEffect(() => {
     // 会话不分空间：仅从 sessionStorage 恢复该窗口的当前对话/消息。
     // 工作区是每轮瞬时上下文，不持久化、不影响会话列表。
+    // 进行中的 streamingBlocks/busy/generationStartedAtMs 也一并恢复，
+    // 保证用户切换菜单再返回时能立即看到离开时的 thinking 内容（不依赖后端 catchup）。
     try {
       const raw = sessionStorage.getItem(SESSION_KEY);
       if (raw) {
         const s = JSON.parse(raw) as {
           conversationId: string | null;
           turns: Turn[];
+          streamingBlocks?: StreamBlock[];
+          busy?: boolean;
+          generationStartedAtMs?: number | null;
         };
         setConversationId(s.conversationId);
         setTurns(s.turns);
+        if (s.streamingBlocks && s.streamingBlocks.length > 0) {
+          setStreamingBlocks(s.streamingBlocks);
+          streamingBlocksRef.current = s.streamingBlocks;
+        }
+        if (s.busy) {
+          setBusy(true);
+          // 恢复锚点：优先用缓存值；否则从现在起算（后续 active 查询/重连会校正）
+          setGenerationStartedAtMs(s.generationStartedAtMs ?? Date.now());
+          // 记下「恢复即生成中」的会话，挂载后据此重连（无论是否仍在 active——
+          // 若已在 grace 窗口内结束，reconnectStream 会补发 done；过窗口则 404→拉历史）
+          restoredBusyConvRef.current = s.conversationId;
+        }
       }
     } catch {}
   }, []);
@@ -218,6 +244,13 @@ export default function ChatPlusPage() {
         );
       } catch {
         /* 忽略瞬时失败 */
+      } finally {
+        // 首次轮询完成后翻一次标志，驱动挂载重连 effect 重跑（即使 activeIds 仍为空，
+        // 也需据此判定 finished-while-away：恢复的 busy 会话要重连一次以拉最终结果/清 busy）
+        if (!cancelled && !firstPollDoneRef.current) {
+          firstPollDoneRef.current = true;
+          setFirstPollDone(true);
+        }
       }
     }
     poll();
@@ -227,22 +260,41 @@ export default function ChatPlusPage() {
 
   useEffect(() => {
     conversationIdRef.current = conversationId;
+    // 跳过 mount 首次执行：此时恢复 effect 的 setState 尚未生效，streamingBlocks 仍是
+    // 初始 []，若此刻写入会用空值覆写掉 sessionStorage 里刚要恢复的快照。
+    if (!restoredRef.current) {
+      restoredRef.current = true;
+      return;
+    }
     try {
-      sessionStorage.setItem(SESSION_KEY, JSON.stringify({ conversationId, turns }));
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify({
+        conversationId,
+        turns,
+        streamingBlocks,
+        busy,
+        generationStartedAtMs,
+      }));
     } catch {}
-  }, [conversationId, turns]);
+  }, [conversationId, turns, streamingBlocks, busy, generationStartedAtMs]);
 
-  // 同标签页返回：从 sessionStorage 恢复的会话若仍在后台生成，自动重连一次
+  // 同标签页返回：等首次 active 轮询返回后再判定（依赖 [firstPollDone] 重跑，
+  // 避免 [] 依赖读到恢复前的 stale 闭包值导致 conversationId=null、重连永不触发）。
+  // 恢复的「生成中」会话一律重连一次：仍在跑→接回 catchup 续看；grace 窗口内已结束
+  // →补发 done；过窗口→404 拉历史。闸门用 !abortRef.current（未在流中）而非 !busy，
+  // 因恢复时可能已 setBusy(true)，用 busy 会把重连卡死。
   useEffect(() => {
     if (mountReconnectDoneRef.current) return;
-    if (activeIds.size === 0) return;
+    if (!firstPollDone) return;
     mountReconnectDoneRef.current = true;
-    if (conversationId && activeIds.has(conversationId) && !busy) {
-      setGenerationStartedAtMs(activeStartedAtById[conversationId] ?? null);
-      reconnectStream(conversationId);
+    const cid = conversationId ?? restoredBusyConvRef.current;
+    if (!cid || abortRef.current) return;
+    // 仅当该会话仍在后台生成，或本次是从「生成中」快照恢复的会话，才重连
+    if (activeIds.has(cid) || restoredBusyConvRef.current === cid) {
+      setGenerationStartedAtMs(activeStartedAtById[cid] ?? null);
+      reconnectStream(cid);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeIds]);
+  }, [firstPollDone]);
 
   // Skill 是全局的、与空间无关 → 持久化到会话；文档选择随工作区瞬时，不持久化。
   function handleSkillChange(ids: string[]) {
@@ -589,7 +641,9 @@ export default function ChatPlusPage() {
       );
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") {
-        // user stopped
+        // 切走/停止：直接 return，跳过 finally 的清空，保留 streamingBlocks 快照
+        // （持久化 effect 会把非空快照写回 sessionStorage，返回时可立即看到 thinking）
+        return;
       } else if (err instanceof ApiError && err.status === 409 && conversationId) {
         // 该会话已有生成在跑（重复发送）：透明切换为订阅同一路流
         setAttachedFiles([]);
@@ -612,12 +666,15 @@ export default function ChatPlusPage() {
         setError(err instanceof ApiError ? err.message : t("requestFailed"));
       }
     } finally {
-      setBusy(false);
-      setStreamingBlocks([]);
-      streamingBlocksRef.current = [];
-      abortRef.current = null;
-      // clear attachments after send
-      setAttachedFiles([]);
+      // 切走(abort)时保留 streamingBlocks 快照，让持久化 effect 落非空快照供返回时恢复；
+      // 仅在正常结束/真失败时清空。
+      if (!ac.signal.aborted) {
+        setBusy(false);
+        setStreamingBlocks([]);
+        streamingBlocksRef.current = [];
+        abortRef.current = null;
+        setAttachedFiles([]);
+      }
     }
   }
 
@@ -735,7 +792,7 @@ export default function ChatPlusPage() {
                 {turn.role === "assistant" && turn.thinking && (
                   <details className="mb-1 ml-11">
                     <summary className="cursor-pointer select-none text-xs text-gray-400 hover:text-gray-600">
-                      思考过程
+                      {t("thinkingProcess")}
                     </summary>
                     <div className="mt-1 rounded-xl border border-gray-100 bg-gray-50 px-3 py-2">
                       <p className="whitespace-pre-wrap text-xs leading-relaxed text-gray-500">{turn.thinking}</p>

@@ -1,5 +1,6 @@
 """对话检索路由。仅限所属空间；串起检索→生成→落库。"""
 
+import asyncio
 import json
 import logging
 import time
@@ -29,11 +30,7 @@ from app.schemas.chat import (
 from app.schemas.document import DocumentUploadAccepted
 from app.services.answer_service import (
     AnswerResult,
-    Stage,
-    ThinkingChunk,
-    TokenChunk,
     answer_question,
-    answer_question_streamed,
 )
 from app.services.chat_generation import (
     _END as _GEN_END,
@@ -52,7 +49,6 @@ from app.services.chat_service import (
     add_message,
     create_conversation,
     delete_conversation,
-    generate_conversation_title,
     get_conversation_for_user,
     get_or_create_conversation,
     list_conversations,
@@ -88,13 +84,24 @@ async def _relay(sub):
 
     sub = (state, queue, catchup)：先补发 catchup（已累积答案 + 终态事件），
     再从队列读实时事件，直到 _END。
+
+    事件间隙每 10s 发一个 SSE 注释心跳（`: ping`）：既保活连接，又强制刷出
+    被代理/uvicorn 缓冲的响应体——否则重连后若正处于两个 thinking 块之间的
+    思考间隙，累积的 catchup 会被缓冲住、直到生成结束才一次性放出（表现为
+    「切走返回后 thinking 不再实时更新」）。
     """
     state, queue, catchup = sub
     try:
         for event, data in catchup:
             yield _sse(event, data)
+        # catchup 之后立即发一次心跳，破开缓冲、让已补发内容立刻抵达客户端
+        yield ": ping\n\n"
         while True:
-            item = await queue.get()
+            try:
+                item = await asyncio.wait_for(queue.get(), timeout=10)
+            except TimeoutError:
+                yield ": ping\n\n"  # 空闲心跳，保活并 flush
+                continue
             if item is _GEN_END:
                 break
             event, data = item
@@ -281,7 +288,14 @@ async def chat_stream(
     return StreamingResponse(
         _relay_with_meta(),
         media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            # 显式声明 identity，阻止 Next.js rewrites 代理对 SSE 做 gzip——
+            # gzip 会攒够压缩块才输出，导致重连流事件被缓冲、直到生成结束才一次性
+            # 解出（表现为「切走返回后 thinking 不再实时更新」）。
+            "Content-Encoding": "identity",
+        },
     )
 
 
@@ -308,7 +322,14 @@ async def chat_reconnect(
     return StreamingResponse(
         _relay_with_meta(),
         media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            # 显式声明 identity，阻止 Next.js rewrites 代理对 SSE 做 gzip——
+            # gzip 会攒够压缩块才输出，导致重连流事件被缓冲、直到生成结束才一次性
+            # 解出（表现为「切走返回后 thinking 不再实时更新」）。
+            "Content-Encoding": "identity",
+        },
     )
 
 
@@ -657,7 +678,14 @@ async def chat_plus_stream(
     return StreamingResponse(
         _relay_with_meta(),
         media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            # 显式声明 identity，阻止 Next.js rewrites 代理对 SSE 做 gzip——
+            # gzip 会攒够压缩块才输出，导致重连流事件被缓冲、直到生成结束才一次性
+            # 解出（表现为「切走返回后 thinking 不再实时更新」）。
+            "Content-Encoding": "identity",
+        },
     )
 
 
@@ -684,7 +712,14 @@ async def chat_plus_reconnect(
     return StreamingResponse(
         _relay_with_meta(),
         media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            # 显式声明 identity，阻止 Next.js rewrites 代理对 SSE 做 gzip——
+            # gzip 会攒够压缩块才输出，导致重连流事件被缓冲、直到生成结束才一次性
+            # 解出（表现为「切走返回后 thinking 不再实时更新」）。
+            "Content-Encoding": "identity",
+        },
     )
 
 

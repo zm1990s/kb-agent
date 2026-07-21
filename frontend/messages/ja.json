@@ -253,7 +253,8 @@
     "delete_confirm": "会話「{title}」を削除しますか？",
     "collapse": "サイドバーを閉じる",
     "expand": "サイドバーを開く",
-    "generating": "生成中…"
+    "generating": "生成中…",
+    "scheduled_tasks": "スケジュールタスク"
   },
   "account": {
     "title": "アカウント",
@@ -726,6 +727,7 @@
     "emptyHint": "スキル注入・ドキュメント絞り込み・ファイルアップロード・出力ダウンロードに対応",
     "thinking": "思考中",
     "thinkingDots": "思考中…",
+    "thinkingProcess": "思考プロセス",
     "inputPlaceholder": "メッセージを入力（Shift+Enter で改行）…",
     "stopGenerating": "生成を停止",
     "retry": "再試行",

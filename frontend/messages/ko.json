@@ -253,7 +253,8 @@
     "delete_confirm": "대화 \"{title}\"을(를) 삭제하시겠습니까?",
     "collapse": "사이드바 접기",
     "expand": "사이드바 펼치기",
-    "generating": "생성 중…"
+    "generating": "생성 중…",
+    "scheduled_tasks": "예약 작업"
   },
   "account": {
     "title": "계정",
@@ -726,6 +727,7 @@
     "emptyHint": "스킬 주입, 문서 필터링, 파일 업로드, 출력 다운로드 지원",
     "thinking": "생각 중",
     "thinkingDots": "생각 중…",
+    "thinkingProcess": "사고 과정",
     "inputPlaceholder": "메시지 입력 (Shift+Enter 줄바꿈)…",
     "stopGenerating": "생성 중지",
     "retry": "재시도",

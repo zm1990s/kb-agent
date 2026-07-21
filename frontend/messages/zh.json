@@ -727,6 +727,7 @@
     "emptyHint": "支持 Skill 注入、文档筛选、文件上传与输出下载",
     "thinking": "思考中",
     "thinkingDots": "思考中…",
+    "thinkingProcess": "思考过程",
     "inputPlaceholder": "输入消息（Shift+Enter 换行）…",
     "stopGenerating": "停止生成",
     "retry": "重试",
