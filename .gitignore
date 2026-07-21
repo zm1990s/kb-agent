@@ -20,6 +20,7 @@ venv/
 node_modules/
 .next/
 
+
 # 编辑器 / 系统
 .DS_Store
 .idea/

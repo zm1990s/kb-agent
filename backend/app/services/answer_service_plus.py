@@ -84,7 +84,8 @@ _SKILL_DIR = "skills"
 # 注入的原始参考文档放在此前缀下（use_original_docs），检测输出时同样排除
 _CONTEXT_DIR = "context"
 # 顶层注入目录：仅当作为工作目录根下的一级前缀时排除
-_INJECTED_PREFIXES = (_SKILL_DIR, _CONTEXT_DIR)
+# work/ 是 Codex 内部工作目录（存放中间产物），不属于用户输出
+_INJECTED_PREFIXES = (_SKILL_DIR, _CONTEXT_DIR, "work")
 
 # 编程/依赖产生的临时目录：路径中任意一段命中即排除（node_modules 等）
 _NOISE_DIRS = frozenset({
@@ -108,6 +109,9 @@ def _is_noise(rel: str) -> bool:
     parts = rel.split("/")
     # 顶层注入目录（skills/、context/）
     if parts[0] in _INJECTED_PREFIXES:
+        return True
+    # tmp_ 前缀目录（Codex 解压 pptx/docx 等产生的临时工作目录）
+    if any(seg.startswith("tmp_") for seg in parts[:-1]):
         return True
     # 路径任意一段命中噪声目录名（node_modules 可能嵌套在子目录里）
     if any(seg in _NOISE_DIRS for seg in parts[:-1]):
