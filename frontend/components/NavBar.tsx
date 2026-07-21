@@ -10,14 +10,6 @@ import { clearAuth, getEmail, isAdmin } from "@/lib/auth";
 import { useLocale } from "@/components/IntlProvider";
 import { LOCALES, type Locale } from "@/lib/locale";
 
-interface Subscription {
-  email: string;
-  frequency: string;
-  last_sent_at: string | null;
-}
-
-const FREQ_VALUES = ["weekly", "biweekly", "monthly"] as const;
-
 const LANG_LABELS: Record<Locale, string> = {
   zh: "简体中文",
   "zh-TW": "繁體中文",
@@ -38,20 +30,13 @@ export default function NavBar() {
   const { locale, setLocale } = useLocale();
   const admin = isAdmin();
   const email = getEmail();
-  const tWn = useTranslations("whatsnew");
   const [perms, setPerms] = useState<Record<string, string> | null>(null);
   const [branding, setBranding] = useState<Branding>({ name: "KB-Agent", logo_url: "" });
   const [dropOpen, setDropOpen] = useState(false);
   const [langOpen, setLangOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [subOpen, setSubOpen] = useState(false);
-  const [sub, setSub] = useState<Subscription | null | "loading">("loading");
-  const [subFreq, setSubFreq] = useState("weekly");
-  const [subSaving, setSubSaving] = useState(false);
-  const [subMsg, setSubMsg] = useState("");
   const dropRef = useRef<HTMLDivElement>(null);
   const langRef = useRef<HTMLDivElement>(null);
-  const subRef = useRef<HTMLDivElement>(null);
 
   const links = [
     { href: "/whatsnew", label: t("whatsnew"), module: "whatsnew" },
@@ -75,19 +60,11 @@ export default function NavBar() {
       .catch(() => {});
   }, []);
 
-  useEffect(() => {
-    if (!subOpen || sub !== "loading") return;
-    api.get<Subscription>("/whatsnew/subscription")
-      .then((data) => { setSub(data); setSubFreq(data.frequency); })
-      .catch(() => setSub(null));
-  }, [subOpen]);
-
   // 路由跳转后关闭所有弹出层
   useEffect(() => {
     setMenuOpen(false);
     setDropOpen(false);
     setLangOpen(false);
-    setSubOpen(false);
   }, [pathname]);
 
   useEffect(() => {
@@ -98,47 +75,10 @@ export default function NavBar() {
       if (langRef.current && !langRef.current.contains(e.target as Node)) {
         setLangOpen(false);
       }
-      if (subRef.current && !subRef.current.contains(e.target as Node)) {
-        setSubOpen(false);
-      }
     }
     document.addEventListener("mousedown", handle);
     return () => document.removeEventListener("mousedown", handle);
   }, []);
-
-  async function handleSubSave() {
-    setSubSaving(true);
-    setSubMsg("");
-    try {
-      const data = await api.put<Subscription>("/whatsnew/subscription", { frequency: subFreq });
-      setSub(data);
-      setSubMsg(tWn("sub_saved"));
-    } catch {
-      setSubMsg(tWn("sub_save_failed"));
-    } finally {
-      setSubSaving(false);
-    }
-  }
-
-  async function handleSubDelete() {
-    setSubSaving(true);
-    setSubMsg("");
-    try {
-      await api.del("/whatsnew/subscription");
-      setSub(null);
-      setSubFreq("weekly");
-      setSubMsg(tWn("sub_deleted"));
-    } catch {
-      setSubMsg(tWn("sub_delete_failed"));
-    } finally {
-      setSubSaving(false);
-    }
-  }
-
-  const FREQ_OPTIONS = FREQ_VALUES.map((v) => ({
-    value: v,
-    label: tWn(`freq_${v}` as Parameters<typeof tWn>[0]),
-  }));
 
   function logout() {
     clearAuth();
@@ -197,86 +137,8 @@ export default function NavBar() {
           ))}
         </div>
 
-        {/* 右：订阅 + 语言切换 + 用户 dropdown（桌面） */}
+        {/* 右：语言切换 + 用户 dropdown（桌面） */}
         <div className="ml-auto hidden items-center gap-1 md:flex">
-          {/* 订阅铃铛 */}
-          {perms && (perms["whatsnew"] ?? "none") !== "none" && (
-            <div className="relative" ref={subRef}>
-              <button
-                onClick={() => { setSubOpen((v) => !v); setSubMsg(""); }}
-                className="flex items-center justify-center rounded px-2 py-1.5 text-gray-400 hover:bg-white/10 hover:text-white transition-colors"
-                title={tWn("subscription")}
-              >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                </svg>
-                {sub && sub !== "loading" && (
-                  <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-blue-400" />
-                )}
-              </button>
-              {subOpen && (
-                <div className="absolute right-0 top-full z-50 mt-1 w-72 rounded-lg border border-gray-700 bg-gray-800 shadow-xl">
-                  <div className="border-b border-gray-700 px-4 py-2.5">
-                    <p className="text-sm font-medium text-white">{tWn("subscription")}</p>
-                  </div>
-                  <div className="p-4 space-y-3">
-                    {/* 收件邮箱 */}
-                    <div>
-                      <p className="mb-1 text-xs text-gray-400">{tWn("sub_email")}</p>
-                      <p className="truncate text-sm text-gray-200">{email ?? "—"}</p>
-                    </div>
-                    {/* 频率 */}
-                    <div>
-                      <p className="mb-1 text-xs text-gray-400">{tWn("sub_frequency")}</p>
-                      <select
-                        value={subFreq}
-                        onChange={(e) => setSubFreq(e.target.value)}
-                        className="w-full rounded border border-gray-600 bg-gray-700 px-2 py-1.5 text-sm text-gray-200 focus:border-blue-400 focus:outline-none"
-                      >
-                        {FREQ_OPTIONS.map((o) => (
-                          <option key={o.value} value={o.value}>{o.label}</option>
-                        ))}
-                      </select>
-                    </div>
-                    {/* 状态信息 */}
-                    {sub && sub !== "loading" && (
-                      <p className="text-xs text-gray-500">
-                        {tWn("sub_current", { freq: FREQ_OPTIONS.find((o) => o.value === sub.frequency)?.label ?? sub.frequency })}
-                        {sub.last_sent_at
-                          ? tWn("sub_last_sent", { date: sub.last_sent_at.slice(0, 10) })
-                          : tWn("sub_never_sent")}
-                      </p>
-                    )}
-                    {/* 按钮 */}
-                    <div className="flex gap-2 pt-1">
-                      <button
-                        onClick={handleSubSave}
-                        disabled={subSaving}
-                        className="flex-1 rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700 disabled:opacity-50 transition-colors"
-                      >
-                        {subSaving ? tWn("sub_save") : sub && sub !== "loading" ? tWn("sub_update") : tWn("sub_subscribe")}
-                      </button>
-                      {sub && sub !== "loading" && (
-                        <button
-                          onClick={handleSubDelete}
-                          disabled={subSaving}
-                          className="rounded border border-red-700 px-3 py-1.5 text-sm text-red-400 hover:bg-red-900/30 disabled:opacity-50 transition-colors"
-                        >
-                          {tWn("sub_unsubscribe")}
-                        </button>
-                      )}
-                    </div>
-                    {subMsg && (
-                      <p className={`text-xs ${subMsg.includes("失败") || subMsg.toLowerCase().includes("fail") ? "text-red-400" : "text-green-400"}`}>
-                        {subMsg}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
           {/* 语言切换 */}
           <div className="relative" ref={langRef}>
             <button
