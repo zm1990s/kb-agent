@@ -2,7 +2,7 @@
 # 以 root 启动，修复 bind-mount 目录权限后降权到 appuser 执行主进程。
 # bind-mount 覆盖了镜像内的 chown，首次部署时目录 owner 是宿主 root。
 set -e
-chown -R appuser:appuser /app/local_storage /app/logs 2>/dev/null || true
+chown -R appuser:appuser /app/local_storage /app/logs /app/codex_config 2>/dev/null || true
 
 # 将内置 Codex Skills 合并到 CODEX_HOME/skills/（用户自定义优先，已存在的不覆盖）
 if [ -d /app/codex_skills_builtin ] && [ "$(ls -A /app/codex_skills_builtin 2>/dev/null)" ]; then
