@@ -19,7 +19,9 @@ RUN npm install -g @openai/codex
 # @oai/artifact-tool（私有包，无法从 npm 公有源安装；从本地 vendor 拷入全局 node_modules）
 # skia-canvas 内含 macOS native binding，需重新下载 Linux 版（从 GitHub public releases）。
 COPY vendor/@oai /usr/local/lib/node_modules/@oai
-RUN node /usr/local/lib/node_modules/@oai/artifact-tool/node_modules/skia-canvas/lib/prebuild.mjs download
+# 删除 macOS native binding（vendor 从 macOS 开发机拷入），强制 download Linux 版
+RUN rm -f /usr/local/lib/node_modules/@oai/artifact-tool/node_modules/skia-canvas/lib/skia.node \
+    && node /usr/local/lib/node_modules/@oai/artifact-tool/node_modules/skia-canvas/lib/prebuild.mjs download
 
 # 先装依赖以利用层缓存
 COPY pyproject.toml ./
