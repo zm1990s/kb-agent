@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import NavBar from "@/components/NavBar";
+import Markdown from "@/components/Markdown";
 import { api, ApiError } from "@/lib/api";
 import { getToken, isAdmin } from "@/lib/auth";
 import { useAuthGuard } from "@/lib/useAuthGuard";
@@ -337,11 +338,20 @@ export default function SkillsPage() {
           </div>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {skills.map((s) => (
+            {skills.map((s, i) => (
               <button
                 key={s.id}
                 onClick={() => openDetail(s)}
-                className="flex flex-col rounded-xl border border-gray-200 bg-white p-5 text-left transition-shadow hover:shadow-md"
+                className={`flex flex-col rounded-xl border p-5 text-left transition-shadow hover:shadow-md ${
+                  [
+                    "bg-blue-50/40 border-blue-100 hover:border-blue-200",
+                    "bg-violet-50/40 border-violet-100 hover:border-violet-200",
+                    "bg-emerald-50/40 border-emerald-100 hover:border-emerald-200",
+                    "bg-amber-50/40 border-amber-100 hover:border-amber-200",
+                    "bg-rose-50/40 border-rose-100 hover:border-rose-200",
+                    "bg-sky-50/40 border-sky-100 hover:border-sky-200",
+                  ][i % 6]
+                }`}
               >
                 <div className="mb-2 flex items-start justify-between gap-2">
                   <span className="font-semibold text-gray-900">{s.name}</span>
@@ -387,7 +397,7 @@ export default function SkillsPage() {
       {detail && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40" onClick={() => setDetail(null)} />
-          <div className="relative flex max-h-[85vh] w-full max-w-2xl flex-col rounded-2xl bg-white shadow-2xl">
+          <div className="relative flex max-h-[85vh] w-full max-w-4xl flex-col rounded-2xl bg-white shadow-2xl">
             <div className="flex items-start justify-between border-b border-gray-200 px-6 py-4">
               <div>
                 <h2 className="text-lg font-semibold text-gray-900">{detail.name}</h2>
@@ -420,9 +430,9 @@ export default function SkillsPage() {
               </button>
             </div>
             <div className="flex-1 overflow-auto px-6 py-4">
-              <pre className="whitespace-pre-wrap rounded-lg bg-gray-50 p-4 text-sm text-gray-800">
-                {detail.content}
-              </pre>
+              <div className="rounded-lg bg-gray-50 p-4">
+                <Markdown content={detail.content ?? ""} />
+              </div>
               <p className="mt-3 text-xs text-gray-400">
                 {t("uploaderLabel")}：{detail.created_by_email ?? t("unknown")} · {t("updatedAt")}{" "}
                 {detail.updated_at.slice(0, 10)}
