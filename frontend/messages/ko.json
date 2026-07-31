@@ -461,6 +461,7 @@
     "chat_engine_saved": "채팅 엔진 설정이 저장되었습니다",
     "task_headers_title": "태스크 요청 Headers",
     "task_headers_desc": "OpenAI 호환 엔진에만 적용됩니다. Portkey 등 게이트웨이의 라우팅 및 레이블링에 사용됩니다.",
+    "task_headers_vars": "헤더 값에서 사용 가능한 변수: $user (이메일), $role (사용자 역할)",
     "task_classify": "문서 분류",
     "task_title": "제목 생성",
     "task_whatsnew": "새 소식 요약",

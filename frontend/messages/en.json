@@ -461,6 +461,7 @@
     "chat_engine_saved": "Chat engine settings saved",
     "task_headers_title": "Task Request Headers",
     "task_headers_desc": "Only applies to the OpenAI-compatible engine. Use for routing and labeling in gateways like Portkey.",
+    "task_headers_vars": "Variables available in header values: $user (user email), $role (user role)",
     "task_classify": "Document Classification",
     "task_title": "Title Generation",
     "task_whatsnew": "What's New Summary",

@@ -461,6 +461,7 @@
     "chat_engine_saved": "チャットエンジン設定を保存しました",
     "task_headers_title": "タスクリクエスト Headers",
     "task_headers_desc": "OpenAI 互換エンジンにのみ適用されます。Portkey などのゲートウェイのルーティングとラベル付けに使用します。",
+    "task_headers_vars": "ヘッダー値で使用できる変数：$user（メールアドレス）、$role（ユーザーロール）",
     "task_classify": "ドキュメント分類",
     "task_title": "タイトル生成",
     "task_whatsnew": "新着情報サマリー",

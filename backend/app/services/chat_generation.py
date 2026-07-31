@@ -59,6 +59,7 @@ class GenerationState:
     conversation_id: uuid.UUID
     user_id: uuid.UUID
     is_new_conv: bool
+    user_email: str | None = None
     # 来源：区分普通对话（chat）与聊天+（chatplus）。驱动 record_event 的 action，
     # 并让 /chat/active 与 /chat/plus/active 各自只列自己来源的会话。
     source: str = "chatplus"
@@ -330,6 +331,7 @@ async def _run_generation(
                     session,
                     conversation_id=state.conversation_id,
                     first_message=question,
+                    user_email=state.user_email,
                 )
                 if title:
                     title_evt = {
@@ -430,6 +432,7 @@ def start_chat_generation(
     workspace_id: uuid.UUID | list[uuid.UUID] | None,
     conv_ws: uuid.UUID | None,
     ws_all: list[str],
+    user_email: str | None = None,
 ) -> GenerationState:
     """启动一个普通对话 detached 生成任务；该会话已在跑则抛 GenerationInProgress。
 
@@ -447,6 +450,7 @@ def start_chat_generation(
         forward_stage=True,
         event_workspace_id=conv_ws,
         extra_meta={"workspaces": ws_all},
+        user_email=user_email,
     )
 
     async def _factory(session, st):
@@ -456,6 +460,7 @@ def start_chat_generation(
             workspace_id=workspace_id or None,
             question=question,
             history=history,
+            user_email=st.user_email,
         ):
             yield item
 

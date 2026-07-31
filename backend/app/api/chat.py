@@ -176,6 +176,7 @@ async def chat(
             workspace_id=target_ws,
             question=body.message,
             history=history,
+            user_email=current_user.email,
         )
 
     await add_message(
@@ -272,6 +273,7 @@ async def chat_stream(
             workspace_id=target_ws,
             conv_ws=conv_ws,
             ws_all=ws_all,
+            user_email=current_user.email,
         )
     except GenerationInProgress:
         raise HTTPException(status.HTTP_409_CONFLICT, "该会话正在生成中") from None

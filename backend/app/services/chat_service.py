@@ -202,6 +202,7 @@ async def generate_conversation_title(
     *,
     conversation_id: uuid.UUID,
     first_message: str,
+    user_email: str | None = None,
 ) -> str | None:
     """用 LLM 为会话生成简短标题（失败静默，返回生成的标题或 None）。"""
     from app.engine.base import get_chat_engine
@@ -211,12 +212,16 @@ async def generate_conversation_title(
         get_chat_engine_backend,
         get_prompt,
         get_task_headers,
+        render_task_headers,
     )
 
     _engine_backend = "unknown"
     try:
         _engine_backend = await get_chat_engine_backend(session)
-        headers = await get_task_headers(session, TASK_HEADERS_TITLE_KEY)
+        headers = render_task_headers(
+            await get_task_headers(session, TASK_HEADERS_TITLE_KEY),
+            user_email=user_email,
+        )
         engine = await get_chat_engine(session, extra_headers=headers)
         prompt_tpl = await get_prompt(session, TITLE_PROMPT_KEY)
         prompt = prompt_tpl.format(message=first_message[:500])

@@ -461,6 +461,7 @@
     "chat_engine_saved": "對話引擎設定已儲存",
     "task_headers_title": "任務請求 Headers",
     "task_headers_desc": "僅對 OpenAI 相容引擎生效，用於 Portkey 等閘道的流量路由與標籤",
+    "task_headers_vars": "可在 Header 值中使用變數：$user（使用者信箱）、$role（使用者角色）",
     "task_classify": "文件分類",
     "task_title": "標題生成",
     "task_whatsnew": "最新動態摘要",

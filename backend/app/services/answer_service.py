@@ -166,6 +166,7 @@ async def answer_question_streamed(
     question: str,
     category_id: uuid.UUID | None = None,
     history: list[tuple[str, str]] | None = None,
+    user_email: str | None = None,
 ):
     """生成器：先 yield 若干 Stage 事件，最后 yield 一个 AnswerResult。
 
@@ -178,6 +179,7 @@ async def answer_question_streamed(
         get_chat_engine_backend,
         get_prompt,
         get_task_headers,
+        render_task_headers,
     )
 
     _engine_backend = await get_chat_engine_backend(session)
@@ -195,7 +197,11 @@ async def answer_question_streamed(
     catalog = _build_catalog(index) if index else "（本空间暂无已归类文档）"
     yield Stage("thinking", "stage_thinking_phase1")
     engine = await get_chat_engine(
-        session, extra_headers=await get_task_headers(session, TASK_HEADERS_CHAT_KEY)
+        session,
+        extra_headers=render_task_headers(
+            await get_task_headers(session, TASK_HEADERS_CHAT_KEY),
+            user_email=user_email,
+        ),
     )
     hist_text = _format_history(history)
     timestamp = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
@@ -310,6 +316,7 @@ async def answer_question(
     question: str,
     category_id: uuid.UUID | None = None,
     history: list[tuple[str, str]] | None = None,
+    user_email: str | None = None,
 ) -> AnswerResult:
     """非流式封装：消费流式生成器，返回最终 AnswerResult。"""
     result = AnswerResult(answer=NO_DOCS_ANSWER, sources=[])
@@ -319,6 +326,7 @@ async def answer_question(
         question=question,
         category_id=category_id,
         history=history,
+        user_email=user_email,
     ):
         if isinstance(item, AnswerResult):
             result = item

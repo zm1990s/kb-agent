@@ -432,7 +432,8 @@ export default function AIEngineSettings() {
       {/* 任务请求 Headers */}
       {activeSec === "task_headers" && <section className="rounded border bg-white p-4">
         <h2 className="mb-1 text-sm font-medium">{t("task_headers_title")}</h2>
-        <p className="mb-4 text-xs text-gray-400">{t("task_headers_desc")}</p>
+        <p className="mb-1 text-xs text-gray-400">{t("task_headers_desc")}</p>
+        <p className="mb-4 text-xs text-gray-400 font-mono">{t("task_headers_vars")}</p>
         <div className="space-y-5">
           {TASK_KEYS.map((task) => (
             <div key={task}>

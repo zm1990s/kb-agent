@@ -545,6 +545,33 @@ async def set_task_headers(session: AsyncSession, key: str, headers: dict[str, s
     await set_setting(session, key, json.dumps(headers, ensure_ascii=False))
 
 
+def render_task_headers(
+    headers: dict[str, str],
+    *,
+    user_email: str | None = None,
+    user_role: str | None = None,
+) -> dict[str, str]:
+    """将 header value 中的模板变量替换为实际用户信息。
+
+    支持的变量：
+      $user  → 发起请求的用户邮箱
+      $role  → 发起请求的用户角色
+
+    变量未提供时替换为空字符串。管理员在 Task Headers 配置界面填写变量，
+    后台在每次请求时调用此函数完成替换。
+    """
+    if not headers:
+        return headers
+    replacements = {
+        "$user": user_email or "",
+        "$role": user_role or "",
+    }
+    return {
+        k: v.replace("$user", replacements["$user"]).replace("$role", replacements["$role"])
+        for k, v in headers.items()
+    }
+
+
 # ── 运行时可调配置（DB 覆盖优先，回落 env 默认） ────────────────────────────
 
 JWT_EXPIRE_MIN_KEY = "jwt_expire_min"
