@@ -21,6 +21,7 @@ class ScheduledTaskCreate(BaseModel):
     skill_ids: list[uuid.UUID] = Field(default_factory=list)
     workspace_id: uuid.UUID | None = None
     locale: str = "zh"
+    engine_backend: str = "claude_cli"
 
 
 class ScheduledTaskUpdate(BaseModel):
@@ -37,6 +38,7 @@ class ScheduledTaskUpdate(BaseModel):
     skill_ids: list[uuid.UUID] | None = None
     workspace_id: uuid.UUID | None = None
     locale: str | None = None
+    engine_backend: str | None = None
 
 
 class ScheduledTaskPublic(BaseModel):
@@ -57,6 +59,7 @@ class ScheduledTaskPublic(BaseModel):
     skill_ids: list[uuid.UUID]
     workspace_id: uuid.UUID | None
     locale: str
+    engine_backend: str
     last_run_at: datetime | None
     next_run_at: datetime | None
     created_at: datetime

@@ -26,6 +26,7 @@ interface ScheduledTask {
   skill_ids: string[];
   workspace_id: string | null;
   locale: string;
+  engine_backend: string;
   last_run_at: string | null;
   next_run_at: string | null;
 }
@@ -114,6 +115,7 @@ export default function ScheduledTaskPanel({ open, onClose, onRun }: Props) {
   const [fMessage, setFMessage] = useState("");
   const [fSystemPrompt, setFSystemPrompt] = useState("");
   const [fSkillIds, setFSkillIds] = useState<string[]>([]);
+  const [fEngine, setFEngine] = useState("claude_cli");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -136,7 +138,7 @@ export default function ScheduledTaskPanel({ open, onClose, onRun }: Props) {
     setFIntervalValue(60); setFIntervalUnit("minutes");
     setFHour(9); setFMinute(0);
     setFWeekDay(0); setFMonthDay(1);
-    setFMessage(""); setFSystemPrompt(""); setFSkillIds([]);
+    setFMessage(""); setFSystemPrompt(""); setFSkillIds([]); setFEngine("claude_cli");
     setFormOpen(true);
   }
 
@@ -156,6 +158,7 @@ export default function ScheduledTaskPanel({ open, onClose, onRun }: Props) {
     setFMessage(task.initial_message);
     setFSystemPrompt(task.system_prompt ?? "");
     setFSkillIds(task.skill_ids);
+    setFEngine(task.engine_backend ?? "claude_cli");
     setFormOpen(true);
   }
 
@@ -177,6 +180,7 @@ export default function ScheduledTaskPanel({ open, onClose, onRun }: Props) {
       skill_ids: fSkillIds,
       workspace_id: null,
       locale,
+      engine_backend: fEngine,
     };
     try {
       if (editing) {
@@ -399,6 +403,20 @@ export default function ScheduledTaskPanel({ open, onClose, onRun }: Props) {
                   />
                 </div>
 
+                {/* 执行引擎 */}
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-600">{t("engine")}</label>
+                  <select
+                    value={fEngine}
+                    onChange={(e) => setFEngine(e.target.value)}
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
+                  >
+                    <option value="claude_cli">Claude CLI</option>
+                    <option value="codex">Codex CLI</option>
+                    <option value="kimi_cli">Kimi CLI</option>
+                  </select>
+                </div>
+
                 {/* Skills */}
                 {skills.length > 0 && (
                   <div>
@@ -470,6 +488,11 @@ export default function ScheduledTaskPanel({ open, onClose, onRun }: Props) {
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium text-gray-900">{task.name}</p>
                       <p className="mt-0.5 text-xs text-gray-500">{formatSchedule(task)}</p>
+                      <p className="mt-0.5 text-xs text-gray-400">
+                        <span className="mr-1.5 rounded bg-gray-100 px-1 py-0.5 font-mono text-gray-500">
+                          {task.engine_backend ?? "claude_cli"}
+                        </span>
+                      </p>
                       <p className="mt-0.5 text-xs text-gray-400">
                         {t("lastRun")}: {formatDate(task.last_run_at)}
                       </p>

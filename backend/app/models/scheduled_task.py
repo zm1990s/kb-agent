@@ -28,6 +28,9 @@ class ScheduledTask(Base):
     skill_ids: Mapped[list] = mapped_column(ARRAY(PGUUID(as_uuid=True)), nullable=False, server_default="{}")
     workspace_id: Mapped[uuid.UUID | None] = mapped_column(PGUUID(as_uuid=True), nullable=True)
     locale: Mapped[str] = mapped_column(String(10), nullable=False, server_default="zh")
+    engine_backend: Mapped[str] = mapped_column(
+        String(30), nullable=False, server_default="claude_cli"
+    )
     last_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     next_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(

@@ -144,7 +144,7 @@ async def run_task(session: AsyncSession, task: ScheduledTask) -> None:
     # 调用 engine（带 cwd，触发 --dangerously-skip-permissions）
     answer = "(执行失败，请查看日志)"
     try:
-        engine = get_engine("claude_cli", audit_user=user.email)
+        engine = get_engine(task.engine_backend or "claude_cli", audit_user=user.email)
         result = await engine.complete(task.initial_message, system=skill_system,
                                        cwd=workdir)
         answer = result.text.strip() if result.text else "(无输出)"
@@ -202,6 +202,7 @@ async def create_task(
     skill_ids: list[uuid.UUID],
     workspace_id: uuid.UUID | None,
     locale: str,
+    engine_backend: str = "claude_cli",
 ) -> ScheduledTask:
     task = ScheduledTask(
         id=uuid.uuid4(),
@@ -219,6 +220,7 @@ async def create_task(
         skill_ids=skill_ids,
         workspace_id=workspace_id,
         locale=locale,
+        engine_backend=engine_backend,
     )
     task.next_run_at = compute_next_run(task) if enabled else None
     session.add(task)

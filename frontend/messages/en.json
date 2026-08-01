@@ -851,6 +851,7 @@
     "delete": "Delete",
     "deleteConfirm": "Delete task \"{name}\"?",
     "empty": "No scheduled tasks",
-    "noFileNote": "Note: Scheduled tasks do not support file output. Continue the conversation after the task completes if files are needed."
+    "noFileNote": "Note: Scheduled tasks do not support file output. Continue the conversation after the task completes if files are needed.",
+    "engine": "Engine"
   }
 }

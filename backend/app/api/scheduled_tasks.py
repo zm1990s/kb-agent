@@ -62,6 +62,7 @@ async def create_scheduled_task(
         skill_ids=body.skill_ids,
         workspace_id=body.workspace_id,
         locale=body.locale,
+        engine_backend=body.engine_backend,
     )
     return ScheduledTaskPublic.model_validate(task)
 
