@@ -94,13 +94,24 @@ Users / Admins
 
 ## Prerequisites
 
-### 0. Cloud Host & Claude Credentials
+### 0. Cloud Host & Agent Engine Credentials
 
-- **Overseas cloud host**: Claude CLI needs to reach the Anthropic API. We recommend deploying on an overseas cloud host (e.g., AWS, GCP, Azure overseas regions) or any environment with network access to Anthropic services.
-- **Claude model credentials**: Choose one of the following:
+KB-Agent supports three Agent engines. **Deploy at least one**:
+
+**Claude CLI (default, `ENGINE_BACKEND=claude_cli`)**
+- **Overseas cloud host**: Requires access to the Anthropic API. We recommend deploying on an overseas cloud host (e.g., AWS, GCP, Azure overseas regions) or any environment with network access to Anthropic services.
+- **Credentials**: Choose one of the following:
   - Anthropic official API key ([console.anthropic.com](https://console.anthropic.com))
   - AWS Bedrock (requires Claude model permissions)
   - Azure or another compatible gateway (configure via `ANTHROPIC_BASE_URL`)
+
+**Codex CLI (`ENGINE_BACKEND=codex`)**
+- Requires an OpenAI API key or a compatible endpoint.
+- Configure `data/codex/config.toml` using `examples/codex_config.toml.example` as a reference.
+
+**Kimi CLI (`ENGINE_BACKEND=kimi_cli`)**
+- Requires a Moonshot AI API key or AWS Bedrock access with Kimi model permissions enabled.
+- Configure `data/kimi/config.toml` using `examples/kimi_config.toml.example` as a reference.
 
 ### 1. Install Docker
 

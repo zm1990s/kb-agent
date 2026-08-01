@@ -94,13 +94,24 @@
 
 ## 前置条件
 
-### 0. 云主机与 Claude 凭据
+### 0. 云主机与 Agent 引擎凭据
 
-- **海外云主机**：Claude CLI 需要访问 Anthropic API，建议部署在海外云主机（如 AWS、GCP、Azure 海外区域）或网络可达 Anthropic 服务的环境。
-- **Claude 模型凭据**：任选一种来源：
+KB-Agent 支持三种 Agent 引擎，**至少部署一种**：
+
+**Claude CLI（默认，`ENGINE_BACKEND=claude_cli`）**
+- **海外云主机**：需访问 Anthropic API，建议部署在海外云主机（如 AWS、GCP、Azure 海外区域）或网络可达 Anthropic 服务的环境。
+- **凭据**：任选一种来源：
   - Anthropic 官方 API key（[console.anthropic.com](https://console.anthropic.com)）
   - AWS Bedrock（需开通 Claude 模型权限）
   - Azure 或其他兼容网关（通过 `ANTHROPIC_BASE_URL` 配置）
+
+**Codex CLI（`ENGINE_BACKEND=codex`）**
+- 需要 OpenAI API key 或兼容接口。
+- 参考 `examples/codex_config.toml.example` 配置 `data/codex/config.toml`。
+
+**Kimi CLI（`ENGINE_BACKEND=kimi_cli`）**
+- 需要 Moonshot AI API key 或 AWS Bedrock 开通 Kimi 模型权限。
+- 参考 `examples/kimi_config.toml.example` 配置 `data/kimi/config.toml`。
 
 ### 1. 安装 Docker
 
