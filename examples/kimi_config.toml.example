@@ -1,0 +1,71 @@
+# Kimi Code CLI 配置模板
+# 复制此文件为 config.toml，填写你的 API Key 后挂载到容器
+# 容器内路径：/app/kimi_config/config.toml（KIMI_CODE_HOME=/app/kimi_config）
+
+default_model = "kimi-code/kimi-for-coding"
+default_plan_mode = false
+telemetry = false
+
+# ── 使用 Kimi 官方 API ──────────────────────────────────────────────────────
+# 方式一：API Key（推荐，填写后删除方式二的 oauth 块）
+[providers."managed:kimi-code"]
+type = "kimi"
+base_url = "https://api.kimi.com/coding/v1"
+api_key = ""          # 填写 kimi platform API key（api_key 与 oauth 互斥，只能选其一）
+
+# 方式二：OAuth（使用 `kimi login` 完成授权后保留此块，同时删除 api_key 行或置空）
+# [providers."managed:kimi-code"]
+# type = "kimi"
+# api_key = ""
+#
+# [providers."managed:kimi-code".oauth]
+# storage = "file"
+# key = "oauth/kimi-code"
+
+# ── 使用兼容 OpenAI 格式访问 Kimi API（可选，替代上方 managed 方式） ──────────
+# 适用于已有 OpenAI SDK 集成、或需要 openai wire_api 的场景。
+# 使用此方式时，将下方模型定义中的 provider 改为 "kimi-openai"，并更新 default_model。
+#
+# [providers.kimi-openai]
+# type = "openai"
+# base_url = "https://api.moonshot.cn/v1"
+# api_key = "sk-xxxxx"          # Moonshot Platform API key
+#
+# [models."kimi-openai/kimi-for-coding"]
+# provider = "kimi-openai"
+# model = "kimi-k2-0711-preview"   # Kimi2.7 在 OpenAI 接口对应的模型名
+# max_context_size = 262144
+# capabilities = ["thinking", "always_thinking", "tool_use"]
+# display_name = "K2.7 Coding (OpenAI)"
+
+# ── 模型定义 ─────────────────────────────────────────────────────────────────
+[models."kimi-code/kimi-for-coding"]
+provider = "managed:kimi-code"
+model = "kimi-for-coding"
+max_context_size = 262144
+capabilities = ["thinking", "always_thinking", "image_in", "video_in", "tool_use"]
+display_name = "K2.7 Coding"
+
+[models."kimi-code/kimi-for-coding-highspeed"]
+provider = "managed:kimi-code"
+model = "kimi-for-coding-highspeed"
+max_context_size = 262144
+capabilities = ["thinking", "always_thinking", "image_in", "video_in", "tool_use"]
+display_name = "K2.7 Coding Highspeed"
+
+[models."kimi-code/k3"]
+provider = "managed:kimi-code"
+model = "k3"
+max_context_size = 1048576
+capabilities = ["thinking", "always_thinking", "image_in", "video_in", "tool_use"]
+display_name = "K3"
+support_efforts = ["max"]
+default_effort = "max"
+
+[thinking]
+enabled = true
+effort = "high"
+
+[loop_control]
+max_retries_per_step = 3
+reserved_context_size = 50000
