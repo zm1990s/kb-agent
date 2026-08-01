@@ -285,7 +285,9 @@ export default function AIEngineSettings() {
         {(() => {
           const currentEngine = engine?.current ?? "claude_cli";
           const isCodex = currentEngine === "codex";
-          const engineLabel = isCodex ? "Codex CLI" : "Claude CLI";
+          const isKimiCli = currentEngine === "kimi_cli";
+          const isCliEngine = isCodex || isKimiCli;
+          const engineLabel = isCodex ? "Codex CLI" : isKimiCli ? "Kimi CLI" : "Claude CLI";
           const visibleTasks = taskModels?.tasks.filter(
             (t) => (t.engine ?? "claude_cli") === currentEngine
           ) ?? [];
@@ -296,6 +298,8 @@ export default function AIEngineSettings() {
               </h3>
               {isCodex ? (
                 <p className="mb-3 text-xs text-gray-400">{t("task_model_codex_hint")}</p>
+              ) : isKimiCli ? (
+                <p className="mb-3 text-xs text-gray-400">{t("task_model_kimi_hint")}</p>
               ) : (
                 <p className="mb-3 text-xs text-gray-400">
                   {t("task_model_desc", { default: taskModels ? taskModels.default_model : t("task_model_loading") })}
@@ -313,7 +317,7 @@ export default function AIEngineSettings() {
                         onChange={(e) =>
                           setTaskModelInputs((prev) => ({ ...prev, [task.key]: e.target.value }))
                         }
-                        placeholder={isCodex ? "" : taskModels.default_model}
+                        placeholder={isCliEngine ? "" : taskModels.default_model}
                         className="flex-1 rounded border bg-white px-3 py-1.5 text-sm font-mono focus:border-blue-400 focus:outline-none"
                       />
                       <button
@@ -375,11 +379,17 @@ export default function AIEngineSettings() {
               <option value="claude_cli">{t("chat_engine_claude_cli")}</option>
               <option value="openai_compat">{t("chat_engine_openai_compat")}</option>
               <option value="codex">{t("chat_engine_codex")}</option>
+              <option value="kimi_cli">{t("chat_engine_kimi")}</option>
             </select>
           </div>
           {chatEngineInput.chat_engine_backend === "codex" && (
             <p className="text-xs text-gray-500 rounded border border-gray-100 bg-gray-50 px-3 py-2">
               {t("chat_engine_codex_hint")}
+            </p>
+          )}
+          {chatEngineInput.chat_engine_backend === "kimi_cli" && (
+            <p className="text-xs text-gray-500 rounded border border-gray-100 bg-gray-50 px-3 py-2">
+              {t("chat_engine_kimi_hint")}
             </p>
           )}
           {chatEngineInput.chat_engine_backend === "openai_compat" && (

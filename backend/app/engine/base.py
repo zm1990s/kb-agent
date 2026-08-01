@@ -106,6 +106,13 @@ def get_engine(
             model=model, audit_user=audit_user, idle_timeout_sec=idle_timeout_sec
         )
 
+    if resolved == "kimi_cli":
+        from app.engine.kimi_cli import KimiCliEngine
+
+        return KimiCliEngine(
+            model=model, audit_user=audit_user, idle_timeout_sec=idle_timeout_sec
+        )
+
     # 预留：openclaw 等未来后端
     raise NotImplementedError(f"未实现的引擎后端: {resolved!r}")
 
@@ -151,6 +158,12 @@ async def get_chat_engine(
         model = await get_task_model(session, model_key or MODEL_CODEX_CHAT_KEY)
         idle_timeout = await get_engine_idle_timeout_sec(session)
         return get_engine("codex", model=model, idle_timeout_sec=idle_timeout)
+
+    if backend == "kimi_cli":
+        from app.services.settings_service import MODEL_KIMI_CHAT_KEY
+        model = await get_task_model(session, model_key or MODEL_KIMI_CHAT_KEY)
+        idle_timeout = await get_engine_idle_timeout_sec(session)
+        return get_engine("kimi_cli", model=model, idle_timeout_sec=idle_timeout)
 
     # 默认 claude_cli（extra_headers 静默忽略）
     model = await get_task_model(session, model_key or MODEL_CHAT_KEY)

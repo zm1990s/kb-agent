@@ -27,6 +27,12 @@ MODEL_CODEX_CLASSIFY_KEY = "model::codex::classify"
 MODEL_CODEX_CHAT_KEY = "model::codex::chat"
 MODEL_CODEX_WHATSNEW_KEY = "model::codex::whatsnew"
 MODEL_CODEX_TITLE_KEY = "model::codex::title"
+
+# Kimi CLI 引擎独立的任务模型 key（存 -m 参数值，空表示使用 config.toml 的 default_model）
+MODEL_KIMI_CLASSIFY_KEY = "model::kimi::classify"
+MODEL_KIMI_CHAT_KEY = "model::kimi::chat"
+MODEL_KIMI_WHATSNEW_KEY = "model::kimi::whatsnew"
+MODEL_KIMI_TITLE_KEY = "model::kimi::title"
 WHATSNEW_HOUR_KEY = "whatsnew_schedule_hour"
 WHATSNEW_HOUR_DEFAULT = 2  # 凌晨 2 点
 
@@ -179,6 +185,7 @@ class EngineOption:
 ENGINE_CATALOG: list[EngineOption] = [
     EngineOption(id="claude_cli", label="Claude CLI", available=True),
     EngineOption(id="codex", label="Codex CLI", available=True),
+    EngineOption(id="kimi_cli", label="Kimi CLI", available=True),
     EngineOption(id="openclaw", label="OpenClaw（未实现）", available=False),
 ]
 
@@ -221,6 +228,7 @@ async def set_engine_backend(session: AsyncSession, backend: str) -> None:
 _TASK_MODEL_KEYS = {
     MODEL_CLASSIFY_KEY, MODEL_CHAT_KEY, MODEL_WHATSNEW_KEY, MODEL_TITLE_KEY,
     MODEL_CODEX_CLASSIFY_KEY, MODEL_CODEX_CHAT_KEY, MODEL_CODEX_WHATSNEW_KEY, MODEL_CODEX_TITLE_KEY,
+    MODEL_KIMI_CLASSIFY_KEY, MODEL_KIMI_CHAT_KEY, MODEL_KIMI_WHATSNEW_KEY, MODEL_KIMI_TITLE_KEY,
 }
 
 
@@ -246,8 +254,13 @@ async def set_task_model(session: AsyncSession, key: str, model: str) -> None:
 async def get_task_model_for_engine(
     session: AsyncSession, task: str, engine: str
 ) -> str | None:
-    """按引擎取任务模型：codex 走 model::codex::<task>，其余走 model::<task>。"""
-    key = f"model::codex::{task}" if engine == "codex" else f"model::{task}"
+    """按引擎取任务模型：各 CLI 引擎走各自命名空间 key，其余走 model::<task>。"""
+    if engine == "codex":
+        key = f"model::codex::{task}"
+    elif engine == "kimi_cli":
+        key = f"model::kimi::{task}"
+    else:
+        key = f"model::{task}"
     return await get_task_model(session, key)
 
 
@@ -465,7 +478,7 @@ OPENAI_BASE_URL_KEY = "openai_base_url"
 OPENAI_API_KEY_KEY = "openai_api_key"
 OPENAI_MODEL_KEY = "openai_model"
 
-_CHAT_ENGINE_IDS = {"claude_cli", "openai_compat", "codex"}
+_CHAT_ENGINE_IDS = {"claude_cli", "openai_compat", "codex", "kimi_cli"}
 
 
 async def get_chat_engine_backend(session: AsyncSession) -> str:

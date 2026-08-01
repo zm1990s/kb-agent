@@ -46,6 +46,11 @@ class Settings(BaseSettings):
     # CODEX_HOME：挂载的配置目录（含 config.toml / hooks.json）
     codex_config_dir: str = Field("/app/codex_config", alias="CODEX_CONFIG_DIR")
 
+    # Kimi CLI 引擎配置
+    kimi_cli_path: str = Field("kimi", alias="KIMI_CLI_PATH")
+    # KIMI_CODE_HOME：挂载的配置目录（含 config.toml，包含 API key / 模型定义）
+    kimi_config_dir: str = Field("/app/kimi_config", alias="KIMI_CONFIG_DIR")
+
     # ── 上传限制 ────────────────────────────────────────
     max_upload_mb: int = Field(200, alias="MAX_UPLOAD_MB")
 

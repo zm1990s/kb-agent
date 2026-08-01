@@ -133,7 +133,7 @@ The table below lists the meaning and default values of the core variables:
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `ENGINE_BACKEND` | Engine type: `claude_cli` (default) / `codex` | `claude_cli` |
+| `ENGINE_BACKEND` | Engine type: `claude_cli` (default) / `codex` / `kimi_cli` | `claude_cli` |
 | `CLAUDE_CLI_PATH` | Claude CLI executable path | `claude` |
 | `CLAUDE_MODEL` | Specify model (leave blank to use CLI default) | None |
 | `ENGINE_IDLE_TIMEOUT_SEC` | Idle timeout in seconds | `300` |
@@ -153,6 +153,13 @@ Codex CLI (applies when `ENGINE_BACKEND=codex`):
 | `CODEX_CLI_PATH` | Codex CLI executable path | `codex` |
 | `CODEX_CONFIG_DIR` | Config directory (contains `config.toml` / `hooks.json`) | `/app/codex_config` |
 | `OPENAI_API_KEY` | Azure OpenAI API key | None |
+
+Kimi CLI (applies when `ENGINE_BACKEND=kimi_cli`):
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `KIMI_CLI_PATH` | Kimi CLI executable path | `kimi` |
+| `KIMI_CONFIG_DIR` | Config directory (contains `config.toml` with API key / model definitions) | `/app/kimi_config` |
 
 #### File Storage
 

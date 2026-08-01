@@ -18,6 +18,10 @@ from app.services.settings_service import (
     MODEL_CODEX_CLASSIFY_KEY,
     MODEL_CODEX_TITLE_KEY,
     MODEL_CODEX_WHATSNEW_KEY,
+    MODEL_KIMI_CHAT_KEY,
+    MODEL_KIMI_CLASSIFY_KEY,
+    MODEL_KIMI_TITLE_KEY,
+    MODEL_KIMI_WHATSNEW_KEY,
     MODEL_TITLE_KEY,
     MODEL_WHATSNEW_KEY,
     PROMPT_CATALOG,
@@ -497,6 +501,10 @@ _TASK_MODEL_LABELS: dict[str, str] = {
     MODEL_CODEX_CHAT_KEY: "对话问答模型",
     MODEL_CODEX_WHATSNEW_KEY: "新动态摘要模型",
     MODEL_CODEX_TITLE_KEY: "会话标题模型",
+    MODEL_KIMI_CLASSIFY_KEY: "文档归类模型",
+    MODEL_KIMI_CHAT_KEY: "对话问答模型",
+    MODEL_KIMI_WHATSNEW_KEY: "新动态摘要模型",
+    MODEL_KIMI_TITLE_KEY: "会话标题模型",
 }
 
 # 每个 key 归属的引擎（前端按此过滤）
@@ -509,6 +517,10 @@ _TASK_MODEL_ENGINE: dict[str, str] = {
     MODEL_CODEX_CHAT_KEY: "codex",
     MODEL_CODEX_WHATSNEW_KEY: "codex",
     MODEL_CODEX_TITLE_KEY: "codex",
+    MODEL_KIMI_CLASSIFY_KEY: "kimi_cli",
+    MODEL_KIMI_CHAT_KEY: "kimi_cli",
+    MODEL_KIMI_WHATSNEW_KEY: "kimi_cli",
+    MODEL_KIMI_TITLE_KEY: "kimi_cli",
 }
 
 

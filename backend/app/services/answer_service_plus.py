@@ -441,7 +441,7 @@ async def answer_question_plus_streamed(
     # engine_override 非空时用用户本轮指定的引擎，否则读系统默认 Agent Engine。
     # 传入用户邮箱，供 CLI hook 在拦截 env 读取时写入安全审计。
     from app.services.settings_service import get_engine_backend, get_task_model_for_engine
-    _resolved_engine = engine_override if engine_override in ("claude_cli", "codex") else await get_engine_backend(session)
+    _resolved_engine = engine_override if engine_override in ("claude_cli", "codex", "kimi_cli") else await get_engine_backend(session)
     logger.info("plus start engine=%s conversation=%s", _resolved_engine, conversation_id)
     _chat_model = await get_task_model_for_engine(session, "chat", _resolved_engine)
     engine = get_engine(_resolved_engine, model=_chat_model, audit_user=user.email)

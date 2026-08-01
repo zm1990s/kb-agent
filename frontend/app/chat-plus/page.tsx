@@ -128,7 +128,7 @@ export default function ChatPlusPage() {
   // 交互模式：开时后端注入 ask-user 协议，模型可弹选项让用户澄清（瞬时，不持久化）
   const [interactive, setInteractive] = useState(false);
   // 引擎覆盖：空字符串 = 跟随系统默认；"claude_cli" / "codex" = 本轮强制指定
-  const [engineOverride, setEngineOverride] = useState<"" | "claude_cli" | "codex">("");
+  const [engineOverride, setEngineOverride] = useState<"" | "claude_cli" | "codex" | "kimi_cli">("");
   // 读取原始文件：开时把引用文档的原始文件拷进工作目录供 Claude 读全文（瞬时，不持久化）
   const [useOriginalDocs, setUseOriginalDocs] = useState(false);
   const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
@@ -929,13 +929,14 @@ export default function ChatPlusPage() {
               </button>
               <select
                 value={engineOverride}
-                onChange={(e) => setEngineOverride(e.target.value as "" | "claude_cli" | "codex")}
+                onChange={(e) => setEngineOverride(e.target.value as "" | "claude_cli" | "codex" | "kimi_cli")}
                 title={t("engineOverrideTitle")}
                 className="rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-xs text-gray-600 focus:border-purple-400 focus:outline-none"
               >
                 <option value="">{t("engineOverrideDefault")}</option>
                 <option value="claude_cli">Claude CLI</option>
                 <option value="codex">Codex CLI</option>
+                <option value="kimi_cli">Kimi CLI</option>
               </select>
             </div>
 

@@ -133,7 +133,7 @@ cp .env.example .env
 
 | 变量 | 说明 | 默认值 |
 |------|------|--------|
-| `ENGINE_BACKEND` | 引擎类型：`claude_cli`（默认）/ `codex` | `claude_cli` |
+| `ENGINE_BACKEND` | 引擎类型：`claude_cli`（默认）/ `codex` / `kimi_cli` | `claude_cli` |
 | `CLAUDE_CLI_PATH` | Claude CLI 可执行路径 | `claude` |
 | `CLAUDE_MODEL` | 指定模型（留空使用 CLI 默认） | 无 |
 | `ENGINE_IDLE_TIMEOUT_SEC` | 空闲超时秒数 | `300` |
@@ -153,6 +153,13 @@ Codex CLI（`ENGINE_BACKEND=codex` 时生效）：
 | `CODEX_CLI_PATH` | Codex CLI 可执行路径 | `codex` |
 | `CODEX_CONFIG_DIR` | 配置目录（含 `config.toml` / `hooks.json`） | `/app/codex_config` |
 | `OPENAI_API_KEY` | Azure OpenAI API key | 无 |
+
+Kimi CLI（`ENGINE_BACKEND=kimi_cli` 时生效）：
+
+| 变量 | 说明 | 默认值 |
+|------|------|--------|
+| `KIMI_CLI_PATH` | Kimi CLI 可执行路径 | `kimi` |
+| `KIMI_CONFIG_DIR` | 配置目录（含 `config.toml`，包含 API key / 模型定义） | `/app/kimi_config` |
 
 #### 文件存储
 

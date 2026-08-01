@@ -448,12 +448,14 @@
     "email_verification_enabled": "已开启邮箱验证",
     "email_verification_disabled": "已关闭邮箱验证",
     "chat_engine_title": "对话引擎",
-    "chat_engine_desc": "选择处理对话问答、会话标题和新动态摘要的引擎后端（文档归类始终使用 Claude CLI）",
+    "chat_engine_desc": "选择处理对话问答、会话标题和新动态摘要的引擎后端（文档归类始终使用默认 Agent 引擎）",
     "chat_engine_backend_label": "引擎后端",
     "chat_engine_claude_cli": "Claude CLI",
     "chat_engine_openai_compat": "OpenAI 兼容（Ollama / vLLM / OpenAI / Azure）",
     "chat_engine_codex": "Codex CLI",
     "chat_engine_codex_hint": "Codex 引擎通过 CODEX_HOME 目录中的 config.toml 配置，无需在此填写额外参数。",
+    "chat_engine_kimi": "Kimi CLI",
+    "chat_engine_kimi_hint": "Kimi 引擎通过 KIMI_CODE_HOME 目录中的 config.toml 配置（含 API key / 模型定义），无需在此填写额外参数。",
     "openai_base_url_label": "Base URL",
     "openai_api_key_label": "API Key",
     "openai_api_key_set": "已配置（留空保持不变）",
@@ -502,7 +504,8 @@
     "case_workspace_none": "（未设置）",
     "case_workspace_saved": "已保存",
     "case_workspace_save": "保存",
-    "task_model_codex_hint": "模型名传给 -m 参数；provider/endpoint 仍由 CODEX_HOME/config.toml 决定。"
+    "task_model_codex_hint": "模型名传给 -m 参数；provider/endpoint 仍由 CODEX_HOME/config.toml 决定。",
+    "task_model_kimi_hint": "填写 KIMI_CODE_HOME/config.toml 中已定义的模型 ID（如 kimi-code/kimi-for-coding），未在 config.toml 中配置的模型名将报错。"
   },
   "caseEntry": {
     "title": "Case 录入",

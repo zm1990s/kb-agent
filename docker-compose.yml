@@ -53,6 +53,7 @@ services:
       - ./data/documents:/app/local_storage
       - ./data/logs:/app/logs
       - ./data/codex:/app/codex_config
+      - ./data/kimi:/app/kimi_config
 
   frontend:
     build: ./frontend

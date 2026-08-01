@@ -16,6 +16,9 @@ RUN npm install -g @anthropic-ai/claude-code
 # OpenAI Codex CLI（可选对话引擎；认证凭据在运行时经 OPENAI_API_KEY 注入）
 RUN npm install -g @openai/codex
 
+# Kimi Code CLI（可选对话引擎；认证凭据在运行时经 KIMI_CODE_HOME/config.toml 注入）
+RUN npm install -g @moonshot-ai/kimi-code
+
 # @oai/artifact-tool（私有包，无法从 npm 公有源安装；从本地 vendor 拷入全局 node_modules）
 # skia-canvas 内含 macOS native binding，需重新下载 Linux 版（从 GitHub public releases）。
 COPY vendor/@oai /usr/local/lib/node_modules/@oai

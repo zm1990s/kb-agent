@@ -448,12 +448,14 @@
     "email_verification_enabled": "이메일 인증이 활성화되었습니다",
     "email_verification_disabled": "이메일 인증이 비활성화되었습니다",
     "chat_engine_title": "채팅 엔진",
-    "chat_engine_desc": "채팅 Q&A, 대화 제목 및 새소식 요약의 엔진 백엔드를 선택합니다（문서 분류는 항상 Claude CLI를 사용）",
+    "chat_engine_desc": "채팅 Q&A, 대화 제목 및 새소식 요약의 엔진 백엔드를 선택합니다（문서 분류는 항상 기본 Agent 엔진을 사용）",
     "chat_engine_backend_label": "엔진 백엔드",
     "chat_engine_claude_cli": "Claude CLI",
     "chat_engine_openai_compat": "OpenAI 호환（Ollama / vLLM / OpenAI / Azure）",
     "chat_engine_codex": "Codex CLI",
     "chat_engine_codex_hint": "Codex 엔진은 CODEX_HOME의 config.toml로 설정됩니다. 추가 입력 불필요.",
+    "chat_engine_kimi": "Kimi CLI",
+    "chat_engine_kimi_hint": "Kimi 엔진은 KIMI_CODE_HOME의 config.toml（API 키 / 모델 정의 포함）로 설정됩니다. 추가 입력 불필요.",
     "openai_base_url_label": "Base URL",
     "openai_api_key_label": "API 키",
     "openai_api_key_set": "설정됨（비워두면 변경 없음）",
@@ -502,7 +504,8 @@
     "case_workspace_none": "(설정 안 함)",
     "case_workspace_saved": "저장됨",
     "case_workspace_save": "저장",
-    "task_model_codex_hint": "모델 이름은 -m 플래그에 전달됩니다. provider/endpoint는 여전히 CODEX_HOME/config.toml에서 제어됩니다."
+    "task_model_codex_hint": "모델 이름은 -m 플래그에 전달됩니다. provider/endpoint는 여전히 CODEX_HOME/config.toml에서 제어됩니다.",
+    "task_model_kimi_hint": "KIMI_CODE_HOME/config.toml에 정의된 모델 ID를 입력하세요（예: kimi-code/kimi-for-coding）. config.toml에 없는 모델은 오류가 발생합니다."
   },
   "caseEntry": {
     "title": "케이스 입력",

@@ -54,6 +54,7 @@ services:
       - ./data/logs:/app/logs
       - ./infra:/app/infra:ro
       - ./data/codex:/app/codex_config
+      - ./data/kimi:/app/kimi_config
 
   frontend:
     build:

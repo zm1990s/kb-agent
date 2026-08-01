@@ -448,12 +448,14 @@
     "email_verification_enabled": "Email verification enabled",
     "email_verification_disabled": "Email verification disabled",
     "chat_engine_title": "Chat Engine",
-    "chat_engine_desc": "Select the engine backend for chat Q&A, conversation titles, and What's New summaries (document classification always uses Claude CLI)",
+    "chat_engine_desc": "Select the engine backend for chat Q&A, conversation titles, and What's New summaries (document classification always uses the default Agent engine)",
     "chat_engine_backend_label": "Engine backend",
     "chat_engine_claude_cli": "Claude CLI",
     "chat_engine_openai_compat": "OpenAI-compatible (Ollama / vLLM / OpenAI / Azure)",
     "chat_engine_codex": "Codex CLI",
     "chat_engine_codex_hint": "Codex engine is configured via config.toml in CODEX_HOME directory. No extra fields needed here.",
+    "chat_engine_kimi": "Kimi CLI",
+    "chat_engine_kimi_hint": "Kimi engine is configured via config.toml in KIMI_CODE_HOME directory (contains API key / model definitions). No extra fields needed here.",
     "openai_base_url_label": "Base URL",
     "openai_api_key_label": "API Key",
     "openai_api_key_set": "Already set (leave blank to keep unchanged)",
@@ -502,7 +504,8 @@
     "case_workspace_none": "(not set)",
     "case_workspace_saved": "Saved",
     "case_workspace_save": "Save",
-    "task_model_codex_hint": "Model name is passed to the -m flag; provider/endpoint is still controlled by CODEX_HOME/config.toml."
+    "task_model_codex_hint": "Model name is passed to the -m flag; provider/endpoint is still controlled by CODEX_HOME/config.toml.",
+    "task_model_kimi_hint": "Enter a model ID defined in KIMI_CODE_HOME/config.toml (e.g. kimi-code/kimi-for-coding). Models not present in config.toml will cause an error."
   },
   "caseEntry": {
     "title": "Case Entry",
