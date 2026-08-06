@@ -16,6 +16,11 @@ interface GroupGrant {
   group_id: string;
   role_in_ws: string;
 }
+interface Member {
+  user_id: string;
+  email: string;
+  role_in_ws: string;
+}
 
 export default function WorkspaceAdmin() {
   const t = useTranslations("admin");
@@ -23,6 +28,7 @@ export default function WorkspaceAdmin() {
   const [selected, setSelected] = useState<string | null>(null);
   const [groups, setGroups] = useState<Group[]>([]);
   const [grants, setGrants] = useState<GroupGrant[]>([]);
+  const [members, setMembers] = useState<Member[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   // 新建空间
@@ -74,6 +80,15 @@ export default function WorkspaceAdmin() {
     }
   }, [selected]);
 
+  const loadMembers = useCallback(async () => {
+    if (!selected) return;
+    try {
+      setMembers(await api.get<Member[]>(`/workspaces/${selected}/members`));
+    } catch {
+      setMembers([]);
+    }
+  }, [selected]);
+
   const loadSq = useCallback(async () => {
     if (!selected) { setSqText(""); return; }
     try {
@@ -86,7 +101,7 @@ export default function WorkspaceAdmin() {
   }, [selected]);
 
   useEffect(() => { loadWorkspaces(); loadGroups(); }, [loadWorkspaces, loadGroups]);
-  useEffect(() => { loadGrants(); loadSq(); }, [loadGrants, loadSq]);
+  useEffect(() => { loadGrants(); loadSq(); loadMembers(); }, [loadGrants, loadSq, loadMembers]);
 
   // 进入重命名模式时聚焦
   useEffect(() => {
@@ -114,6 +129,7 @@ export default function WorkspaceAdmin() {
     if (!selected) return;
     await api.post(`/workspaces/${selected}/members`, { email: memberId, role_in_ws: memberRole });
     setMemberId("");
+    await loadMembers();
   });
 
   const addGrant = wrap(async () => {
@@ -353,6 +369,30 @@ export default function WorkspaceAdmin() {
                   {t("ws_add_btn")}
                 </button>
               </form>
+
+              {members.length > 0 && (
+                <ul className="mt-3 space-y-1 text-sm text-gray-700">
+                  {members.map((m) => (
+                    <li key={m.user_id} className="flex items-center justify-between rounded bg-gray-50 px-3 py-1.5">
+                      <span className="truncate">{m.email} · <span className="text-gray-500">{m.role_in_ws}</span></span>
+                      <button
+                        onClick={async () => {
+                          setError(null);
+                          try {
+                            await api.del(`/workspaces/${selected}/members/${m.user_id}`);
+                            await loadMembers();
+                          } catch (err) {
+                            setError(err instanceof ApiError ? err.message : t("ws_op_failed"));
+                          }
+                        }}
+                        className="ml-3 shrink-0 text-xs text-red-500 hover:underline"
+                      >
+                        {t("ws_revoke")}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
 
               <div className="mt-4 border-t pt-4">
                 <h3 className="mb-1 text-sm font-medium text-gray-700">{t("ws_group_grant_title")}</h3>

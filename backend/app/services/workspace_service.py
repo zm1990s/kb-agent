@@ -179,6 +179,31 @@ async def list_group_grants(session: AsyncSession, *, workspace_id: uuid.UUID):
     return list(result.scalars().all())
 
 
+async def list_members(
+    session: AsyncSession, *, workspace_id: uuid.UUID
+) -> list[tuple[uuid.UUID, str, str]]:
+    """返回空间内所有直接成员 (user_id, email, role_in_ws) 列表。"""
+    result = await session.execute(
+        select(User.id, User.email, WorkspaceMember.role_in_ws)
+        .join(WorkspaceMember, WorkspaceMember.user_id == User.id)
+        .where(WorkspaceMember.workspace_id == workspace_id)
+        .order_by(User.email)
+    )
+    return list(result.all())
+
+
+async def remove_member(
+    session: AsyncSession, *, workspace_id: uuid.UUID, user_id: uuid.UUID
+) -> bool:
+    """移除空间成员，返回 True 表示成功，False 表示记录不存在。"""
+    member = await session.get(WorkspaceMember, (workspace_id, user_id))
+    if member is None:
+        return False
+    await session.delete(member)
+    await session.commit()
+    return True
+
+
 async def is_member(
     session: AsyncSession, *, workspace_id: uuid.UUID, user_id: uuid.UUID
 ) -> bool:

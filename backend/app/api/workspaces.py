@@ -32,7 +32,9 @@ from app.services.workspace_service import (
     create_workspace,
     grant_group,
     list_group_grants,
+    list_members,
     list_my_workspaces,
+    remove_member,
     rename_workspace,
     revoke_group,
 )
@@ -126,6 +128,41 @@ async def add_workspace_member(
                              "member_user_id": str(body.user_id) if body.user_id else None,
                              "email": body.email, "role_in_ws": body.role_in_ws})
     return {"status": "ok"}
+
+
+class MemberPublic(BaseModel):
+    user_id: uuid.UUID
+    email: str
+    role_in_ws: str
+
+
+@router.get("/{workspace_id}/members", response_model=list[MemberPublic])
+async def list_workspace_members(
+    workspace_id: uuid.UUID,
+    admin: User = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+) -> list[MemberPublic]:
+    rows = await list_members(session, workspace_id=workspace_id)
+    return [MemberPublic(user_id=uid, email=email, role_in_ws=role) for uid, email, role in rows]
+
+
+@router.delete(
+    "/{workspace_id}/members/{user_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def remove_workspace_member(
+    workspace_id: uuid.UUID,
+    user_id: uuid.UUID,
+    admin: User = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+) -> None:
+    removed = await remove_member(session, workspace_id=workspace_id, user_id=user_id)
+    if not removed:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "成员不存在")
+    logger.info("audit admin remove_member admin=%s workspace=%s user=%s",
+                admin.id, workspace_id, user_id)
+    await record_event(session, action="admin_remove_member", user_id=admin.id,
+                       meta={"workspace_id": str(workspace_id), "member_user_id": str(user_id)})
 
 
 # ── F7 空间按组授权 ────────────────────────────────────
