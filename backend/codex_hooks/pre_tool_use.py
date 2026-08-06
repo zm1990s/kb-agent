@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""PreToolUse hook（Codex CLI）：拦截读取环境变量的 Bash 命令。
+"""PreToolUse hook（Codex CLI）：拦截读取环境变量及路径越界访问。
 
 输入格式（Codex CLI）：
   {"hook_event_name": "PreToolUse", "tool_name": "Bash",
@@ -22,6 +22,12 @@ _DENY_REASON_ENV = (
     "Platform policy violation: reading environment variables is prohibited. "
     "This event has been logged. Please continue without accessing the "
     "environment; inform the user that this action was blocked and recorded."
+)
+_DENY_REASON_PATH = (
+    "Platform policy violation: file access outside the authorized workspace "
+    "directory is prohibited. This event has been logged. Please only access "
+    "files within the designated workspace; inform the user that this action "
+    "was blocked and recorded."
 )
 
 # ── 与 claude_hooks/pre_tool_use.py 相同的检测规则 ───────────────────────────
@@ -71,6 +77,11 @@ _PATTERNS = (
     ),
 )
 
+# ── 路径越界检查 ──────────────────────────────────────────────────────────────
+_ABS_PATH_RE = re.compile(
+    r'(?<![/\w])/(?:data|etc|home|root|proc|var|tmp|app)/[^\s|;&><"\'\n]+'
+)
+
 _SCRIPT_INTERPRETERS = frozenset({
     "python", "python3", "node", "ruby", "perl",
     "bash", "sh", "zsh", "ksh", "fish",
@@ -78,6 +89,13 @@ _SCRIPT_INTERPRETERS = frozenset({
     "Rscript", "rscript", "pwsh", "powershell", "php", "groovy",
 })
 _SCRIPT_FLAG_INTERPRETERS = frozenset({"awk", "gawk", "nawk", "mawk"})
+
+_PATH_REASON_LABELS = frozenset({
+    "file_access_outside_workspace",
+    "file_read_outside_workspace",
+    "file_path_outside_workspace_in_written_content",
+    "file_path_outside_workspace_in_executed_script",
+})
 
 
 def _matches_pattern(text: str) -> bool:
@@ -92,17 +110,26 @@ def _extract_inline_code(command: str) -> str:
     return m.group(2) if m else ""
 
 
-def _read_and_check(path: str) -> bool:
+def _read_and_check(path: str) -> tuple[bool, str]:
+    """读取脚本文件，检查 env 访问模式和越界路径。返回 (命中, 原因标签)。"""
     try:
-        return _matches_pattern(Path(path).read_text(encoding="utf-8", errors="replace"))
+        content = Path(path).read_text(encoding="utf-8", errors="replace")
     except OSError:
-        return False
+        return False, ""
+    if _matches_pattern(content):
+        return True, "env_read_in_executed_script"
+    allowed = _get_allowed_dirs()
+    if allowed:
+        for m in _ABS_PATH_RE.finditer(content):
+            if not _path_allowed(m.group(0), allowed):
+                return True, "file_path_outside_workspace_in_executed_script"
+    return False, ""
 
 
-def _check_script_content(command: str) -> bool:
+def _check_script_content(command: str) -> tuple[bool, str]:
     tokens = command.split()
     if not tokens:
-        return False
+        return False, ""
     interpreter = os.path.basename(tokens[0])
     if interpreter in _SCRIPT_FLAG_INTERPRETERS:
         for i, tok in enumerate(tokens[1:], 1):
@@ -112,15 +139,41 @@ def _check_script_content(command: str) -> bool:
                 return _read_and_check(tok[2:])
         m = re.search(r"""awk\s+(['"'])(.*?)\1""", command, re.DOTALL)
         if m:
-            return _matches_pattern(m.group(2))
-        return False
+            if _matches_pattern(m.group(2)):
+                return True, "env_read_in_executed_script"
+        return False, ""
     if interpreter not in _SCRIPT_INTERPRETERS:
-        return False
+        return False, ""
     for tok in tokens[1:]:
         if tok.startswith("-"):
             continue
         return _read_and_check(tok)
-    return False
+    return False, ""
+
+
+def _get_allowed_dirs() -> list[Path]:
+    """从 KB_AGENT_ALLOWED_DIRS 读取授权目录列表（冒号分隔），resolve() 规范化。
+    未设置时返回空列表（不拦截，向后兼容）。
+    """
+    raw = os.environ.get("KB_AGENT_ALLOWED_DIRS", "")
+    result = []
+    for p in raw.split(":"):
+        p = p.strip()
+        if p:
+            try:
+                result.append(Path(p).resolve())
+            except (OSError, ValueError):
+                pass
+    return result
+
+
+def _path_allowed(file_path: str, allowed: list[Path]) -> bool:
+    """检查 file_path 是否在某个授权目录内（resolve() 后校验 parents）。"""
+    try:
+        candidate = Path(file_path).resolve()
+    except (OSError, ValueError):
+        return False
+    return any(candidate == d or d in candidate.parents for d in allowed)
 
 
 def _check_bash(tool_input: dict) -> tuple[bool, str]:
@@ -130,9 +183,39 @@ def _check_bash(tool_input: dict) -> tuple[bool, str]:
     inline = _extract_inline_code(command)
     if inline and _matches_pattern(inline):
         return True, "env_read_in_inline_code"
-    if _check_script_content(command):
-        return True, "env_read_in_executed_script"
+    hit, label = _check_script_content(command)
+    if hit:
+        return True, label
+    # 路径越界检查：扫描命令中的绝对路径
+    allowed = _get_allowed_dirs()
+    if allowed:
+        for m in _ABS_PATH_RE.finditer(command):
+            if not _path_allowed(m.group(0), allowed):
+                return True, "file_access_outside_workspace"
     return False, ""
+
+
+def _check_read(tool_input: dict) -> tuple[bool, str]:
+    """拒绝读取不在授权目录内的文件。"""
+    file_path = (tool_input.get("file_path") or "").strip()
+    if not file_path:
+        return False, ""
+    allowed = _get_allowed_dirs()
+    if allowed and not _path_allowed(file_path, allowed):
+        return True, "file_read_outside_workspace"
+    return False, ""
+
+
+def _deny_reason_for(tool_name: str, reason_label: str) -> str:
+    if reason_label in _PATH_REASON_LABELS:
+        return _DENY_REASON_PATH
+    return _DENY_REASON_ENV
+
+
+_TOOL_CHECKERS = {
+    "Bash": _check_bash,
+    "Read": _check_read,
+}
 
 
 def main() -> int:
@@ -142,39 +225,58 @@ def main() -> int:
         return 0
 
     tool_name = payload.get("tool_name") or ""
-    # Codex: tool_input 直接是 dict（与 Claude 相同）
     tool_input = payload.get("tool_input") or {}
 
-    if tool_name != "Bash":
+    checker_fn = _TOOL_CHECKERS.get(tool_name)
+    if checker_fn is None:
         return 0
 
     user = os.environ.get("KB_AGENT_AUDIT_USER") or "unknown"
     session_id = payload.get("session_id")
     cwd = payload.get("cwd")
     command = (tool_input.get("command", "") or "")[:2000]
+    file_path = tool_input.get("file_path", "") or ""
 
-    hit, reason_label = _check_bash(tool_input)
+    hit, reason_label = checker_fn(tool_input)
 
     hook_log(
-        "pre", "Bash",
+        "pre", tool_name,
         "deny" if hit else "allow",
-        {"user": user, "session_id": session_id, "cwd": cwd,
-         "reason": reason_label or "no_match", "command": command},
+        {
+            "user": user,
+            "session_id": session_id,
+            "cwd": cwd,
+            "reason": reason_label or "no_match",
+            "command": command,
+            "file_path": file_path,
+        },
     )
 
     if not hit:
         return 0
 
-    audit(
-        "env_access_blocked",
-        {"user": user, "session_id": session_id, "cwd": cwd,
-         "tool_name": "Bash", "reason": reason_label, "command": command},
+    audit_event = (
+        "file_access_blocked" if reason_label in _PATH_REASON_LABELS
+        else "env_access_blocked"
     )
+    audit(
+        audit_event,
+        {
+            "user": user,
+            "session_id": session_id,
+            "cwd": cwd,
+            "tool_name": tool_name,
+            "reason": reason_label,
+            "command": command,
+            "file_path": file_path,
+        },
+    )
+    deny_reason = _deny_reason_for(tool_name, reason_label)
     print(json.dumps({
         "hookSpecificOutput": {
             "hookEventName": "PreToolUse",
             "permissionDecision": "deny",
-            "permissionDecisionReason": _DENY_REASON_ENV,
+            "permissionDecisionReason": deny_reason,
         }
     }))
     return 0

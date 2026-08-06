@@ -30,6 +30,12 @@ _DENY_REASON_WRITE = (
     "is prohibited. This event has been logged. Please rewrite the content "
     "without environment variable access."
 )
+_DENY_REASON_PATH = (
+    "Platform policy violation: file access outside the authorized workspace "
+    "directory is prohibited. This event has been logged. Please only access "
+    "files within the designated workspace; inform the user that this action "
+    "was blocked and recorded."
+)
 
 # ── 环境变量读取模式 ──────────────────────────────────────────────────────────
 _CMD_START = r"(?:^|[\n;&|]|\|\||&&|\bsudo\s+|\bnohup\s+|\bexec\s+)\s*"
@@ -94,6 +100,38 @@ _PATTERNS = (
     ),
 )
 
+# ── 路径越界检查 ──────────────────────────────────────────────────────────────
+# 从 Bash 命令中提取绝对路径的正则（覆盖常见数据和系统目录）
+_ABS_PATH_RE = re.compile(
+    r'(?<![/\w])/(?:data|etc|home|root|proc|var|tmp|app)/[^\s|;&><"\'\n]+'
+)
+
+
+def _get_allowed_dirs() -> list[Path]:
+    """从 KB_AGENT_ALLOWED_DIRS 读取授权目录列表（冒号分隔），resolve() 规范化。
+    未设置时返回空列表（不拦截，向后兼容）。
+    """
+    raw = os.environ.get("KB_AGENT_ALLOWED_DIRS", "")
+    result = []
+    for p in raw.split(":"):
+        p = p.strip()
+        if p:
+            try:
+                result.append(Path(p).resolve())
+            except (OSError, ValueError):
+                pass
+    return result
+
+
+def _path_allowed(file_path: str, allowed: list[Path]) -> bool:
+    """检查 file_path 是否在某个授权目录内（resolve() 后校验 parents）。"""
+    try:
+        candidate = Path(file_path).resolve()
+    except (OSError, ValueError):
+        return False
+    return any(candidate == d or d in candidate.parents for d in allowed)
+
+
 # 脚本路径作为位置参数的解释器
 _SCRIPT_INTERPRETERS = frozenset({
     "python", "python3", "node", "ruby", "perl",
@@ -123,16 +161,24 @@ def _extract_inline_code(command: str) -> str:
     return m.group(2) if m else ""
 
 
-def _read_and_check(path: str) -> bool:
+def _read_and_check(path: str) -> tuple[bool, str]:
+    """读取脚本文件，检查 env 访问模式和越界路径。返回 (命中, 原因标签)。"""
     try:
         content = Path(path).read_text(encoding="utf-8", errors="replace")
-        return _matches_pattern(content)
     except OSError:
-        return False
+        return False, ""
+    if _matches_pattern(content):
+        return True, "env_read_in_executed_script"
+    allowed = _get_allowed_dirs()
+    if allowed:
+        for m in _ABS_PATH_RE.finditer(content):
+            if not _path_allowed(m.group(0), allowed):
+                return True, "file_path_outside_workspace_in_executed_script"
+    return False, ""
 
 
-def _check_script_content(command: str) -> bool:
-    """读取脚本文件内容检测 env 访问模式。
+def _check_script_content(command: str) -> tuple[bool, str]:
+    """读取脚本文件内容检测 env 访问模式和越界路径。
 
     支持两种传参方式：
       - 位置参数：python/perl/bash/... script.py [args]
@@ -140,7 +186,7 @@ def _check_script_content(command: str) -> bool:
     """
     tokens = command.split()
     if not tokens:
-        return False
+        return False, ""
     interpreter = os.path.basename(tokens[0])
 
     # awk/gawk 等：脚本通过 -f 传入，或内联程序作为第一个引号包裹参数
@@ -155,17 +201,18 @@ def _check_script_content(command: str) -> bool:
         if not m:
             m = re.search(r"""awk\s+(['"'])(.*?)\1""", command, re.DOTALL)
         if m:
-            return _matches_pattern(m.group(2))
-        return False
+            if _matches_pattern(m.group(2)):
+                return True, "env_read_in_executed_script"
+        return False, ""
 
     # python/perl/bash 等：脚本是第一个非 - 参数
     if interpreter not in _SCRIPT_INTERPRETERS:
-        return False
+        return False, ""
     for tok in tokens[1:]:
         if tok.startswith("-"):
             continue
         return _read_and_check(tok)
-    return False
+    return False, ""
 
 
 def _check_bash(tool_input: dict) -> tuple[bool, str]:
@@ -176,42 +223,87 @@ def _check_bash(tool_input: dict) -> tuple[bool, str]:
     inline = _extract_inline_code(command)
     if inline and _matches_pattern(inline):
         return True, "env_read_in_inline_code"
-    if _check_script_content(command):
-        return True, "env_read_in_executed_script"
+    hit, label = _check_script_content(command)
+    if hit:
+        return True, label
+    # 路径越界检查：扫描命令中的绝对路径
+    allowed = _get_allowed_dirs()
+    if allowed:
+        for m in _ABS_PATH_RE.finditer(command):
+            if not _path_allowed(m.group(0), allowed):
+                return True, "file_access_outside_workspace"
     return False, ""
 
 
-def _check_write_content(content: str) -> bool:
-    return _matches_pattern(content)
+def _check_read(tool_input: dict) -> tuple[bool, str]:
+    """拒绝读取不在授权目录内的文件。"""
+    file_path = (tool_input.get("file_path") or "").strip()
+    if not file_path:
+        return False, ""
+    allowed = _get_allowed_dirs()
+    if allowed and not _path_allowed(file_path, allowed):
+        return True, "file_read_outside_workspace"
+    return False, ""
+
+
+def _check_write_content(content: str) -> tuple[bool, str]:
+    """检查写入内容中的 env 访问模式和越界绝对路径。返回 (命中, 原因标签)。"""
+    if _matches_pattern(content):
+        return True, "env_read_pattern_in_written_content"
+    allowed = _get_allowed_dirs()
+    if allowed:
+        for m in _ABS_PATH_RE.finditer(content):
+            if not _path_allowed(m.group(0), allowed):
+                return True, "file_path_outside_workspace_in_written_content"
+    return False, ""
 
 
 def _check_write(tool_input: dict) -> tuple[bool, str]:
     content = tool_input.get("content", "") or ""
-    if _check_write_content(content):
-        return True, "env_read_pattern_in_written_content"
-    return False, ""
+    return _check_write_content(content)
 
 
 def _check_edit(tool_input: dict) -> tuple[bool, str]:
     new_string = tool_input.get("new_string", "") or ""
-    if _check_write_content(new_string):
-        return True, "env_read_pattern_in_edited_content"
+    hit, label = _check_write_content(new_string)
+    if hit:
+        # 把 written_content 替换为 edited_content 以区分来源
+        return True, label.replace("written_content", "edited_content")
     return False, ""
 
 
 def _check_multiedit(tool_input: dict) -> tuple[bool, str]:
     for edit in tool_input.get("edits", []) or []:
-        if _check_write_content(edit.get("new_string", "") or ""):
-            return True, "env_read_pattern_in_multiedit_content"
+        hit, label = _check_write_content(edit.get("new_string", "") or "")
+        if hit:
+            return True, label.replace("written_content", "multiedit_content")
     return False, ""
 
 
+_PATH_REASON_LABELS = frozenset({
+    "file_access_outside_workspace",
+    "file_read_outside_workspace",
+    "file_path_outside_workspace_in_written_content",
+    "file_path_outside_workspace_in_edited_content",
+    "file_path_outside_workspace_in_multiedit_content",
+    "file_path_outside_workspace_in_executed_script",
+})
+
 _TOOL_CHECKERS = {
-    "Bash": (_check_bash, _DENY_REASON_ENV),
-    "Write": (_check_write, _DENY_REASON_WRITE),
-    "Edit": (_check_edit, _DENY_REASON_WRITE),
-    "MultiEdit": (_check_multiedit, _DENY_REASON_WRITE),
+    "Bash": _check_bash,
+    "Write": _check_write,
+    "Edit": _check_edit,
+    "MultiEdit": _check_multiedit,
+    "Read": _check_read,
 }
+
+# 各工具命中时对应的拒绝话术（按 reason_label 区分 path 类 vs env 类）
+def _deny_reason_for(tool_name: str, reason_label: str) -> str:
+    if reason_label in _PATH_REASON_LABELS:
+        return _DENY_REASON_PATH
+    if tool_name in ("Write", "Edit", "MultiEdit"):
+        return _DENY_REASON_WRITE
+    return _DENY_REASON_ENV
 
 
 def main() -> int:
@@ -223,8 +315,8 @@ def main() -> int:
     tool_name = payload.get("tool_name") or ""
     tool_input = payload.get("tool_input") or {}
 
-    checker_entry = _TOOL_CHECKERS.get(tool_name)
-    if checker_entry is None:
+    checker_fn = _TOOL_CHECKERS.get(tool_name)
+    if checker_fn is None:
         return 0
 
     user = os.environ.get("KB_AGENT_AUDIT_USER") or "unknown"
@@ -233,7 +325,6 @@ def main() -> int:
     command = (tool_input.get("command", "") or "")[:2000]
     file_path = tool_input.get("file_path", "") or ""
 
-    checker_fn, deny_reason = checker_entry
     hit, reason_label = checker_fn(tool_input)
 
     hook_log(
@@ -252,8 +343,12 @@ def main() -> int:
     if not hit:
         return 0
 
+    audit_event = (
+        "file_access_blocked" if reason_label in _PATH_REASON_LABELS
+        else "env_access_blocked"
+    )
     audit(
-        "env_access_blocked",
+        audit_event,
         {
             "user": user,
             "session_id": session_id,
@@ -264,6 +359,7 @@ def main() -> int:
             "file_path": file_path,
         },
     )
+    deny_reason = _deny_reason_for(tool_name, reason_label)
     print(
         json.dumps(
             {

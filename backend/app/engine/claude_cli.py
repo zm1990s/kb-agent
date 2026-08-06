@@ -32,12 +32,17 @@ _CLI_ENV_EXACT = (
 _CLI_ENV_PREFIXES = ("ANTHROPIC_", "AWS_", "CLAUDE_")
 
 
-def _build_cli_env(audit_user: str | None = None) -> dict[str, str]:
+def _build_cli_env(
+    audit_user: str | None = None,
+    allowed_dirs: list[str] | None = None,
+) -> dict[str, str]:
     """构造传给 claude 子进程的精简环境（白名单透传）。
 
     只包含 CLI 运行与认证所需变量；前缀透传保证未来新增同前缀认证变量
     自动生效，无需改代码。剥离所有无关应用密钥。
     audit_user：发起本次调用的用户标识，经 KB_AGENT_AUDIT_USER 传给 hook 写审计。
+    allowed_dirs：本次调用授权的目录列表，经 KB_AGENT_ALLOWED_DIRS 传给 hook
+                  做路径越界校验（冒号分隔）。
     """
     out = {k: os.environ[k] for k in _CLI_ENV_EXACT if k in os.environ}
     for k, v in os.environ.items():
@@ -45,6 +50,8 @@ def _build_cli_env(audit_user: str | None = None) -> dict[str, str]:
             out[k] = v
     if audit_user:
         out["KB_AGENT_AUDIT_USER"] = audit_user
+    if allowed_dirs:
+        out["KB_AGENT_ALLOWED_DIRS"] = ":".join(allowed_dirs)
     return out
 
 
@@ -75,13 +82,15 @@ class ClaudeCliEngine:
 
     def _build_argv(
         self, prompt: str, files: list[Path] | None, cwd: Path | None = None
-    ) -> list[str]:
+    ) -> tuple[list[str], list[str]]:
         """构造 argv 列表；参数以独立元素传入，避免 shell 解析。
 
         文件通过"把路径写进 prompt + --add-dir 授权目录"让 CLI 用 Read 工具读原文
         （CLI 的 --file 是 file_id:path 远程资源语义，不适用于本地路径）。
         headless 下用 --permission-mode 跳过交互授权（平台可信，见 SECURITY #2）。
         cwd 为工作目录：CLI 子进程在此运行，并授权其读写（--add-dir）。
+
+        返回 (argv, allowed_dirs)：allowed_dirs 传给 hook 做路径越界校验。
         """
         files = files or []
         full_prompt = prompt
@@ -94,22 +103,32 @@ class ClaudeCliEngine:
         argv: list[str] = [self._cli_path, "-p", full_prompt]
         if self._model:
             argv += ["--model", self._model]
-        # 授权每个文件所在目录，供工具访问
+
+        # 构建授权目录列表（去重），同时加入 --add-dir 参数
+        seen: set[str] = set()
+        allowed_dirs: list[str] = []
         for f in files:
-            argv += ["--add-dir", str(f.parent)]
-        # 授权工作目录，供 Agent 在其中创建/修改文件
+            d = str(f.parent)
+            argv += ["--add-dir", d]
+            if d not in seen:
+                seen.add(d)
+                allowed_dirs.append(d)
         if cwd is not None:
             argv += ["--add-dir", str(cwd)]
+            d = str(cwd)
+            if d not in seen:
+                allowed_dirs.append(d)
+
         if files or cwd is not None:
             # 放开全部工具（含 Bash，用于 pdftotext 等抽取大文件）。
             # 按项目决策：工具不做限制、假设平台可信（见 SECURITY.md #2）。
             # 注意：该 flag 拒绝 root 运行，容器以非 root 用户启动。
             argv += ["--dangerously-skip-permissions"]
             # 注入 hook：PreToolUse 拦截读取环境变量的 Bash 命令（env/printenv/
-            # os.environ 等）+ 写审计（见 SECURITY.md #2/#10）。放开工具时才需要。
+            # os.environ 等）及路径越界访问 + 写审计（见 SECURITY.md #2/#10）。
             if self._hooks_settings:
                 argv += ["--settings", self._hooks_settings]
-        return argv
+        return argv, allowed_dirs
 
     async def complete(
         self,
@@ -119,7 +138,7 @@ class ClaudeCliEngine:
         system: str | None = None,
         cwd: Path | None = None,
     ) -> EngineResult:
-        argv = self._build_argv(prompt, files, cwd)
+        argv, allowed_dirs = self._build_argv(prompt, files, cwd)
         if system:
             argv += ["--append-system-prompt", system]
 
@@ -134,7 +153,7 @@ class ClaudeCliEngine:
             proc = await asyncio.create_subprocess_exec(
                 *argv,
                 cwd=str(cwd) if cwd is not None else None,
-                env=_build_cli_env(self._audit_user),
+                env=_build_cli_env(self._audit_user, allowed_dirs),
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 limit=self._stream_limit,
@@ -198,7 +217,7 @@ class ClaudeCliEngine:
         cwd: Path | None = None,
     ) -> AsyncGenerator[ThinkingChunk | TextChunk, None]:
         """流式调用：解析 CLI stream-json NDJSON，yield ThinkingChunk / TextChunk。"""
-        argv = self._build_argv(prompt, files, cwd)
+        argv, allowed_dirs = self._build_argv(prompt, files, cwd)
         if system:
             argv += ["--append-system-prompt", system]
         argv += ["--output-format", "stream-json", "--verbose", "--include-partial-messages"]
@@ -210,7 +229,7 @@ class ClaudeCliEngine:
             proc = await asyncio.create_subprocess_exec(
                 *argv,
                 cwd=str(cwd) if cwd is not None else None,
-                env=_build_cli_env(self._audit_user),
+                env=_build_cli_env(self._audit_user, allowed_dirs),
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 limit=self._stream_limit,

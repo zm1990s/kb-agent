@@ -26,10 +26,16 @@ _CLI_ENV_EXACT = (
 _CLI_ENV_PREFIXES = ("KIMI_", "MOONSHOT_")
 
 
-def _build_cli_env(kimi_config_dir: str, audit_user: str | None = None) -> dict[str, str]:
+def _build_cli_env(
+    kimi_config_dir: str,
+    audit_user: str | None = None,
+    allowed_dirs: list[str] | None = None,
+) -> dict[str, str]:
     """构造传给 kimi 子进程的精简环境（白名单透传）。
 
     KIMI_CODE_HOME 指向挂载的配置目录，Kimi CLI 从中读取 config.toml（含 API key / 模型定义）。
+    allowed_dirs：本次调用授权的目录列表，经 KB_AGENT_ALLOWED_DIRS 传给 hook
+                  做路径越界校验（冒号分隔）。
     """
     out = {k: os.environ[k] for k in _CLI_ENV_EXACT if k in os.environ}
     for k, v in os.environ.items():
@@ -38,6 +44,8 @@ def _build_cli_env(kimi_config_dir: str, audit_user: str | None = None) -> dict[
     out["KIMI_CODE_HOME"] = kimi_config_dir
     if audit_user:
         out["KB_AGENT_AUDIT_USER"] = audit_user
+    if allowed_dirs:
+        out["KB_AGENT_ALLOWED_DIRS"] = ":".join(allowed_dirs)
     return out
 
 
@@ -70,12 +78,14 @@ class KimiCliEngine:
 
     def _build_argv(
         self, full_prompt: str, files: list[Path] | None, cwd: Path | None
-    ) -> list[str]:
+    ) -> tuple[list[str], list[str]]:
         """构造完整 argv 列表。
 
         kimi -p 直接跟 prompt 字符串（不同于 codex exec 的 positional arg）。
         --auto 完全自主模式，不产生交互提问。
         --output-format stream-json 输出 NDJSON，每行一个 JSON 事件。
+
+        返回 (argv, allowed_dirs)：allowed_dirs 传给 hook 做路径越界校验。
         """
         files = files or []
         argv: list[str] = [self._cli_path, "-p", full_prompt]
@@ -85,12 +95,21 @@ class KimiCliEngine:
 
         argv += ["--output-format", "stream-json"]
 
+        seen: set[str] = set()
+        allowed_dirs: list[str] = []
         for f in files:
-            argv += ["--add-dir", str(f.parent)]
+            d = str(f.parent)
+            argv += ["--add-dir", d]
+            if d not in seen:
+                seen.add(d)
+                allowed_dirs.append(d)
         if cwd is not None:
             argv += ["--add-dir", str(cwd)]
+            d = str(cwd)
+            if d not in seen:
+                allowed_dirs.append(d)
 
-        return argv
+        return argv, allowed_dirs
 
     async def complete(
         self,
@@ -105,12 +124,12 @@ class KimiCliEngine:
             listing = "\n".join(f"- {f}" for f in files)
             full_prompt = f"{full_prompt}\n\n请阅读以下本地文件后作答：\n{listing}"
 
-        argv = self._build_argv(full_prompt, files, cwd)
+        argv, allowed_dirs = self._build_argv(full_prompt, files, cwd)
 
         argv_log = [a if a != full_prompt else f"<prompt:{len(full_prompt)}chars>" for a in argv]
         logger.debug("Kimi CLI 启动: %s", argv_log)
 
-        env = _build_cli_env(self._config_dir, self._audit_user)
+        env = _build_cli_env(self._config_dir, self._audit_user, allowed_dirs)
         try:
             proc = await asyncio.create_subprocess_exec(
                 *argv,
@@ -194,12 +213,12 @@ class KimiCliEngine:
             listing = "\n".join(f"- {f}" for f in files)
             full_prompt = f"{full_prompt}\n\n请阅读以下本地文件后作答：\n{listing}"
 
-        argv = self._build_argv(full_prompt, files, cwd)
+        argv, allowed_dirs = self._build_argv(full_prompt, files, cwd)
 
         argv_log = [a if a != full_prompt else f"<prompt:{len(full_prompt)}chars>" for a in argv]
         logger.debug("Kimi CLI 流式启动: %s", argv_log)
 
-        env = _build_cli_env(self._config_dir, self._audit_user)
+        env = _build_cli_env(self._config_dir, self._audit_user, allowed_dirs)
         try:
             proc = await asyncio.create_subprocess_exec(
                 *argv,
