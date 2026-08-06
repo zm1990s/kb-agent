@@ -2,6 +2,7 @@
 
 import { forwardRef, useImperativeHandle, useRef } from "react";
 import { useTranslations } from "next-intl";
+import DOMPurify from "dompurify";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { Placeholder } from "@tiptap/extensions";
@@ -131,7 +132,7 @@ const CaseEditor = forwardRef<
         getJSON: () => editor?.getJSON() ?? { type: "doc", content: [] },
         getHTML: () => editor?.getHTML() ?? "",
         isEmpty: () => editor?.isEmpty ?? true,
-        setContent: (html: string) => editor?.commands.setContent(html),
+        setContent: (html: string) => editor?.commands.setContent(DOMPurify.sanitize(html)),
       }),
       [editor]
     );
@@ -156,6 +157,7 @@ const CaseEditor = forwardRef<
         editor!.chain().focus().extendMarkRange("link").unsetLink().run();
         return;
       }
+      if (!/^(https?:\/\/|mailto:|tel:)/i.test(url)) return;
       editor!.chain().focus().extendMarkRange("link").setLink({ href: url }).run();
     }
 

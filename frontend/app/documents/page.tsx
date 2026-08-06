@@ -1023,7 +1023,7 @@ export default function DocumentsPage() {
                   src={previewUrl!}
                   className="h-full w-full border-0"
                   title={previewDoc.title}
-                  sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
+                  sandbox="allow-same-origin allow-forms allow-popups"
                 />
               ) : (
                 <iframe

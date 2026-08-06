@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
+import DOMPurify from "dompurify";
 import NavBar from "@/components/NavBar";
 import CaseEditor, { type CaseEditorHandle } from "@/components/CaseEditor";
 import { api, ApiError } from "@/lib/api";
@@ -32,7 +33,7 @@ export default function DocumentEditPage() {
       .get<{ html: string; title: string }>(`/documents/${docId}/html`)
       .then(({ html, title: docTitle }) => {
         setTitle(docTitle);
-        setInitialHtml(html);
+        setInitialHtml(DOMPurify.sanitize(html));
       })
       .catch((e) => {
         setLoadError(e instanceof ApiError ? e.message : t("editLoadFailed"));

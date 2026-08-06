@@ -20,6 +20,8 @@
     "@tiptap/pm": "^3.28.0",
     "@tiptap/react": "^3.28.0",
     "@tiptap/starter-kit": "^3.28.0",
+    "@types/dompurify": "^3.0.5",
+    "dompurify": "^3.4.13",
     "next": "16.2.10",
     "next-intl": "^4.13.2",
     "react": "^19.0.0",
