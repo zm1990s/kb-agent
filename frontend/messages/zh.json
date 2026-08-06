@@ -44,7 +44,7 @@
     "lang_label": "语言",
     "chatPlus": "聊天+",
     "skills": "Skill 库",
-    "caseEntry": "Case 录入"
+    "caseEntry": "KB 录入"
   },
   "login": {
     "title": "KB-Agent",
@@ -214,7 +214,14 @@
     "detail_summary": "摘要",
     "detail_tags": "标签",
     "detail_content": "正文全文",
-    "preview_close": "关闭"
+    "preview_close": "关闭",
+    "action_edit": "在线编辑",
+    "editSave": "保存修改",
+    "editSaving": "保存中…",
+    "editSaved": "已保存，正在重新整理…",
+    "editOnlyDocx": "仅支持 Word、Markdown、TXT 文件在线编辑",
+    "editLoadFailed": "加载文档内容失败",
+    "editBackToList": "返回文档列表"
   },
   "taskLog": {
     "title": "处理详情 · {name}",
@@ -498,9 +505,9 @@
     "download_ttl_label": "下载链接有效期（秒）",
     "storage_save": "保存",
     "storage_saved": "存储配置已保存",
-    "setting_case_workspace": "Case 默认空间",
-    "case_workspace_title": "Case 录入默认保存空间",
-    "case_workspace_desc": "Case 录入生成的文档将自动保存到此空间。未设置时用户无法使用 Case 录入。",
+    "setting_case_workspace": "KB 默认空间",
+    "case_workspace_title": "KB 录入默认保存空间",
+    "case_workspace_desc": "KB 录入生成的文档将自动保存到此空间。未设置时用户无法使用 KB 录入。",
     "case_workspace_none": "（未设置）",
     "case_workspace_saved": "已保存",
     "case_workspace_save": "保存",
@@ -508,7 +515,7 @@
     "task_model_kimi_hint": "填写 KIMI_CODE_HOME/config.toml 中已定义的模型 ID（如 kimi-code/kimi-for-coding），未在 config.toml 中配置的模型名将报错。"
   },
   "caseEntry": {
-    "title": "Case 录入",
+    "title": "KB 录入",
     "titlePlaceholder": "请输入标题",
     "formatDocx": "Word (.docx)",
     "formatPdf": "PDF (.pdf)",
@@ -517,7 +524,8 @@
     "saved": "✓ 已保存，正在后台整理…",
     "goDocuments": "前往文档管理查看",
     "saveTargetLabel": "将保存到：",
-    "notConfigured": "管理员尚未配置 Case 默认保存空间，请联系管理员。",
+    "notConfigured": "管理员尚未配置 KB 默认保存空间，请联系管理员。",
+    "workspaceLabel": "保存到空间",
     "saveFailed": "保存失败",
     "errNoTitle": "请输入标题",
     "errEmpty": "内容不能为空",
@@ -674,7 +682,7 @@
     "engine_timeout_save": "保存",
     "engine_timeout_saved": "引擎超时配置已保存",
     "module_chatplus": "聊天+",
-    "module_cases": "Case 录入",
+    "module_cases": "KB 录入",
     "module_skills": "Skill 库"
   },
   "verifyEmail": {

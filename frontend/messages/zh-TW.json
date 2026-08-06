@@ -44,7 +44,7 @@
     "lang_label": "語言",
     "chatPlus": "對話+",
     "skills": "Skill 庫",
-    "caseEntry": "Case 錄入"
+    "caseEntry": "KB 錄入"
   },
   "login": {
     "title": "KB-Agent",
@@ -214,7 +214,14 @@
     "detail_summary": "摘要",
     "detail_tags": "標籤",
     "detail_content": "正文全文",
-    "preview_close": "關閉"
+    "preview_close": "關閉",
+    "action_edit": "線上編輯",
+    "editSave": "儲存修改",
+    "editSaving": "儲存中…",
+    "editSaved": "已儲存，正在重新整理…",
+    "editOnlyDocx": "僅支援 Word、Markdown、TXT 文件線上編輯",
+    "editLoadFailed": "載入文件內容失敗",
+    "editBackToList": "返回文件列表"
   },
   "taskLog": {
     "title": "處理詳情 · {name}",
@@ -498,9 +505,9 @@
     "download_ttl_label": "下載連結有效期（秒）",
     "storage_save": "儲存",
     "storage_saved": "儲存配置已儲存",
-    "setting_case_workspace": "Case 預設空間",
-    "case_workspace_title": "Case 錄入預設儲存空間",
-    "case_workspace_desc": "Case 錄入產生的文件將自動儲存到此空間。未設定時使用者無法使用 Case 錄入。",
+    "setting_case_workspace": "KB 預設空間",
+    "case_workspace_title": "KB 錄入預設儲存空間",
+    "case_workspace_desc": "KB 錄入產生的文件將自動儲存到此空間。未設定時使用者無法使用 KB 錄入。",
     "case_workspace_none": "（未設定）",
     "case_workspace_saved": "已儲存",
     "case_workspace_save": "儲存",
@@ -508,7 +515,7 @@
     "task_model_kimi_hint": "填寫 KIMI_CODE_HOME/config.toml 中已定義的模型 ID（如 kimi-code/kimi-for-coding），未在 config.toml 中設定的模型名稱將報錯。"
   },
   "caseEntry": {
-    "title": "Case 錄入",
+    "title": "KB 錄入",
     "titlePlaceholder": "請輸入標題",
     "formatDocx": "Word (.docx)",
     "formatPdf": "PDF (.pdf)",
@@ -517,7 +524,8 @@
     "saved": "✓ 已儲存，正在背景整理…",
     "goDocuments": "前往文件管理查看",
     "saveTargetLabel": "將儲存到：",
-    "notConfigured": "管理員尚未設定 Case 預設儲存空間，請聯絡管理員。",
+    "notConfigured": "管理員尚未設定 KB 預設儲存空間，請聯絡管理員。",
+    "workspaceLabel": "儲存到空間",
     "saveFailed": "儲存失敗",
     "errNoTitle": "請輸入標題",
     "errEmpty": "內容不能為空",
@@ -674,7 +682,7 @@
     "engine_timeout_save": "儲存",
     "engine_timeout_saved": "引擎逾時設定已儲存",
     "module_chatplus": "對話+",
-    "module_cases": "Case 錄入",
+    "module_cases": "KB 錄入",
     "module_skills": "Skill 庫"
   },
   "verifyEmail": {

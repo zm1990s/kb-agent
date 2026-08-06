@@ -116,3 +116,18 @@ class ProcessingTaskPublic(BaseModel):
 class ReprocessAccepted(BaseModel):
     task_id: uuid.UUID
     status: str
+
+
+class DocumentEditSave(BaseModel):
+    """在线编辑保存请求：Tiptap 文档 → docx 替换原文件，触发重新索引。"""
+
+    title: str = Field(min_length=1, max_length=200)
+    content_json: dict
+    content_html: str | None = None
+
+
+class DocumentHtmlResponse(BaseModel):
+    """在线编辑加载响应：docx 转换后的 HTML + 标题（去掉扩展名）。"""
+
+    html: str
+    title: str

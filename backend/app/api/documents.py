@@ -1,11 +1,14 @@
 """文档路由。上传需管理员 + 空间成员；触发后台归类任务。"""
 
+import html as html_lib
 import re
 import unicodedata
 import uuid
 from pathlib import PurePosixPath
 from urllib.parse import quote
 
+import mammoth
+import markdown as md_lib
 from fastapi import (
     APIRouter,
     BackgroundTasks,
@@ -17,6 +20,7 @@ from fastapi import (
     status,
 )
 from fastapi.responses import Response
+from markdownify import markdownify as html_to_md
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import SessionLocal, get_session
@@ -24,6 +28,8 @@ from app.core.deps import get_current_user
 from app.models.auth import User
 from app.models.document import Document
 from app.schemas.document import (
+    DocumentEditSave,
+    DocumentHtmlResponse,
     DocumentListItem,
     DocumentMove,
     DocumentPublic,
@@ -32,6 +38,7 @@ from app.schemas.document import (
     ProcessingTaskPublic,
     ReprocessAccepted,
 )
+from app.services.case_service import export_case
 from app.services.document_service import (
     create_reprocess_task,
     delete_document,
@@ -45,8 +52,8 @@ from app.services.document_service import (
     upload_document,
 )
 from app.services.folder_service import get_folder_in_workspace
-from app.services.usage_service import record_event
 from app.services.settings_service import get_max_upload_mb
+from app.services.usage_service import record_event
 from app.services.workspace_service import get_ws_role, is_member
 from app.storage.base import get_storage
 from app.tasks.worker import enqueue_classification
@@ -406,4 +413,106 @@ async def reprocess(
     await _require_ws_write(session, doc.workspace_id, current_user)
     task = await create_reprocess_task(session, document_id=document_id)
     enqueue_classification(task.id)
+    return ReprocessAccepted(task_id=task.id, status="queued")
+
+
+def _doc_edit_mode(doc: Document) -> str:
+    """根据文件名后缀/MIME 返回 'docx'/'md'/'txt'，否则 raise 400。
+    优先文件名后缀（md/txt 上传时 MIME 均为 text/plain，后缀更可靠）。
+    """
+    title_lower = (doc.title or "").lower()
+    if title_lower.endswith(".md"):
+        return "md"
+    if title_lower.endswith(".txt"):
+        return "txt"
+    if "wordprocessingml" in (doc.mime_type or ""):
+        return "docx"
+    raise HTTPException(status.HTTP_400_BAD_REQUEST, "该文件类型不支持在线编辑")
+
+
+@router.get("/documents/{document_id}/html", response_model=DocumentHtmlResponse)
+async def get_document_html(
+    document_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> DocumentHtmlResponse:
+    """将文档转换为可编辑 HTML，供在线编辑器加载。支持 docx/md/txt，仅 owner/editor 可调用。"""
+    doc = await _get_doc_for_member(session, document_id, current_user)
+    await _require_ws_write(session, doc.workspace_id, current_user)
+
+    mode = _doc_edit_mode(doc)
+    path = await get_storage().open_path(doc.storage_key)
+
+    if mode == "docx":
+        with path.open("rb") as f:
+            result = mammoth.convert_to_html(f)
+        html = result.value
+        title = doc.title[:-5] if doc.title.lower().endswith(".docx") else doc.title
+    elif mode == "md":
+        text = path.read_text(encoding="utf-8", errors="replace")
+        html = md_lib.markdown(text, extensions=["tables", "fenced_code"])
+        title = doc.title[:-3]
+    else:  # txt
+        text = path.read_text(encoding="utf-8", errors="replace")
+        html = "".join(
+            f"<p>{html_lib.escape(line) if line.strip() else '&nbsp;'}</p>"
+            for line in text.splitlines()
+        )
+        title = doc.title[:-4] if doc.title.lower().endswith(".txt") else doc.title
+
+    return DocumentHtmlResponse(html=html, title=title)
+
+
+@router.post(
+    "/documents/{document_id}/edit-save",
+    response_model=ReprocessAccepted,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def edit_save_document(
+    document_id: uuid.UUID,
+    body: DocumentEditSave,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> ReprocessAccepted:
+    """在线编辑保存：按原始格式回写（docx/md/txt），替换原文件并触发重新归类索引。"""
+    doc = await _get_doc_for_member(session, document_id, current_user)
+    await _require_ws_write(session, doc.workspace_id, current_user)
+
+    mode = _doc_edit_mode(doc)
+
+    if mode == "docx":
+        data, mime_type, _ = export_case(
+            title=body.title,
+            fmt="docx",
+            content_json=body.content_json,
+            content_html=body.content_html,
+        )
+        clean_name = sanitize_filename(f"{body.title}.docx")
+    elif mode == "md":
+        md_text = html_to_md(body.content_html or "", heading_style="ATX")
+        data = md_text.encode("utf-8")
+        mime_type = "text/markdown"
+        clean_name = sanitize_filename(f"{body.title}.md")
+    else:  # txt
+        from bs4 import BeautifulSoup  # noqa: PLC0415
+        plain = BeautifulSoup(body.content_html or "", "html.parser").get_text("\n")
+        data = plain.encode("utf-8")
+        mime_type = "text/plain"
+        clean_name = sanitize_filename(f"{body.title}.txt")
+
+    task = await replace_document_content(
+        session,
+        doc=doc,
+        filename=clean_name,
+        mime_type=mime_type,
+        data=data,
+    )
+    enqueue_classification(task.id)
+    await record_event(
+        session,
+        action="doc_edit_save",
+        user_id=current_user.id,
+        workspace_id=doc.workspace_id,
+        meta={"document_id": str(document_id), "title": body.title},
+    )
     return ReprocessAccepted(task_id=task.id, status="queued")

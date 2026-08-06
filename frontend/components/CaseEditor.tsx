@@ -7,18 +7,22 @@ import StarterKit from "@tiptap/starter-kit";
 import { Placeholder } from "@tiptap/extensions";
 import Image from "@tiptap/extension-image";
 import Link from "@tiptap/extension-link";
+import { Table, TableRow, TableHeader, TableCell } from "@tiptap/extension-table";
 
 export interface CaseEditorHandle {
   getJSON: () => object;
   getHTML: () => string;
   isEmpty: () => boolean;
+  setContent: (html: string) => void;
 }
 
 // 单张内嵌图片上限（base64，防 payload 过大）
 const MAX_IMAGE_BYTES = 2 * 1024 * 1024;
 
-const CaseEditor = forwardRef<CaseEditorHandle, { onImageError?: () => void }>(
-  function CaseEditor({ onImageError }, ref) {
+const CaseEditor = forwardRef<
+  CaseEditorHandle,
+  { onImageError?: () => void; initialContent?: string }
+>(function CaseEditor({ onImageError, initialContent }, ref) {
     const t = useTranslations("caseEntry");
     const fileRef = useRef<HTMLInputElement>(null);
     // editorProps 在 useEditor 求值时 editor 尚不存在，粘贴/拖拽回调经 ref 拿实例
@@ -51,11 +55,15 @@ const CaseEditor = forwardRef<CaseEditorHandle, { onImageError?: () => void }>(
       extensions: [
         // StarterKit v3 已内置 Link；关掉它，改用下面单独配置的 Link，避免重复扩展
         StarterKit.configure({ link: false }),
-        Image.configure({ inline: false }),
+        Image.configure({ inline: false, allowBase64: true }),
+        Table.configure({ resizable: false }),
+        TableRow,
+        TableHeader,
+        TableCell,
         Link.configure({ openOnClick: false, autolink: true }),
         Placeholder.configure({ placeholder: t("editorPlaceholder") }),
       ],
-      content: "",
+      content: initialContent ?? "",
       immediatelyRender: false,
       editorProps: {
         // 粘贴：剪贴板里有图片项时转 base64 内嵌；否则放行默认（文本/富文本）粘贴
@@ -104,6 +112,9 @@ const CaseEditor = forwardRef<CaseEditorHandle, { onImageError?: () => void }>(
             "[&_a]:text-blue-600 [&_a]:underline",
             "[&_strong]:font-bold [&_em]:italic",
             "[&_img]:max-w-full [&_img]:rounded-md [&_img]:my-3 [&_img]:shadow-sm",
+            "[&_table]:border-collapse [&_table]:w-full [&_table]:my-3",
+            "[&_th]:border [&_th]:border-gray-300 [&_th]:bg-gray-50 [&_th]:px-3 [&_th]:py-1.5 [&_th]:text-left [&_th]:text-sm [&_th]:font-semibold",
+            "[&_td]:border [&_td]:border-gray-300 [&_td]:px-3 [&_td]:py-1.5 [&_td]:text-sm",
             // 占位符（Placeholder 扩展给空节点加 is-empty + data-placeholder）
             "[&_.is-editor-empty:first-child]:before:content-[attr(data-placeholder)]",
             "[&_.is-editor-empty:first-child]:before:text-gray-300 [&_.is-editor-empty:first-child]:before:float-left",
@@ -120,6 +131,7 @@ const CaseEditor = forwardRef<CaseEditorHandle, { onImageError?: () => void }>(
         getJSON: () => editor?.getJSON() ?? { type: "doc", content: [] },
         getHTML: () => editor?.getHTML() ?? "",
         isEmpty: () => editor?.isEmpty ?? true,
+        setContent: (html: string) => editor?.commands.setContent(html),
       }),
       [editor]
     );

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import FolderTree, { buildTree } from "@/components/FolderTree";
 import Markdown from "@/components/Markdown";
@@ -33,6 +34,7 @@ export default function DocumentsPage() {
   const t = useTranslations("documents");
   const { showConfirm, showPrompt } = useDialog();
   const ready = useAuthGuard("documents");
+  const router = useRouter();
   const globalAdmin = isAdmin();
   // workspace 内的写权限：全局 admin，或空间 owner/editor
   const [wsRole, setWsRole] = useState<string | null>(null);
@@ -884,6 +886,18 @@ export default function DocumentsPage() {
                           >
                             {t("action_rename")}
                           </button>
+                          {(
+                            (d.mime_type ?? "").includes("wordprocessingml") ||
+                            (d.title ?? "").toLowerCase().endsWith(".md") ||
+                            (d.title ?? "").toLowerCase().endsWith(".txt")
+                          ) && (
+                            <button
+                              onClick={() => router.push(`/documents/${d.id}/edit`)}
+                              className="mr-1 rounded bg-indigo-50 px-2 py-1 text-xs text-indigo-700 hover:bg-indigo-100"
+                            >
+                              {t("action_edit")}
+                            </button>
+                          )}
                           <button
                             onClick={() => triggerReplace(d.id)}
                             className="mr-1 rounded bg-gray-100 px-2 py-1 text-xs text-gray-700 hover:bg-gray-200"

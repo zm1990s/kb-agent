@@ -1,7 +1,7 @@
-"""Case 录入路由：富文本导出为 docx/pdf，保存进管理员配置的默认空间。
+"""KB 录入路由：富文本导出为 docx/pdf，保存进目标空间。
 
 产物即普通 documents 记录，走与上传一致的后台 AI 归类（status: processing→ready）。
-权限复用 documents 模块 + 默认空间写权限（owner/editor）。
+权限复用 documents 模块 + 目标空间写权限（owner/editor）。
 """
 
 import logging
@@ -35,7 +35,7 @@ async def _require_cases(session: AsyncSession, user: User) -> None:
 
     perms = await effective_permissions(session, user=user)
     if perms.get("cases", "none") == "none":
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "无 Case 录入权限")
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "无 KB 录入权限")
 
 
 @router.post("/cases", response_model=DocumentPublic, status_code=status.HTTP_201_CREATED)
@@ -44,22 +44,25 @@ async def create_case(
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> DocumentPublic:
-    """把 Case 富文本导出为 docx/pdf，存进默认空间（status=ready）。"""
+    """把 KB 富文本导出为 docx/pdf，存进目标空间（status=ready）。"""
     await _require_cases(session, current_user)
 
-    # 默认空间：管理员在系统设置配置；未配置则 Case 录入不可用
-    ws_id_str = await get_case_default_workspace_id(session)
-    if not ws_id_str:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "管理员尚未配置 Case 默认保存空间")
-    try:
-        workspace_id = uuid.UUID(ws_id_str)
-    except (ValueError, TypeError) as exc:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "默认空间配置无效") from exc
+    # 目标空间：优先用用户选择的空间，否则回退到管理员配置的默认空间
+    if body.workspace_id:
+        workspace_id = body.workspace_id
+    else:
+        ws_id_str = await get_case_default_workspace_id(session)
+        if not ws_id_str:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "管理员尚未配置 KB 默认保存空间")
+        try:
+            workspace_id = uuid.UUID(ws_id_str)
+        except (ValueError, TypeError) as exc:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "默认空间配置无效") from exc
 
     # 目标空间写权限（全局 admin 或 owner/editor）
     role = await get_ws_role(session, workspace_id=workspace_id, user_id=current_user.id)
     if role not in ("owner", "editor"):
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "对默认空间没有写入权限，请联系管理员")
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "对目标空间没有写入权限")
 
     # 导出（Tiptap JSON → docx/pdf；纯文本由后续 AI 归类自行抽取，这里不再使用）
     try:

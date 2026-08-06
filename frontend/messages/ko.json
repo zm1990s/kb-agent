@@ -44,7 +44,7 @@
     "lang_label": "언어",
     "chatPlus": "채팅+",
     "skills": "스킬",
-    "caseEntry": "케이스 입력"
+    "caseEntry": "KB 입력"
   },
   "login": {
     "title": "KB-Agent",
@@ -214,7 +214,14 @@
     "detail_summary": "요약",
     "detail_tags": "태그",
     "detail_content": "전체 본문",
-    "preview_close": "닫기"
+    "preview_close": "닫기",
+    "action_edit": "온라인 편집",
+    "editSave": "변경 사항 저장",
+    "editSaving": "저장 중…",
+    "editSaved": "저장됨. 백그라운드에서 재정리 중…",
+    "editOnlyDocx": "Word, Markdown, TXT 파일만 온라인 편집을 지원합니다",
+    "editLoadFailed": "문서 내용을 불러오지 못했습니다",
+    "editBackToList": "문서 목록으로 돌아가기"
   },
   "taskLog": {
     "title": "처리 로그 · {name}",
@@ -498,9 +505,9 @@
     "download_ttl_label": "다운로드 URL 유효 시간 (초)",
     "storage_save": "저장",
     "storage_saved": "스토리지 설정이 저장되었습니다",
-    "setting_case_workspace": "케이스 기본 워크스페이스",
-    "case_workspace_title": "케이스 입력 기본 저장 워크스페이스",
-    "case_workspace_desc": "케이스 입력으로 생성한 문서는 이 워크스페이스에 저장됩니다. 설정하지 않으면 케이스 입력을 사용할 수 없습니다.",
+    "setting_case_workspace": "KB 기본 워크스페이스",
+    "case_workspace_title": "KB 입력 기본 저장 워크스페이스",
+    "case_workspace_desc": "KB 입력으로 생성한 문서는 이 워크스페이스에 저장됩니다. 설정하지 않으면 KB 입력을 사용할 수 없습니다.",
     "case_workspace_none": "(설정 안 함)",
     "case_workspace_saved": "저장됨",
     "case_workspace_save": "저장",
@@ -508,7 +515,7 @@
     "task_model_kimi_hint": "KIMI_CODE_HOME/config.toml에 정의된 모델 ID를 입력하세요（예: kimi-code/kimi-for-coding）. config.toml에 없는 모델은 오류가 발생합니다."
   },
   "caseEntry": {
-    "title": "케이스 입력",
+    "title": "KB 입력",
     "titlePlaceholder": "제목을 입력하세요",
     "formatDocx": "Word (.docx)",
     "formatPdf": "PDF (.pdf)",
@@ -517,7 +524,8 @@
     "saved": "✓ 저장됨. 백그라운드에서 정리 중…",
     "goDocuments": "문서 관리에서 보기",
     "saveTargetLabel": "저장 위치: ",
-    "notConfigured": "관리자가 아직 케이스 기본 저장 워크스페이스를 설정하지 않았습니다. 관리자에게 문의하세요.",
+    "notConfigured": "관리자가 아직 KB 기본 저장 워크스페이스를 설정하지 않았습니다. 관리자에게 문의하세요.",
+    "workspaceLabel": "저장할 워크스페이스",
     "saveFailed": "저장 실패",
     "errNoTitle": "제목을 입력하세요",
     "errEmpty": "내용을 입력하세요",
@@ -674,7 +682,7 @@
     "engine_timeout_save": "저장",
     "engine_timeout_saved": "엔진 타임아웃이 저장되었습니다",
     "module_chatplus": "채팅+",
-    "module_cases": "케이스 입력",
+    "module_cases": "KB 입력",
     "module_skills": "스킬"
   },
   "verifyEmail": {

@@ -13,6 +13,12 @@ interface CaseWorkspace {
   workspace_name: string | null;
 }
 
+interface WorkspaceItem {
+  id: string;
+  name: string;
+  role_in_ws: string;
+}
+
 export default function CaseEntryPage() {
   const t = useTranslations("caseEntry");
   const ready = useAuthGuard("cases");
@@ -21,6 +27,8 @@ export default function CaseEntryPage() {
   const [title, setTitle] = useState("");
   const format = "docx";
   const [defaultWs, setDefaultWs] = useState<CaseWorkspace | null>(null);
+  const [myWorkspaces, setMyWorkspaces] = useState<WorkspaceItem[]>([]);
+  const [selectedWsId, setSelectedWsId] = useState<string | null>(null);
   const [wsLoaded, setWsLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -28,16 +36,33 @@ export default function CaseEntryPage() {
 
   useEffect(() => {
     if (!ready) return;
-    api
-      .get<CaseWorkspace>("/settings/case-default-workspace")
-      .then((w) => setDefaultWs(w))
-      .catch(() => setDefaultWs({ workspace_id: null, workspace_name: null }))
-      .finally(() => setWsLoaded(true));
+    Promise.all([
+      api.get<CaseWorkspace>("/settings/case-default-workspace").catch(() => ({
+        workspace_id: null,
+        workspace_name: null,
+      })),
+      api.get<WorkspaceItem[]>("/workspaces").catch(() => [] as WorkspaceItem[]),
+    ]).then(([ws, allWs]) => {
+      setDefaultWs(ws);
+      // 只保留有写权限的空间
+      const writable = allWs.filter((w) => w.role_in_ws === "owner" || w.role_in_ws === "editor");
+      setMyWorkspaces(writable);
+      // 默认选中管理员配置的默认空间（若在列表中）
+      if (ws.workspace_id) {
+        setSelectedWsId(ws.workspace_id);
+      } else if (writable.length > 0) {
+        setSelectedWsId(writable[0].id);
+      }
+      setWsLoaded(true);
+    });
   }, [ready]);
 
   if (!ready) return null;
 
-  const notConfigured = wsLoaded && !defaultWs?.workspace_id;
+  const notConfigured = wsLoaded && !defaultWs?.workspace_id && myWorkspaces.length === 0;
+
+  const selectedWsName =
+    myWorkspaces.find((w) => w.id === selectedWsId)?.name ?? defaultWs?.workspace_name ?? null;
 
   async function save() {
     setError(null);
@@ -59,6 +84,7 @@ export default function CaseEntryPage() {
         format,
         content_json: editor.getJSON(),
         content_html: editor.getHTML(),
+        workspace_id: selectedWsId ?? undefined,
       });
       setSavedId(doc.id);
     } catch (e) {
@@ -87,6 +113,20 @@ export default function CaseEntryPage() {
             placeholder={t("titlePlaceholder")}
             className="flex-1 min-w-[200px] rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-500"
           />
+          {myWorkspaces.length > 1 && (
+            <select
+              value={selectedWsId ?? ""}
+              onChange={(e) => setSelectedWsId(e.target.value)}
+              className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 outline-none focus:border-blue-500 bg-white"
+              aria-label={t("workspaceLabel")}
+            >
+              {myWorkspaces.map((ws) => (
+                <option key={ws.id} value={ws.id}>
+                  {ws.name}
+                </option>
+              ))}
+            </select>
+          )}
           <button
             type="button"
             onClick={save}
@@ -97,10 +137,10 @@ export default function CaseEntryPage() {
           </button>
         </div>
 
-        {defaultWs?.workspace_name && (
+        {selectedWsName && (
           <p className="mb-2 text-xs text-gray-400">
             {t("saveTargetLabel")}
-            <span className="font-medium text-gray-600">{defaultWs.workspace_name}</span>
+            <span className="font-medium text-gray-600">{selectedWsName}</span>
           </p>
         )}
 

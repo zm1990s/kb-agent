@@ -44,7 +44,7 @@
     "lang_label": "Language",
     "chatPlus": "Chat+",
     "skills": "Skills",
-    "caseEntry": "Case Entry"
+    "caseEntry": "KB Entry"
   },
   "login": {
     "title": "KB-Agent",
@@ -214,7 +214,14 @@
     "detail_summary": "Summary",
     "detail_tags": "Tags",
     "detail_content": "Full text",
-    "preview_close": "Close"
+    "preview_close": "Close",
+    "action_edit": "Edit Online",
+    "editSave": "Save Changes",
+    "editSaving": "Saving…",
+    "editSaved": "Saved. Re-indexing in the background…",
+    "editOnlyDocx": "Online editing is only supported for Word, Markdown, and TXT files",
+    "editLoadFailed": "Failed to load document content",
+    "editBackToList": "Back to Documents"
   },
   "taskLog": {
     "title": "Process log · {name}",
@@ -498,9 +505,9 @@
     "download_ttl_label": "Download URL TTL (seconds)",
     "storage_save": "Save",
     "storage_saved": "Storage settings saved",
-    "setting_case_workspace": "Case Default Workspace",
-    "case_workspace_title": "Default workspace for Case Entry",
-    "case_workspace_desc": "Documents created via Case Entry are saved to this workspace. Case Entry is unavailable until this is set.",
+    "setting_case_workspace": "KB Default Workspace",
+    "case_workspace_title": "Default workspace for KB Entry",
+    "case_workspace_desc": "Documents created via KB Entry are saved to this workspace. KB Entry is unavailable until this is set.",
     "case_workspace_none": "(not set)",
     "case_workspace_saved": "Saved",
     "case_workspace_save": "Save",
@@ -508,7 +515,7 @@
     "task_model_kimi_hint": "Enter a model ID defined in KIMI_CODE_HOME/config.toml (e.g. kimi-code/kimi-for-coding). Models not present in config.toml will cause an error."
   },
   "caseEntry": {
-    "title": "Case Entry",
+    "title": "KB Entry",
     "titlePlaceholder": "Enter a title",
     "formatDocx": "Word (.docx)",
     "formatPdf": "PDF (.pdf)",
@@ -517,7 +524,8 @@
     "saved": "✓ Saved. Organizing in the background…",
     "goDocuments": "View in Documents",
     "saveTargetLabel": "Will save to: ",
-    "notConfigured": "The admin hasn't configured a default Case workspace yet. Please contact your administrator.",
+    "notConfigured": "The admin hasn't configured a default KB workspace yet. Please contact your administrator.",
+    "workspaceLabel": "Save to workspace",
     "saveFailed": "Save failed",
     "errNoTitle": "Please enter a title",
     "errEmpty": "Content cannot be empty",
@@ -674,7 +682,7 @@
     "engine_timeout_save": "Save",
     "engine_timeout_saved": "Engine timeout saved",
     "module_chatplus": "Chat+",
-    "module_cases": "Case Entry",
+    "module_cases": "KB Entry",
     "module_skills": "Skills"
   },
   "verifyEmail": {
