@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <title>SSO 测试</title>
+  <style>
+    body { font-family: monospace; max-width: 700px; margin: 40px auto; padding: 0 20px; background: #f5f5f5; }
+    h2 { font-size: 1rem; color: #333; border-bottom: 1px solid #ddd; padding-bottom: 6px; }
+    label { display: block; font-size: 0.8rem; color: #666; margin-bottom: 4px; }
+    input { width: 100%; box-sizing: border-box; padding: 6px 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 0.85rem; font-family: monospace; }
+    button { margin-top: 8px; padding: 6px 16px; background: #2563eb; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 0.85rem; }
+    button:hover { background: #1d4ed8; }
+    pre { background: #1e1e1e; color: #d4d4d4; padding: 12px; border-radius: 6px; font-size: 0.8rem; white-space: pre-wrap; word-break: break-all; min-height: 40px; }
+    .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; margin-bottom: 20px; }
+    .row { display: flex; gap: 8px; align-items: flex-end; }
+    .row input { flex: 1; }
+    .ok { color: #16a34a; } .err { color: #dc2626; }
+    .step { font-size: 0.75rem; color: #9ca3af; margin-bottom: 8px; }
+  </style>
+</head>
+<body>
+
+<h1 style="font-size:1.1rem; margin-bottom:4px;">SSO 联合登录 · 测试页</h1>
+<p style="font-size:0.8rem;color:#6b7280;margin-top:0">模拟外部应用发起 SSO 登录并换取用户信息</p>
+
+<!-- Step 0: 配置 -->
+<div class="card">
+  <h2>基础配置</h2>
+  <label>KB 地址（含 /api 前缀）</label>
+  <input id="base" value="http://localhost/api" />
+</div>
+
+<!-- Step 1: 检查 SSO 状态 -->
+<div class="card">
+  <h2>Step 1 · 检查 SSO 是否启用</h2>
+  <p class="step">GET /sso/status — 无需登录，查看功能是否已在管理后台开启</p>
+  <button onclick="checkStatus()">检查状态</button>
+  <pre id="out-status"></pre>
+</div>
+
+<!-- Step 2: 发起 SSO 跳转 -->
+<div class="card">
+  <h2>Step 2 · 发起登录跳转</h2>
+  <p class="step">将用户重定向到 KB 登录页，附带 redirect_uri 和 state。<br>
+  回调地址必须已在管理后台「联合登录」中登记。</p>
+  <label>redirect_uri（本页地址）</label>
+  <input id="redirect-uri" value="" />
+  <label style="margin-top:8px">state（随机串，原样返回）</label>
+  <input id="state" value="" />
+  <button onclick="doRedirect()">跳转到 KB 登录页</button>
+</div>
+
+<!-- Step 3: 用 code 换用户信息 -->
+<div class="card">
+  <h2>Step 3 · code 换用户信息</h2>
+  <p class="step">登录完成后浏览器会带 ?code=xxx&state=xxx 跳回本页，自动填入下方。<br>
+  点「兑换」模拟外部后端调用 POST /sso/token。</p>
+  <label>code（从 URL 参数自动读取）</label>
+  <div class="row">
+    <input id="code" placeholder="等待回调…" />
+    <button onclick="exchangeCode()">兑换</button>
+  </div>
+  <pre id="out-token"></pre>
+</div>
+
+<!-- Step 4: 安全验证 -->
+<div class="card">
+  <h2>Step 4 · 安全验证</h2>
+  <p class="step">同一个 code 只能用一次；兑换后再次提交应返回 400 code_already_used。</p>
+  <button onclick="exchangeCode()">再次兑换（应报错）</button>
+  <pre id="out-reuse"></pre>
+</div>
+
+<script>
+  // 读取 URL 中的 code/state，填入表单
+  const params = new URLSearchParams(location.search);
+  const urlCode = params.get("code");
+  const urlState = params.get("state");
+  if (urlCode) document.getElementById("code").value = urlCode;
+  if (urlState) document.getElementById("state").value = urlState;
+
+  // 用当前页地址预填 redirect_uri
+  document.getElementById("redirect-uri").value =
+    location.origin + location.pathname;
+
+  // 预填 state（若 URL 里没有则生成随机串）
+  if (!urlState) {
+    document.getElementById("state").value =
+      "state_" + Math.random().toString(36).slice(2, 10);
+  }
+
+  function base() {
+    return document.getElementById("base").value.replace(/\/$/, "");
+  }
+
+  async function checkStatus() {
+    const el = document.getElementById("out-status");
+    el.textContent = "请求中…";
+    try {
+      const r = await fetch(`${base()}/sso/status`);
+      const d = await r.json();
+      el.innerHTML = `<span class="${d.enabled ? "ok" : "err"}">${JSON.stringify(d, null, 2)}</span>`;
+    } catch (e) {
+      el.innerHTML = `<span class="err">${e}</span>`;
+    }
+  }
+
+  function doRedirect() {
+    const kb = document.getElementById("base").value.replace(/\/api\/?$/, "");
+    const uri = document.getElementById("redirect-uri").value;
+    const state = document.getElementById("state").value;
+    const url = `${kb}/login?redirect_uri=${encodeURIComponent(uri)}&state=${encodeURIComponent(state)}`;
+    window.location.href = url;
+  }
+
+  async function exchangeCode() {
+    const code = document.getElementById("code").value.trim();
+    // Step 3 还是 Step 4 看是否已经有结果
+    const el = document.getElementById("out-token").textContent
+      ? document.getElementById("out-reuse")
+      : document.getElementById("out-token");
+    if (!code) { el.textContent = "请先填入 code"; return; }
+    el.textContent = "请求中…";
+    try {
+      const r = await fetch(`${base()}/sso/token`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code }),
+      });
+      const d = await r.json();
+      el.innerHTML = r.ok
+        ? `<span class="ok">${JSON.stringify(d, null, 2)}</span>`
+        : `<span class="err">HTTP ${r.status}\n${JSON.stringify(d, null, 2)}</span>`;
+    } catch (e) {
+      el.innerHTML = `<span class="err">${e}</span>`;
+    }
+  }
+</script>
+</body>
+</html>

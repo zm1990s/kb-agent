@@ -1,11 +1,17 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { api, ApiError } from "@/lib/api";
-import { resolveLandingPath, setAuth } from "@/lib/auth";
+import { isLoggedIn, resolveLandingPath, setAuth } from "@/lib/auth";
 import type { TokenResponse } from "@/lib/types";
+
+interface SsoAuthorizeResponse {
+  code: string;
+  redirect_uri: string;
+  state: string;
+}
 
 interface RegisterResponse {
   id: string;
@@ -17,8 +23,34 @@ interface RegisterResponse {
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const t = useTranslations("login");
   const [mode, setMode] = useState<"login" | "register" | "forgot" | "reset" | "verify-pin">("login");
+
+  // SSO 参数：从 URL 读取，验证后执行回调跳转
+  const ssoRedirectUri = searchParams.get("redirect_uri") ?? "";
+  const ssoState = searchParams.get("state") ?? "";
+
+  // 已登录用户带 redirect_uri 进入登录页：直接发起 SSO 授权，无需重新登录
+  useEffect(() => {
+    if (!ssoRedirectUri || !isLoggedIn()) return;
+    (async () => {
+      try {
+        const resp = await api.post<SsoAuthorizeResponse>("/sso/authorize", {
+          redirect_uri: ssoRedirectUri,
+          state: ssoState,
+        });
+        const target = new URL(ssoRedirectUri);
+        target.searchParams.set("code", resp.code);
+        if (ssoState) target.searchParams.set("state", ssoState);
+        window.location.href = target.toString();
+      } catch (err) {
+        const msg = err instanceof ApiError ? err.message : "sso_authorize_failed";
+        setError(msg);
+      }
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [resetCode, setResetCode] = useState("");
@@ -27,6 +59,27 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  async function _handlePostLogin() {
+    if (ssoRedirectUri) {
+      try {
+        const resp = await api.post<SsoAuthorizeResponse>("/sso/authorize", {
+          redirect_uri: ssoRedirectUri,
+          state: ssoState,
+        });
+        const target = new URL(ssoRedirectUri);
+        target.searchParams.set("code", resp.code);
+        if (ssoState) target.searchParams.set("state", ssoState);
+        window.location.href = target.toString();
+        return;
+      } catch (err) {
+        const msg = err instanceof ApiError ? err.message : "sso_authorize_failed";
+        setError(msg);
+        return;
+      }
+    }
+    router.replace(await resolveLandingPath());
+  }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -44,7 +97,7 @@ export default function LoginPage() {
       }
       const tok = await api.post<TokenResponse>("/auth/login", { email, password });
       setAuth(tok.access_token, tok.role, email);
-      router.replace(await resolveLandingPath());
+      await _handlePostLogin();
     } catch (err) {
       if (err instanceof ApiError) {
         if (err.status === 423) {
@@ -144,7 +197,7 @@ export default function LoginPage() {
       // 验证成功，自动登录
       const tok = await api.post<TokenResponse>("/auth/login", { email, password });
       setAuth(tok.access_token, tok.role, email);
-      router.replace(await resolveLandingPath());
+      await _handlePostLogin();
     } catch (err) {
       if (err instanceof ApiError && err.status === 400) {
         setError(t("err_pin_invalid"));

@@ -558,6 +558,11 @@ async def set_task_headers(session: AsyncSession, key: str, headers: dict[str, s
     await set_setting(session, key, json.dumps(headers, ensure_ascii=False))
 
 
+# ── SSO 联合登录 ─────────────────────────────────────────────────────────────
+
+SSO_ENABLED_KEY = "sso_enabled"
+
+
 def render_task_headers(
     headers: dict[str, str],
     *,

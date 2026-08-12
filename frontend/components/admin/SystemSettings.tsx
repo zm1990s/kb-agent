@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import Image from "next/image";
 import AIEngineSettings from "@/components/admin/AIEngineSettings";
 import PromptsTab from "@/components/admin/PromptsTab";
+import SSOSettings from "@/components/admin/SSOSettings";
 import UserAdmin from "@/components/admin/UserAdmin";
 import WorkspaceAdmin from "@/components/admin/WorkspaceAdmin";
 import { api, ApiError } from "@/lib/api";
@@ -16,7 +17,7 @@ interface Branding {
 }
 
 type Tab = "workspaces" | "users" | "general" | "prompts" | "ai_engine";
-type GeneralSection = "branding" | "domains" | "whatsnew" | "suggested" | "email_verification" | "chat_retention" | "security" | "storage" | "smtp" | "case_workspace";
+type GeneralSection = "branding" | "domains" | "whatsnew" | "suggested" | "email_verification" | "chat_retention" | "security" | "storage" | "smtp" | "case_workspace" | "sso";
 
 interface Props {
   // null = admin（全部可见）；Record = 普通用户权限表
@@ -408,6 +409,7 @@ export default function SystemSettings({ perms }: Props) {
                 ["security", t("setting_security")],
                 ["storage", t("setting_storage")],
                 ["case_workspace", t("setting_case_workspace")],
+                ["sso", t("setting_sso")],
               ] as [GeneralSection, string][]
             ).map(([key, label]) => (
               <button
@@ -819,6 +821,8 @@ export default function SystemSettings({ perms }: Props) {
             {caseWsMsg && <p className="mt-2 text-xs text-green-600">{caseWsMsg}</p>}
           </section>
           )}
+
+          {activeSetting === "sso" && <SSOSettings />}
 
           {error && <p className="text-sm text-red-600">{error}</p>}
           </div>
