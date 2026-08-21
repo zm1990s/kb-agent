@@ -44,8 +44,12 @@ def _build_cli_env(
     out["KIMI_CODE_HOME"] = kimi_config_dir
     if audit_user:
         out["KB_AGENT_AUDIT_USER"] = audit_user
-    if allowed_dirs:
-        out["KB_AGENT_ALLOWED_DIRS"] = ":".join(allowed_dirs)
+    # 把 KIMI_CODE_HOME 也加入允许列表，使 hook 放行 Kimi 读取 skill 文件
+    dirs = list(allowed_dirs) if allowed_dirs else []
+    if kimi_config_dir:
+        dirs.append(kimi_config_dir)
+    if dirs:
+        out["KB_AGENT_ALLOWED_DIRS"] = ":".join(dirs)
     return out
 
 

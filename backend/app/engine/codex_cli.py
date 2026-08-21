@@ -44,8 +44,12 @@ def _build_cli_env(
     out["CODEX_HOME"] = codex_config_dir
     if audit_user:
         out["KB_AGENT_AUDIT_USER"] = audit_user
-    if allowed_dirs:
-        out["KB_AGENT_ALLOWED_DIRS"] = ":".join(allowed_dirs)
+    # 把 CODEX_HOME 也加入允许列表，使 hook 放行 Codex 读取 skill 文件
+    dirs = list(allowed_dirs) if allowed_dirs else []
+    if codex_config_dir:
+        dirs.append(codex_config_dir)
+    if dirs:
+        out["KB_AGENT_ALLOWED_DIRS"] = ":".join(dirs)
     return out
 
 
