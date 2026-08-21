@@ -30,12 +30,13 @@ def _build_cli_env(
     kimi_config_dir: str,
     audit_user: str | None = None,
     allowed_dirs: list[str] | None = None,
+    storage_root: str | None = None,
 ) -> dict[str, str]:
     """构造传给 kimi 子进程的精简环境（白名单透传）。
 
     KIMI_CODE_HOME 指向挂载的配置目录，Kimi CLI 从中读取 config.toml（含 API key / 模型定义）。
-    allowed_dirs：本次调用授权的目录列表，经 KB_AGENT_ALLOWED_DIRS 传给 hook
-                  做路径越界校验（冒号分隔）。
+    allowed_dirs：工作区目录列表，经 KB_AGENT_ALLOWED_DIRS 传给 hook（冒号分隔）。
+    storage_root：文档存储根目录，经 KB_AGENT_STORAGE_ROOT 传给 hook 做跨对话访问检测。
     """
     out = {k: os.environ[k] for k in _CLI_ENV_EXACT if k in os.environ}
     for k, v in os.environ.items():
@@ -50,6 +51,8 @@ def _build_cli_env(
         dirs.append(kimi_config_dir)
     if dirs:
         out["KB_AGENT_ALLOWED_DIRS"] = ":".join(dirs)
+    if storage_root:
+        out["KB_AGENT_STORAGE_ROOT"] = storage_root
     return out
 
 
@@ -79,6 +82,7 @@ class KimiCliEngine:
         self._stream_limit = settings.engine_stream_limit_bytes
         self._audit_user = audit_user
         self._model = model or ""
+        self._storage_root = str(Path(settings.local_storage_dir).resolve())
 
     def _build_argv(
         self, full_prompt: str, files: list[Path] | None, cwd: Path | None
@@ -133,7 +137,7 @@ class KimiCliEngine:
         argv_log = [a if a != full_prompt else f"<prompt:{len(full_prompt)}chars>" for a in argv]
         logger.debug("Kimi CLI 启动: %s", argv_log)
 
-        env = _build_cli_env(self._config_dir, self._audit_user, allowed_dirs)
+        env = _build_cli_env(self._config_dir, self._audit_user, allowed_dirs, self._storage_root)
         try:
             proc = await asyncio.create_subprocess_exec(
                 *argv,
@@ -222,7 +226,7 @@ class KimiCliEngine:
         argv_log = [a if a != full_prompt else f"<prompt:{len(full_prompt)}chars>" for a in argv]
         logger.debug("Kimi CLI 流式启动: %s", argv_log)
 
-        env = _build_cli_env(self._config_dir, self._audit_user, allowed_dirs)
+        env = _build_cli_env(self._config_dir, self._audit_user, allowed_dirs, self._storage_root)
         try:
             proc = await asyncio.create_subprocess_exec(
                 *argv,

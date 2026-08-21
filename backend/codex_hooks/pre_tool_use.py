@@ -23,11 +23,15 @@ _DENY_REASON_ENV = (
     "This event has been logged. Please continue without accessing the "
     "environment; inform the user that this action was blocked and recorded."
 )
-_DENY_REASON_PATH = (
-    "Platform policy violation: file access outside the authorized workspace "
-    "directory is prohibited. This event has been logged. Please only access "
-    "files within the designated workspace; inform the user that this action "
-    "was blocked and recorded."
+_DENY_REASON_SENSITIVE = (
+    "Platform policy violation: access to sensitive files (credentials, system "
+    "config) is prohibited. This event has been logged. Please continue without "
+    "accessing this file; inform the user that this action was blocked."
+)
+_DENY_REASON_CROSS_STORAGE = (
+    "Platform policy violation: accessing another user's workspace is prohibited. "
+    "This event has been logged. Only access files within the current conversation "
+    "workspace; inform the user that this action was blocked."
 )
 
 # ── 与 claude_hooks/pre_tool_use.py 相同的检测规则 ───────────────────────────
@@ -77,9 +81,19 @@ _PATTERNS = (
     ),
 )
 
-# ── 路径越界检查 ──────────────────────────────────────────────────────────────
+# ── 路径安全检查（黑名单模式）────────────────────────────────────────────────
 _ABS_PATH_RE = re.compile(
     r'(?<![/\w])/(?:data|etc|home|root|proc|var|app)/[^\s|;&><"\'\n]+'
+)
+
+_ALWAYS_BLOCK_PREFIXES = ("/etc/", "/root/", "/proc/")
+
+_SENSITIVE_FILE_RE = re.compile(
+    r"(?:^|/)\.env(?:\.|$)"
+    r"|(?:^|/)id_(?:rsa|dsa|ecdsa|ed25519)(?:\.pub)?$"
+    r"|\.(?:pem|key|p12|pfx)$"
+    r"|(?:^|/)(?:passwd|shadow|sudoers)$",
+    re.IGNORECASE,
 )
 
 _SCRIPT_INTERPRETERS = frozenset({
@@ -90,12 +104,15 @@ _SCRIPT_INTERPRETERS = frozenset({
 })
 _SCRIPT_FLAG_INTERPRETERS = frozenset({"awk", "gawk", "nawk", "mawk"})
 
-_PATH_REASON_LABELS = frozenset({
-    "file_access_outside_workspace",
-    "file_read_outside_workspace",
-    "file_path_outside_workspace_in_written_content",
-    "file_path_outside_workspace_in_executed_script",
+_SENSITIVE_REASON_LABELS = frozenset({
+    "sensitive_file_access",
+    "sensitive_file_access_in_executed_script",
 })
+_CROSS_STORAGE_REASON_LABELS = frozenset({
+    "cross_storage_access",
+    "cross_storage_access_in_executed_script",
+})
+_PATH_REASON_LABELS = _SENSITIVE_REASON_LABELS | _CROSS_STORAGE_REASON_LABELS
 
 
 def _matches_pattern(text: str) -> bool:
@@ -111,18 +128,17 @@ def _extract_inline_code(command: str) -> str:
 
 
 def _read_and_check(path: str) -> tuple[bool, str]:
-    """读取脚本文件，检查 env 访问模式和越界路径。返回 (命中, 原因标签)。"""
+    """读取脚本文件，检查 env 访问模式和路径安全（黑名单）。返回 (命中, 原因标签)。"""
     try:
         content = Path(path).read_text(encoding="utf-8", errors="replace")
     except OSError:
         return False, ""
     if _matches_pattern(content):
         return True, "env_read_in_executed_script"
-    allowed = _get_allowed_dirs()
-    if allowed:
-        for m in _ABS_PATH_RE.finditer(content):
-            if not _path_allowed(m.group(0), allowed):
-                return True, "file_path_outside_workspace_in_executed_script"
+    for m in _ABS_PATH_RE.finditer(content):
+        blocked, label = _path_blocked(m.group(0))
+        if blocked:
+            return True, f"{label}_in_executed_script"
     return False, ""
 
 
@@ -152,9 +168,7 @@ def _check_script_content(command: str) -> tuple[bool, str]:
 
 
 def _get_allowed_dirs() -> list[Path]:
-    """从 KB_AGENT_ALLOWED_DIRS 读取授权目录列表（冒号分隔），resolve() 规范化。
-    未设置时返回空列表（不拦截，向后兼容）。
-    """
+    """从 KB_AGENT_ALLOWED_DIRS 读取工作区目录列表（冒号分隔）。"""
     raw = os.environ.get("KB_AGENT_ALLOWED_DIRS", "")
     result = []
     for p in raw.split(":"):
@@ -167,13 +181,48 @@ def _get_allowed_dirs() -> list[Path]:
     return result
 
 
-def _path_allowed(file_path: str, allowed: list[Path]) -> bool:
-    """检查 file_path 是否在某个授权目录内（resolve() 后校验 parents）。"""
+def _get_storage_root() -> Path | None:
+    """从 KB_AGENT_STORAGE_ROOT 读取文档存储根目录，用于跨对话访问检测。"""
+    raw = os.environ.get("KB_AGENT_STORAGE_ROOT", "").strip()
+    if not raw:
+        return None
+    try:
+        return Path(raw).resolve()
+    except (OSError, ValueError):
+        return None
+
+
+def _is_sensitive(path: Path) -> bool:
+    s = str(path)
+    for prefix in _ALWAYS_BLOCK_PREFIXES:
+        if s.startswith(prefix):
+            return True
+    return bool(_SENSITIVE_FILE_RE.search(s))
+
+
+def _path_blocked(file_path: str) -> tuple[bool, str]:
+    """黑名单模式路径检查。返回 (blocked, reason_label)。"""
     try:
         candidate = Path(file_path).resolve()
     except (OSError, ValueError):
-        return False
-    return any(candidate == d or d in candidate.parents for d in allowed)
+        return False, ""
+
+    if _is_sensitive(candidate):
+        return True, "sensitive_file_access"
+
+    allowed = _get_allowed_dirs()
+    if allowed and any(candidate == d or d in candidate.parents for d in allowed):
+        return False, ""
+
+    storage_root = _get_storage_root()
+    if storage_root:
+        try:
+            candidate.relative_to(storage_root)
+            return True, "cross_storage_access"
+        except ValueError:
+            pass
+
+    return False, ""
 
 
 def _check_bash(tool_input: dict) -> tuple[bool, str]:
@@ -186,29 +235,27 @@ def _check_bash(tool_input: dict) -> tuple[bool, str]:
     hit, label = _check_script_content(command)
     if hit:
         return True, label
-    # 路径越界检查：扫描命令中的绝对路径
-    allowed = _get_allowed_dirs()
-    if allowed:
-        for m in _ABS_PATH_RE.finditer(command):
-            if not _path_allowed(m.group(0), allowed):
-                return True, "file_access_outside_workspace"
+    # 路径安全检查：扫描命令中的绝对路径（黑名单）
+    for m in _ABS_PATH_RE.finditer(command):
+        blocked, label = _path_blocked(m.group(0))
+        if blocked:
+            return True, label
     return False, ""
 
 
 def _check_read(tool_input: dict) -> tuple[bool, str]:
-    """拒绝读取不在授权目录内的文件。"""
+    """路径安全检查（黑名单）：拒绝敏感文件和跨对话文档访问。"""
     file_path = (tool_input.get("file_path") or "").strip()
     if not file_path:
         return False, ""
-    allowed = _get_allowed_dirs()
-    if allowed and not _path_allowed(file_path, allowed):
-        return True, "file_read_outside_workspace"
-    return False, ""
+    return _path_blocked(file_path)
 
 
 def _deny_reason_for(tool_name: str, reason_label: str) -> str:
-    if reason_label in _PATH_REASON_LABELS:
-        return _DENY_REASON_PATH
+    if reason_label in _SENSITIVE_REASON_LABELS:
+        return _DENY_REASON_SENSITIVE
+    if reason_label in _CROSS_STORAGE_REASON_LABELS:
+        return _DENY_REASON_CROSS_STORAGE
     return _DENY_REASON_ENV
 
 
@@ -256,7 +303,8 @@ def main() -> int:
         return 0
 
     audit_event = (
-        "file_access_blocked" if reason_label in _PATH_REASON_LABELS
+        "sensitive_file_blocked" if reason_label in _SENSITIVE_REASON_LABELS
+        else "cross_storage_blocked" if reason_label in _CROSS_STORAGE_REASON_LABELS
         else "env_access_blocked"
     )
     audit(

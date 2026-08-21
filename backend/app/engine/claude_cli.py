@@ -35,14 +35,15 @@ _CLI_ENV_PREFIXES = ("ANTHROPIC_", "AWS_", "CLAUDE_")
 def _build_cli_env(
     audit_user: str | None = None,
     allowed_dirs: list[str] | None = None,
+    storage_root: str | None = None,
 ) -> dict[str, str]:
     """构造传给 claude 子进程的精简环境（白名单透传）。
 
     只包含 CLI 运行与认证所需变量；前缀透传保证未来新增同前缀认证变量
     自动生效，无需改代码。剥离所有无关应用密钥。
     audit_user：发起本次调用的用户标识，经 KB_AGENT_AUDIT_USER 传给 hook 写审计。
-    allowed_dirs：本次调用授权的目录列表，经 KB_AGENT_ALLOWED_DIRS 传给 hook
-                  做路径越界校验（冒号分隔）。
+    allowed_dirs：工作区目录列表，经 KB_AGENT_ALLOWED_DIRS 传给 hook（冒号分隔）。
+    storage_root：文档存储根目录，经 KB_AGENT_STORAGE_ROOT 传给 hook 做跨对话访问检测。
     """
     out = {k: os.environ[k] for k in _CLI_ENV_EXACT if k in os.environ}
     for k, v in os.environ.items():
@@ -52,6 +53,8 @@ def _build_cli_env(
         out["KB_AGENT_AUDIT_USER"] = audit_user
     if allowed_dirs:
         out["KB_AGENT_ALLOWED_DIRS"] = ":".join(allowed_dirs)
+    if storage_root:
+        out["KB_AGENT_STORAGE_ROOT"] = storage_root
     return out
 
 
@@ -77,8 +80,8 @@ class ClaudeCliEngine:
         self._stream_limit = settings.engine_stream_limit_bytes
         # hook 配置路径：仅当放开工具时经 --settings 注入（拦截 env 读取 + 脱敏）
         self._hooks_settings = settings.claude_hooks_settings
-        # 发起调用的用户标识（写入 hook 安全审计），经子进程 env 传给 hook
         self._audit_user = audit_user
+        self._storage_root = str(Path(settings.local_storage_dir).resolve())
 
     def _build_argv(
         self, prompt: str, files: list[Path] | None, cwd: Path | None = None
@@ -153,7 +156,7 @@ class ClaudeCliEngine:
             proc = await asyncio.create_subprocess_exec(
                 *argv,
                 cwd=str(cwd) if cwd is not None else None,
-                env=_build_cli_env(self._audit_user, allowed_dirs),
+                env=_build_cli_env(self._audit_user, allowed_dirs, self._storage_root),
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 limit=self._stream_limit,
@@ -229,7 +232,7 @@ class ClaudeCliEngine:
             proc = await asyncio.create_subprocess_exec(
                 *argv,
                 cwd=str(cwd) if cwd is not None else None,
-                env=_build_cli_env(self._audit_user, allowed_dirs),
+                env=_build_cli_env(self._audit_user, allowed_dirs, self._storage_root),
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 limit=self._stream_limit,
