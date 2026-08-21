@@ -79,7 +79,7 @@ _PATTERNS = (
 
 # ── 路径越界检查 ──────────────────────────────────────────────────────────────
 _ABS_PATH_RE = re.compile(
-    r'(?<![/\w])/(?:data|etc|home|root|proc|var|tmp|app)/[^\s|;&><"\'\n]+'
+    r'(?<![/\w])/(?:data|etc|home|root|proc|var|app)/[^\s|;&><"\'\n]+'
 )
 
 _SCRIPT_INTERPRETERS = frozenset({

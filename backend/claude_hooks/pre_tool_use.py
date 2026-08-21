@@ -103,7 +103,7 @@ _PATTERNS = (
 # ── 路径越界检查 ──────────────────────────────────────────────────────────────
 # 从 Bash 命令中提取绝对路径的正则（覆盖常见数据和系统目录）
 _ABS_PATH_RE = re.compile(
-    r'(?<![/\w])/(?:data|etc|home|root|proc|var|tmp|app)/[^\s|;&><"\'\n]+'
+    r'(?<![/\w])/(?:data|etc|home|root|proc|var|app)/[^\s|;&><"\'\n]+'
 )
 
 
