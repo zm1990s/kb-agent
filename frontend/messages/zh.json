@@ -150,7 +150,8 @@
     "agent_auto": "自动",
     "agent_hint": "从勾选的能力中选择相关来源；产品目录和最近文档清单会查看全部已勾选空间。",
     "agent_reset": "恢复全部可用能力",
-    "stage_upload_history": "正在查询文档上传记录"
+    "stage_upload_history": "正在查询文档上传记录",
+    "stage_general_knowledge": "正在基于已有知识回答"
   },
   "messageBubble": {
     "me": "我",
@@ -180,7 +181,8 @@
     "retrieval_failed": "检索未完成，请重试。",
     "citation_missing": "回答缺少可核验的引用，请调整问题后重试。",
     "citation_degraded": "来源引用未能通过校验，以下回答仅供参考，请核对原文。",
-    "context_budget_exceeded": "查询范围或文档内容超出当前模型输入预算，请缩小问题范围或联系管理员调整预算。"
+    "context_budget_exceeded": "查询范围或文档内容超出当前模型输入预算，请缩小问题范围或联系管理员调整预算。",
+    "knowledge_fallback": "基于模型已有知识及对话上下文回答，未引用知识库文档。"
   },
   "documents": {
     "workspace_label": "空间：",

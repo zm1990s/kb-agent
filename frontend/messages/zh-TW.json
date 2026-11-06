@@ -150,7 +150,8 @@
     "agent_auto": "自動",
     "agent_hint": "從勾選的能力中選擇相關來源；產品目錄和最近文件清單會查看全部已勾選空間。",
     "agent_reset": "恢復全部可用能力",
-    "stage_upload_history": "正在查詢文件上傳記錄"
+    "stage_upload_history": "正在查詢文件上傳記錄",
+    "stage_general_knowledge": "正在根據既有知識回答"
   },
   "messageBubble": {
     "me": "我",
@@ -180,7 +181,8 @@
     "retrieval_failed": "檢索未完成，請重試。",
     "citation_missing": "回答缺少可核驗的引用，請調整問題後重試。",
     "citation_degraded": "來源引用未能通過驗證，以下回答僅供參考，請核對原文。",
-    "context_budget_exceeded": "查詢範圍或文件內容超出目前模型輸入預算，請縮小問題範圍或聯絡管理員調整預算。"
+    "context_budget_exceeded": "查詢範圍或文件內容超出目前模型輸入預算，請縮小問題範圍或聯絡管理員調整預算。",
+    "knowledge_fallback": "根據模型既有知識及對話內容回答，未引用知識庫文件。"
   },
   "documents": {
     "workspace_label": "空間：",

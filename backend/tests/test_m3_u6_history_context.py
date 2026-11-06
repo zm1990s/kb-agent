@@ -81,7 +81,7 @@ async def test_history_is_passed_to_engine(client, seed_user, db_session, monkey
 
 
 async def test_no_hit_with_history_still_answers(db_session, monkeypatch):
-    """元问题可回顾历史，但必须明确其来源是会话，不能伪装为知识库。"""
+    """无文档时可以回顾历史并使用通用知识，不伪装为知识库引用。"""
     from app.services.answer_service import answer_question
 
     cap = _CapturingEngine()
@@ -95,9 +95,9 @@ async def test_no_hit_with_history_still_answers(db_session, monkeypatch):
         history=[("user", "介绍防火墙"), ("assistant", "防火墙是…")],
     )
     assert cap.last_prompt is not None  # 引擎被调用了
-    assert res.answer == "答案[S1]"
-    assert res.sources[0]["source_type"] == "conversation"
-    assert res.sources[0]["doc_id"] is None
+    assert res.answer == "答案"
+    assert res.sources == [] and res.warning == "knowledge_fallback"
+    assert "介绍防火墙" in cap.last_prompt
 
 
 async def test_create_and_list_conversations(client, seed_user):

@@ -83,13 +83,14 @@ async def test_answer_no_docs_selected_returns_no_sources(db_session, monkeypatc
     await db_session.commit()
     await _ready_doc(db_session, ws.id, title="报销流程")
 
-    fake = _FakeEngine(answer="没有找到防火墙相关文档。", doc_numbers=[])
+    fake = _FakeEngine(answer="防火墙通过安全策略控制流量。", doc_numbers=[])
     async def _engine(*a, **k): return fake
     monkeypatch.setattr(answer_service, "get_chat_engine", _engine)
 
     res = await answer_question(db_session, workspace_id=ws.id, question="防火墙")
-    assert res.error_key == "no_evidence"
+    assert res.error_key is None and res.warning == "knowledge_fallback"
     assert res.sources == []
+    assert res.answer == "防火墙通过安全策略控制流量。"
 
 
 async def test_answer_empty_workspace_no_history(db_session, monkeypatch):
@@ -102,9 +103,11 @@ async def test_answer_empty_workspace_no_history(db_session, monkeypatch):
     monkeypatch.setattr(answer_service, "get_chat_engine", _engine)
 
     res = await answer_question(db_session, workspace_id=ws.id, question="任意问题")
-    # 空间无文档且无历史：不调用引擎，直接提示
-    assert res.error_key == "no_evidence"
-    assert fake.called is False
+    # 空间无文档且无历史：跳过选文，基于模型知识回答
+    assert res.error_key is None and res.warning == "knowledge_fallback"
+    assert fake.called is False  # No selection or citation-repair call.
+    assert res.answer == "这是答案"
+    assert "已有通用知识" in fake.last_prompt
 
 
 async def test_answer_hallucinated_doc_number_ignored(db_session, monkeypatch):

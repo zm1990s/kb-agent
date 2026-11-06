@@ -150,7 +150,8 @@
     "agent_auto": "자동",
     "agent_hint": "활성화된 에이전트에서 관련 출처를 선택합니다. 제품 카탈로그와 최근 문서 목록은 활성화된 모든 워크스페이스를 대상으로 합니다.",
     "agent_reset": "사용 가능한 모든 소스 활성화",
-    "stage_upload_history": "문서 업로드 기록 조회 중"
+    "stage_upload_history": "문서 업로드 기록 조회 중",
+    "stage_general_knowledge": "기존 지식을 바탕으로 답변 중"
   },
   "messageBubble": {
     "me": "나",
@@ -180,7 +181,8 @@
     "retrieval_failed": "검색을 완료하지 못했습니다. 다시 시도하세요.",
     "citation_missing": "검증 가능한 인용이 없습니다. 질문을 조정한 후 다시 시도하세요.",
     "citation_degraded": "출처 인용을 검증하지 못했습니다. 답변은 참고용으로만 사용하고 원문을 확인하세요.",
-    "context_budget_exceeded": "질문 또는 문서가 모델 입력 한도를 초과했습니다. 범위를 좁히거나 관리자에게 한도 조정을 요청하세요."
+    "context_budget_exceeded": "질문 또는 문서가 모델 입력 한도를 초과했습니다. 범위를 좁히거나 관리자에게 한도 조정을 요청하세요.",
+    "knowledge_fallback": "모델의 기존 지식과 대화 맥락을 바탕으로 한 답변이며, 지식베이스 문서를 인용하지 않았습니다."
   },
   "documents": {
     "workspace_label": "워크스페이스:",

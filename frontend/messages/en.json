@@ -150,7 +150,8 @@
     "agent_auto": "Auto",
     "agent_hint": "Select relevant sources from enabled agents. Product catalogs and recent document lists cover all enabled workspaces.",
     "agent_reset": "Enable all available sources",
-    "stage_upload_history": "Querying document upload history"
+    "stage_upload_history": "Querying document upload history",
+    "stage_general_knowledge": "Answering from existing knowledge"
   },
   "messageBubble": {
     "me": "Me",
@@ -180,7 +181,8 @@
     "retrieval_failed": "Retrieval could not complete. Please retry.",
     "citation_missing": "The answer lacks verifiable citations. Refine the question and retry.",
     "citation_degraded": "Source citations could not be verified. Treat this answer as unverified and check the original documents.",
-    "context_budget_exceeded": "The query or document content exceeds the configured model input budget. Narrow the scope or ask an administrator to adjust the budget."
+    "context_budget_exceeded": "The query or document content exceeds the configured model input budget. Narrow the scope or ask an administrator to adjust the budget.",
+    "knowledge_fallback": "Based on the model’s existing knowledge and conversation context; no knowledge-base documents are cited."
   },
   "documents": {
     "workspace_label": "Workspace:",

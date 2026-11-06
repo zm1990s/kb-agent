@@ -150,7 +150,8 @@
     "agent_auto": "自動",
     "agent_hint": "有効なエージェントから関連する情報源を選択します。製品カタログや最近の文書一覧は、有効なすべてのワークスペースを対象にします。",
     "agent_reset": "利用可能な検索元をすべて有効にする",
-    "stage_upload_history": "文書のアップロード履歴を確認中"
+    "stage_upload_history": "文書のアップロード履歴を確認中",
+    "stage_general_knowledge": "既存の知識に基づいて回答中"
   },
   "messageBubble": {
     "me": "自分",
@@ -180,7 +181,8 @@
     "retrieval_failed": "検索を完了できませんでした。再試行してください。",
     "citation_missing": "検証可能な引用がありません。質問を調整して再試行してください。",
     "citation_degraded": "出典の引用を検証できませんでした。回答は参考情報として扱い、原文を確認してください。",
-    "context_budget_exceeded": "検索範囲または文書がモデルの入力上限を超えています。範囲を絞るか、管理者に上限の調整を依頼してください。"
+    "context_budget_exceeded": "検索範囲または文書がモデルの入力上限を超えています。範囲を絞るか、管理者に上限の調整を依頼してください。",
+    "knowledge_fallback": "モデルの既存知識と会話の文脈に基づく回答です。ナレッジベースの文書は引用していません。"
   },
   "documents": {
     "workspace_label": "ワークスペース：",

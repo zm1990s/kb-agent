@@ -48,7 +48,9 @@ async def _make_ready_doc(db_session, ws_id, *, title, content):
     return doc
 
 
-async def test_chat_empty_workspace_no_docs(client, seed_user):
+async def test_chat_empty_workspace_no_docs(client, seed_user, monkeypatch):
+    async def _engine(*a, **k): return _FakeEngine(answer="基于已有知识回答")
+    monkeypatch.setattr(answer_service, "get_chat_engine", _engine)
     _, admin = await seed_user("admin")
     ws_id = await _ws(client, admin)
     resp = await client.post(
@@ -58,7 +60,8 @@ async def test_chat_empty_workspace_no_docs(client, seed_user):
     )
     assert resp.status_code == 200
     body = resp.json()
-    assert body["error_key"] == "no_evidence"
+    assert body["error_key"] is None and body["warning"] == "knowledge_fallback"
+    assert body["answer"] == "基于已有知识回答"
     assert body["sources"] == []
     assert "conversation_id" in body
 

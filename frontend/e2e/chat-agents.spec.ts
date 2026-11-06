@@ -1,9 +1,11 @@
 import { expect, test } from "@playwright/test";
 
 // Contract/UI test: no live backend or model calls.
-for (const variant of ["body", "metadata", "degraded"]) {
+for (const variant of ["body", "metadata", "degraded", "knowledge"]) {
 const metadata = variant === "metadata";
-const degraded = variant === "degraded";
+const degraded = variant === "degraded" || variant === "knowledge";
+const warningKey = variant === "knowledge" ? "knowledge_fallback" : "citation_degraded";
+const warningText = variant === "knowledge" ? "未引用知识库文档" : "来源引用未能通过校验";
 test(`source selection, ${variant} and history restoration`, async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem("kb_token", `test.${btoa(JSON.stringify({ role: "admin" }))}.test`);
@@ -32,7 +34,7 @@ test(`source selection, ${variant} and history restoration`, async ({ page }) =>
       const events = [
         ["meta", { conversation_id: "conv-1" }],
         ["token", { text: answer }],
-        ["done", { conversation_id: "conv-1", answer, sources: degraded ? [] : [source], agent_runs: runs, warning: degraded ? "citation_degraded" : undefined }],
+        ["done", { conversation_id: "conv-1", answer, sources: degraded ? [] : [source], agent_runs: runs, warning: degraded ? warningKey : undefined }],
       ];
       await route.fulfill({ contentType: "text/event-stream", body: events.map(([event, data]) =>
         `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`).join("") });
@@ -47,7 +49,7 @@ test(`source selection, ${variant} and history restoration`, async ({ page }) =>
     if (path === "/api/auth/my-permissions") body = { chat: "admin" };
     if (path === "/api/conversations/conv-1") body = { conversation_id: "conv-1", messages: [
       { role: "user", content: question, sources: [] },
-      { role: "assistant", content: answer, sources: degraded ? [] : [source], retrieval: { agent_runs: runs, warning: degraded ? "citation_degraded" : undefined } },
+      { role: "assistant", content: answer, sources: degraded ? [] : [source], retrieval: { agent_runs: runs, warning: degraded ? warningKey : undefined } },
     ] };
     await route.fulfill({ json: body });
   });
@@ -58,11 +60,11 @@ test(`source selection, ${variant} and history restoration`, async ({ page }) =>
   if (degraded) {
     await expect(page.getByText(answer, { exact: true })).toBeVisible();
     const warning = page.getByRole("status");
-    await expect(warning).toContainText("来源引用未能通过校验");
+    await expect(warning).toContainText(warningText);
     await expect(page.getByRole("button", { name: "[S1]", exact: true })).toHaveCount(0);
     await page.reload();
     await expect(page.getByText(answer, { exact: true })).toBeVisible();
-    await expect(warning).toContainText("来源引用未能通过校验");
+    await expect(warning).toContainText(warningText);
     return;
   }
   const citation = page.getByRole("button", { name: "[S1]", exact: true });

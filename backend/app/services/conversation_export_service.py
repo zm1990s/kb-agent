@@ -86,6 +86,8 @@ def _source_description(source) -> str:
 # ── Markdown ────────────────────────────────────────────────────────────────
 
 def _answer_content(msg: MessagePublic) -> str:
+    if msg.retrieval.get("warning") == "knowledge_fallback":
+        return "基于模型已有知识及对话上下文回答，未引用知识库文档。\n\n" + msg.content
     if msg.retrieval.get("warning") == "citation_degraded":
         return "来源引用未通过校验（Unverified citations），请核对原文。\n\n" + msg.content
     return msg.content
