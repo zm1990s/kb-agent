@@ -8,7 +8,6 @@ from unittest.mock import AsyncMock
 import pytest
 from sqlalchemy import event, text
 
-from app.agents import workspace as workspace_module
 from app.engine.base import EngineResult, TextChunk
 from app.models.auth import Workspace, WorkspaceMember
 from app.models.document import Document
@@ -28,8 +27,7 @@ class FullIndexEngine:
         assert "你是知识检索路由器" not in prompt and "product_catalog" not in prompt
         self.pages.append(rows)
         return EngineResult(text=json.dumps({
-            "mode": self.mode, "doc_numbers": [r["number"] for r in rows],
-            "fetch_numbers": [r["number"] for r in rows],
+            "mode": self.mode, "doc_ids": [r["doc_id"] for r in rows],
         }))
 
     async def complete_streaming(self, prompt, **kwargs):
@@ -42,7 +40,6 @@ class FullIndexEngine:
 
 def patch_engine(monkeypatch, engine):
     monkeypatch.setattr(answer_service, "get_chat_engine", AsyncMock(return_value=engine))
-    monkeypatch.setattr(workspace_module, "get_prompt", AsyncMock(return_value="{catalog}"))
     monkeypatch.setattr(settings_service, "get_prompt", AsyncMock(return_value="{catalog}"))
     monkeypatch.setattr(settings_service, "get_task_headers", AsyncMock(return_value={}))
 
@@ -59,7 +56,7 @@ def document(ws, title, **kwargs):
 @pytest.mark.asyncio
 @pytest.mark.parametrize("timezone_column", [False, True])
 @pytest.mark.parametrize("question", [
-    "PAN-OS 怎么配置？", "知识库里有哪些产品的文档？", "获取所有最近文档更新",
+    "PAN-OS 怎么配置？", "知识库里有哪些产品的文档？",
 ])
 async def test_full_index_has_no_space_product_or_document_count_filter(
     client, seed_user, db_session, db_engine, monkeypatch, timezone_column, question,
@@ -113,11 +110,15 @@ async def test_full_index_has_no_space_product_or_document_count_filter(
     assert len(body["agent_runs"]) == 5
     assert sum(r["indexed_count"] for r in body["agent_runs"]) == 233
     assert all(r["status"] == "done" and not r["truncated"] for r in body["agent_runs"])
-    assert {s["doc_id"] for s in body["sources"]} == set(expected)
-    assert len(engine.pages) == 10  # 6 pages in the large space, one in each other space.
+    if question.startswith("PAN-OS"):
+        assert len(body["sources"]) == 10
+        assert {s["doc_id"] for s in body["sources"]} <= set(expected)
+    else:
+        assert {s["doc_id"] for s in body["sources"]} == set(expected)
+    assert len(engine.pages) == 1  # Global selection sees all spaces in one call.
     assert sum(len(page) for page in engine.pages) == 233
-    assert all(len(page) <= 40 for page in engine.pages)
-    assert len(engine.synthesis) == 1 and len(engine.synthesis[0]) == 233
+    assert len(engine.synthesis) == 1
+    assert len(engine.synthesis[0]) == len(body["sources"])
     assert all(s["content_kind"] == "document_metadata" for s in body["sources"])
     assert all(datetime.fromisoformat(s["uploaded_at"]) == datetime(2020, 1, 1, tzinfo=UTC)
                for s in body["sources"])
@@ -164,7 +165,7 @@ async def test_stream_runs_index_retrieval_then_synthesis(
     assert events[-1][0] == "done"
     body = events[-1][1]
     assert not body.get("error_key") and len(body["agent_runs"]) == 4
-    assert len(engine.pages) == 4 and len(engine.synthesis) == 1
+    assert len(engine.pages) == 1 and len(engine.synthesis) == 1
     assert all(s["content_kind"] == "processed_text" for s in body["sources"])
     assert all("BODY_SECRET" in s["excerpt"] for s in body["sources"])
     assert "".join(d["text"] for k, d in events if k == "token") == body["answer"]

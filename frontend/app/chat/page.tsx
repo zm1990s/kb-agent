@@ -24,6 +24,7 @@ interface Turn {
   content: string;
   sources?: SourceRef[];
   error_key?: string;
+  warning?: string;
   thinking?: string;
   agent_runs?: AgentRun[];
 }
@@ -33,6 +34,7 @@ interface DonePayload {
   sources: SourceRef[];
   conversation_id: string;
   error_key?: string;
+  warning?: string;
   agent_runs?: AgentRun[];
 }
 
@@ -271,6 +273,7 @@ export default function ChatPage() {
           sources: m.sources,
           error_key: m.retrieval?.error_key ?? undefined,
           agent_runs: m.retrieval?.agent_runs,
+          warning: m.retrieval?.warning,
         }))
       );
     } catch (err) {
@@ -372,7 +375,7 @@ export default function ChatPage() {
           if (last?.role === "assistant" && last.content === d.answer) return prev;
           return [
             ...prev,
-            { role: "assistant", content: d.answer, sources: d.sources, error_key: d.error_key, thinking: savedThinking, agent_runs: d.agent_runs },
+            { role: "assistant", content: d.answer, sources: d.sources, error_key: d.error_key, thinking: savedThinking, agent_runs: d.agent_runs, warning: d.warning },
           ];
         });
         setBusy(false);
@@ -642,6 +645,7 @@ export default function ChatPage() {
                   sources={turn.sources}
                   agentRuns={turn.agent_runs}
                   errorKey={turn.error_key}
+                  warning={turn.warning}
                   onDownload={download}
                   onEdit={turn.role === "user" && !busy ? (newContent) => handleEdit(i, newContent) : undefined}
                   onResend={interrupted && !busy && turn.role === "user" && i === turns.length - 1 ? () => sendMessage(turn.content) : undefined}

@@ -85,13 +85,19 @@ def _source_description(source) -> str:
 
 # ── Markdown ────────────────────────────────────────────────────────────────
 
+def _answer_content(msg: MessagePublic) -> str:
+    if msg.retrieval.get("warning") == "citation_degraded":
+        return "来源引用未通过校验（Unverified citations），请核对原文。\n\n" + msg.content
+    return msg.content
+
+
 def _build_markdown(title: str, messages: list[MessagePublic], date_str: str) -> bytes:
     lines: list[str] = [f"# {title}", "", f"*导出时间：{date_str}*", ""]
     for msg in messages:
         if msg.role == "user":
             lines += ["---", "", "**提问**", "", msg.content, ""]
         else:
-            lines += ["**回答**", "", msg.content, ""]
+            lines += ["**回答**", "", _answer_content(msg), ""]
             sources: list = getattr(msg, "sources", []) or []
             if sources:
                 titles = " · ".join(
@@ -324,7 +330,7 @@ def _build_docx(title: str, messages: list[MessagePublic], date_str: str) -> byt
             for line in msg.content.splitlines():
                 d.add_paragraph(line)
         else:
-            _render_markdown_to_doc(d, msg.content)
+            _render_markdown_to_doc(d, _answer_content(msg))
 
         # 来源
         sources: list = getattr(msg, "sources", []) or []
@@ -537,7 +543,7 @@ def _build_pdf(title: str, messages: list[MessagePublic], date_str: str) -> byte
                 if line.strip():
                     flow.append(Paragraph(_pdf_esc(line), body_st))
         else:
-            lines = msg.content.splitlines()
+            lines = _answer_content(msg).splitlines()
             i = 0
             in_code = False
             code_lines: list[str] = []

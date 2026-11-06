@@ -44,6 +44,7 @@ class ChatResponse(BaseModel):
     conversation_id: uuid.UUID
     error_key: str | None = None
     agent_runs: list[dict] = Field(default_factory=list)
+    warning: str | None = None
 
 
 class MessagePublic(BaseModel):

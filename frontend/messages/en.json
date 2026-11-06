@@ -149,7 +149,8 @@
     "agent_capabilities": "Sources",
     "agent_auto": "Auto",
     "agent_hint": "Select relevant sources from enabled agents. Product catalogs and recent document lists cover all enabled workspaces.",
-    "agent_reset": "Enable all available sources"
+    "agent_reset": "Enable all available sources",
+    "stage_upload_history": "Querying document upload history"
   },
   "messageBubble": {
     "me": "Me",
@@ -177,7 +178,9 @@
     "routing_failed": "Could not route this question. Retry or select a workspace.",
     "no_evidence": "No sufficient evidence found. Refine the question or selected sources.",
     "retrieval_failed": "Retrieval could not complete. Please retry.",
-    "citation_missing": "The answer lacks verifiable citations. Refine the question and retry."
+    "citation_missing": "The answer lacks verifiable citations. Refine the question and retry.",
+    "citation_degraded": "Source citations could not be verified. Treat this answer as unverified and check the original documents.",
+    "context_budget_exceeded": "The query or document content exceeds the configured model input budget. Narrow the scope or ask an administrator to adjust the budget."
   },
   "documents": {
     "workspace_label": "Workspace:",

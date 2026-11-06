@@ -5,7 +5,15 @@ import re
 from app.agents.base import Evidence
 
 _CODE = re.compile(r"(```[\s\S]*?```|~~~[\s\S]*?~~~|`[^`\n]*`)")
-_CITATION = re.compile(r"\[(S\d+)\](?!\()")
+_CITATION = re.compile(r"\[(S\d+)\](?:\([^\n)]*\))?")
+
+
+def strip_citations(answer: str) -> str:
+    """Remove source markers from prose, preserving code examples verbatim."""
+    parts = _CODE.split(answer)
+    for index in range(0, len(parts), 2):
+        parts[index] = re.sub(r"\[S\d+\](?:\([^\n)]*\))?", "", parts[index])
+    return "".join(parts).strip()
 
 
 def has_invalid_citations(answer: str, evidence: list[Evidence]) -> bool:
@@ -23,7 +31,7 @@ def validate_citations(answer: str, evidence: list[Evidence]) -> tuple[str, list
         if citation not in available:
             return ""  # An invented ID can never create a source or link.
         used[citation] = None
-        return match[0]
+        return f"[{citation}]"  # Citation targets come from Evidence, never model URLs.
 
     parts = _CODE.split(answer)
     for index in range(0, len(parts), 2):

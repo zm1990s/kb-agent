@@ -297,13 +297,16 @@ async def _run_generation(
             if final is None:
                 final = AnswerResult(answer="", sources=[], error_key="no_answer")
             state.status = "done"
-            state.retrieval = {"error_key": final.error_key, "agent_runs": final.agent_runs}
+            state.retrieval = {"error_key": final.error_key, "agent_runs": final.agent_runs,
+                               "warning": final.warning}
             done_payload: dict = {
                 "answer": final.answer,
                 "sources": final.sources,
                 "conversation_id": str(state.conversation_id),
                 "agent_runs": final.agent_runs,
             }
+            if final.warning:
+                done_payload["warning"] = final.warning
             if final.error_key:
                 done_payload["error_key"] = final.error_key
             state.terminal_events.append(("done", done_payload))

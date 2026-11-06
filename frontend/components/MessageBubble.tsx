@@ -11,12 +11,13 @@ interface Props {
   sources?: SourceRef[];
   agentRuns?: AgentRun[];
   errorKey?: string;
+  warning?: string;
   onDownload?: (s: SourceRef) => void;
   onEdit?: (newContent: string) => void;
   onResend?: () => void;
 }
 
-export default function MessageBubble({ role, content, sources, agentRuns, errorKey, onDownload, onEdit, onResend }: Props) {
+export default function MessageBubble({ role, content, sources, agentRuns, errorKey, warning, onDownload, onEdit, onResend }: Props) {
   const t = useTranslations("messageBubble");
   const isUser = role === "user";
   const [editing, setEditing] = useState(false);
@@ -189,6 +190,11 @@ export default function MessageBubble({ role, content, sources, agentRuns, error
               </button>
             ))}
           </div>
+        )}
+        {!isUser && warning && (
+          <p role="status" className="text-xs text-amber-700">
+            {t(warning as Parameters<typeof t>[0])}
+          </p>
         )}
         {agentRuns && agentRuns.length > 0 && (
           <details className="text-xs text-gray-500">

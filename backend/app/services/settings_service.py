@@ -119,10 +119,10 @@ class PromptTemplate:
 PROMPT_CATALOG: list[PromptTemplate] = [
     PromptTemplate(
         key=ANSWER_FETCH_PROMPT_KEY,
-        label="对话检索提示词（Workspace Agent：选择文档）",
+        label="对话检索提示词（全局索引：选择文档）",
         description=(
-            "每个 Workspace Agent 在自己的摘要目录中选择相关文档，服务端随后读取正文证据。"
-            "返回 fetch_numbers 或兼容的 doc_numbers。"
+            "合并所有授权空间的完整文档索引后选择相关文档，服务端随后读取正文证据。"
+            "返回 doc_ids，也兼容 fetch_numbers 或 doc_numbers。"
         ),
         default=DEFAULT_ANSWER_FETCH_PROMPT,
         required_placeholders=["{question}", "{catalog}", "{history}", "{timestamp}"],

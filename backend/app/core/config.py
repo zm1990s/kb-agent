@@ -30,6 +30,12 @@ class Settings(BaseSettings):
     claude_cli_path: str = Field("claude", alias="CLAUDE_CLI_PATH")
     claude_model: str = Field("", alias="CLAUDE_MODEL")
     engine_idle_timeout_sec: int = Field(300, alias="ENGINE_IDLE_TIMEOUT_SEC")
+    chat_retrieval_concurrency: int = Field(4, ge=1, le=16, alias="CHAT_RETRIEVAL_CONCURRENCY")
+    chat_retrieval_top_k: int = Field(10, ge=1, le=100, alias="CHAT_RETRIEVAL_TOP_K")
+    # UTF-8 byte budget, not a model-specific token count; reserve output separately.
+    chat_prompt_budget_bytes: int = Field(
+        180000, ge=16000, alias="CHAT_PROMPT_BUDGET_BYTES"
+    )
     # 子进程 stdout 单行缓冲上限（字节）。stream-json 每行一个 JSON 事件，
     # 大文件工具结果/整条消息快照可能超 asyncio 默认 64KB → LimitOverrunError。
     engine_stream_limit_bytes: int = Field(

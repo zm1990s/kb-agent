@@ -7,8 +7,6 @@ from typing import Protocol
 
 from app.engine.base import EngineProtocol
 
-RETRIEVAL_STEP_TIMEOUT_SECONDS = 90
-
 
 @dataclass(frozen=True)
 class AgentDescriptor:

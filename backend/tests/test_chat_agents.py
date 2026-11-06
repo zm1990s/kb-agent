@@ -115,7 +115,7 @@ async def test_one_failed_agent_does_not_discard_other_results(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_missing_citations_fail_closed_after_one_repair(monkeypatch):
+async def test_missing_citations_degrade_after_one_repair(monkeypatch):
     engine = FakeEngine(answer="unsupported answer")
     monkeypatch.setattr(answer_service, "build_registry", AsyncMock(
         return_value=AgentRegistry([FakeAgent("a")]),
@@ -123,8 +123,8 @@ async def test_missing_citations_fail_closed_after_one_repair(monkeypatch):
     monkeypatch.setattr(answer_service, "get_chat_engine", AsyncMock(return_value=engine))
     mock_prompts(monkeypatch)
     result = await answer_service.answer_question(None, workspace_id=[], question="q")
-    assert result.error_key == "citation_missing"
-    assert result.sources == [] and result.answer == ""
+    assert result.error_key is None and result.warning == "citation_degraded"
+    assert result.sources == [] and result.answer == "unsupported answer"
     assert len(engine.prompts) == 2
 
 
@@ -212,7 +212,7 @@ async def test_auto_full_index_persists_actual_scope_and_citations(
             self.prompts.append(prompt)
             if "你是知识检索路由器" in prompt:
                 return EngineResult(text=json.dumps({"agent_ids": [f"workspace:{spaces[0]}"]}))
-            return EngineResult(text='{"fetch_numbers": [1], "mode": "fetch"}')
+            return EngineResult(text='{"fetch_numbers": [1, 2], "mode": "fetch"}')
 
     engine = RoutedEngine(answer="配置说明。[S1][S2]")
     monkeypatch.setattr(answer_service, "get_chat_engine", AsyncMock(return_value=engine))

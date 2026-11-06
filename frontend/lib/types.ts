@@ -135,7 +135,7 @@ export interface Message {
   role: "user" | "assistant";
   content: string;
   sources: SourceRef[];
-  retrieval?: { error_key?: string; agent_runs?: AgentRun[] };
+  retrieval?: { error_key?: string; agent_runs?: AgentRun[]; warning?: string };
   attachments?: { storage_key: string; filename: string; size?: number }[];
   output_files?: { filename: string; storage_key?: string; conversation_id?: string }[];
   created_at: string;

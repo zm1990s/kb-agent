@@ -1,8 +1,10 @@
 import { expect, test } from "@playwright/test";
 
 // Contract/UI test: no live backend or model calls.
-for (const metadata of [false, true]) {
-test(`source selection, ${metadata ? "full index metadata" : "inline evidence"} and history restoration`, async ({ page }) => {
+for (const variant of ["body", "metadata", "degraded"]) {
+const metadata = variant === "metadata";
+const degraded = variant === "degraded";
+test(`source selection, ${variant} and history restoration`, async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem("kb_token", `test.${btoa(JSON.stringify({ role: "admin" }))}.test`);
     localStorage.setItem("locale", "zh");
@@ -20,7 +22,7 @@ test(`source selection, ${metadata ? "full index metadata" : "inline evidence"} 
     ...(metadata ? { uploaded_at: "2020-01-01T00:00:00+00:00" } : {}) };
   const question = metadata ? "Which products have documents in the knowledge base?"
     : "How do I configure GlobalProtect?";
-  const answer = (metadata ? "**PAN-OS** deployment is documented.[S1]" : "Configure the portal first.[S1]")
+  const answer = degraded ? "Useful configuration draft without verified citations." : (metadata ? "**PAN-OS** deployment is documented.[S1]" : "Configure the portal first.[S1]")
     + "\n\n`[S1]` is a code example.";
   const runs = [{ agent_id: "workspace:a", name: "Firewall", status: "done", evidence_count: 1, indexed_count: 233 }];
   await page.route("**/api/**", async (route) => {
@@ -30,7 +32,7 @@ test(`source selection, ${metadata ? "full index metadata" : "inline evidence"} 
       const events = [
         ["meta", { conversation_id: "conv-1" }],
         ["token", { text: answer }],
-        ["done", { conversation_id: "conv-1", answer, sources: [source], agent_runs: runs }],
+        ["done", { conversation_id: "conv-1", answer, sources: degraded ? [] : [source], agent_runs: runs, warning: degraded ? "citation_degraded" : undefined }],
       ];
       await route.fulfill({ contentType: "text/event-stream", body: events.map(([event, data]) =>
         `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`).join("") });
@@ -45,7 +47,7 @@ test(`source selection, ${metadata ? "full index metadata" : "inline evidence"} 
     if (path === "/api/auth/my-permissions") body = { chat: "admin" };
     if (path === "/api/conversations/conv-1") body = { conversation_id: "conv-1", messages: [
       { role: "user", content: question, sources: [] },
-      { role: "assistant", content: answer, sources: [source], retrieval: { agent_runs: runs } },
+      { role: "assistant", content: answer, sources: degraded ? [] : [source], retrieval: { agent_runs: runs, warning: degraded ? "citation_degraded" : undefined } },
     ] };
     await route.fulfill({ json: body });
   });
@@ -53,6 +55,16 @@ test(`source selection, ${metadata ? "full index metadata" : "inline evidence"} 
   await expect(page.getByRole("button", { name: /检索能力/ })).toHaveCount(0);
   await page.locator("textarea").fill(question);
   await page.locator('button[type="submit"]').click();
+  if (degraded) {
+    await expect(page.getByText(answer, { exact: true })).toBeVisible();
+    const warning = page.getByRole("status");
+    await expect(warning).toContainText("来源引用未能通过校验");
+    await expect(page.getByRole("button", { name: "[S1]", exact: true })).toHaveCount(0);
+    await page.reload();
+    await expect(page.getByText(answer, { exact: true })).toBeVisible();
+    await expect(warning).toContainText("来源引用未能通过校验");
+    return;
+  }
   const citation = page.getByRole("button", { name: "[S1]", exact: true });
   await expect(citation).toHaveCount(1);
   expect(submitted).not.toHaveProperty("agent_ids");

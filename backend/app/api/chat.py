@@ -201,7 +201,8 @@ async def chat(
         role="assistant",
         content=result.answer,
         sources=result.sources,
-        retrieval={"error_key": result.error_key, "agent_runs": result.agent_runs},
+        retrieval={"error_key": result.error_key, "agent_runs": result.agent_runs,
+                   "warning": result.warning},
     )
 
     logger.info(
@@ -241,6 +242,7 @@ async def chat(
         conversation_id=conv.id,
         error_key=result.error_key,
         agent_runs=result.agent_runs,
+        warning=result.warning,
     )
 
 
