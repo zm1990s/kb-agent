@@ -38,10 +38,12 @@ function citationPlugin(ids: Set<string>) {
 
 // LLM 产物的 Markdown 渲染。react-markdown 默认不解析裸 HTML，
 // 且未启用 rehype-raw，故不会执行 <script> 等 —— 天然防存储型 XSS（SECURITY #6）。
-export default function Markdown({ content, citationIds = [], onCitationClick }: {
+export default function Markdown({ content, citationIds = [], onCitationClick, citationTargetId, activeCitationId }: {
   content: string;
   citationIds?: string[];
   onCitationClick?: (id: string) => void;
+  citationTargetId?: string;
+  activeCitationId?: string;
 }) {
   // 兜底：LLM 有时输出字面量 \n 而非真实换行，导致 Markdown 解析失败
   const normalized = content.replace(/\\n/g, "\n").replace(/\\t/g, "\t");
@@ -55,6 +57,7 @@ export default function Markdown({ content, citationIds = [], onCitationClick }:
               const id = href.slice("#kb-source-".length);
               if (citationIds.includes(id)) return (
                 <button type="button" onClick={() => onCitationClick(id)}
+                  aria-expanded={activeCitationId === id} aria-controls={citationTargetId}
                   className="mx-0.5 text-xs font-semibold text-blue-600 underline">
                   {props.children}
                 </button>

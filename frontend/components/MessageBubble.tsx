@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import Markdown from "@/components/Markdown";
 import type { AgentRun, SourceRef } from "@/lib/types";
@@ -23,8 +23,27 @@ export default function MessageBubble({ role, content, sources, agentRuns, error
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(content);
   const [copied, setCopied] = useState(false);
-  const [selectedSource, setSelectedSource] = useState<string | null>(null);
-  const selected = sources?.find((s) => s.citation_id === selectedSource);
+  const [selectedSource, setSelectedSource] = useState<{ id: string } | null>(null);
+  const selected = sources?.find((s) => s.citation_id === selectedSource?.id);
+  const evidenceId = useId();
+  const evidenceRef = useRef<HTMLDivElement>(null);
+  const excerptRef = useRef<HTMLQuoteElement>(null);
+
+  useEffect(() => {
+    const panel = evidenceRef.current;
+    if (!selectedSource || !panel) return;
+    if (excerptRef.current) excerptRef.current.scrollTop = 0;
+    panel.focus({ preventScroll: true });
+    panel.scrollIntoView({
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth",
+      block: "start",
+    });
+  }, [selectedSource]);
+
+  function openSource(id: string) {
+    // A new selection also scrolls when the same citation is clicked again.
+    setSelectedSource({ id });
+  }
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   function sourceLabel(source: SourceRef) {
@@ -125,7 +144,8 @@ export default function MessageBubble({ role, content, sources, agentRuns, error
                   ? <span className="text-red-500">{t(errorKey as Parameters<typeof t>[0])}</span>
                   : <Markdown content={content}
                       citationIds={sources?.flatMap((s) => s.citation_id ? [s.citation_id] : [])}
-                      onCitationClick={setSelectedSource} />
+                      onCitationClick={openSource}
+                      citationTargetId={evidenceId} activeCitationId={selectedSource?.id} />
               }
             </div>
             {/* 右下角操作按钮 */}
@@ -183,9 +203,11 @@ export default function MessageBubble({ role, content, sources, agentRuns, error
               <button
                 key={s.id ?? s.doc_id ?? s.url}
                 onClick={() => s.citation_id
-                  ? setSelectedSource(selectedSource === s.citation_id ? null : s.citation_id)
+                  ? setSelectedSource(selectedSource?.id === s.citation_id ? null : { id: s.citation_id })
                   : onDownload?.(s)}
                 className="flex items-center gap-1 rounded-full border border-gray-200 bg-white px-2.5 py-1 text-xs text-blue-600 hover:border-blue-300 hover:bg-blue-50 transition-colors"
+                aria-expanded={s.citation_id ? selectedSource?.id === s.citation_id : undefined}
+                aria-controls={s.citation_id ? evidenceId : undefined}
                 title={s.citation_id ? t("view_evidence") : t("download_original")}
               >
                 <svg className="h-3 w-3" viewBox="0 0 16 16" fill="currentColor">
@@ -217,7 +239,9 @@ export default function MessageBubble({ role, content, sources, agentRuns, error
           </details>
         )}
         {selected && (
-          <div className="w-full rounded-lg border border-blue-100 bg-blue-50 p-3 text-xs text-gray-700">
+          <div ref={evidenceRef} id={evidenceId} role="region" tabIndex={-1}
+            aria-label={`[${selected.citation_id}] ${selected.title}`}
+            className="w-full scroll-mt-4 rounded-lg border border-blue-100 bg-blue-50 p-3 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-300">
             <div className="font-medium">[{selected.citation_id}] {selected.title}</div>
             <div className="mt-1 text-gray-500">
               {sourceLabel(selected)}
@@ -234,7 +258,7 @@ export default function MessageBubble({ role, content, sources, agentRuns, error
             {(["updated_at", "indexed_at", "retrieved_at"] as const).map((field) => selected[field] && (
               <div key={field} className="mt-1 text-gray-500">{t(field)}: {selected[field]}</div>
             ))}
-            {selected.excerpt && <blockquote className="my-2 max-h-60 overflow-y-auto whitespace-pre-wrap border-l-2 border-blue-200 pl-3">{selected.excerpt}</blockquote>}
+            {selected.excerpt && <blockquote ref={excerptRef} className="my-2 max-h-60 overflow-y-auto whitespace-pre-wrap border-l-2 border-blue-200 pl-3">{selected.excerpt}</blockquote>}
             {selected.doc_id && <button type="button" onClick={() => onDownload?.(selected)}
               className="text-blue-600 underline">{t("download_original")}</button>}
             {selected.url && /^https?:\/\//i.test(selected.url) && (
