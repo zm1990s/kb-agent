@@ -54,7 +54,14 @@ export default function MessageBubble({ role, content, sources, agentRuns, error
   }
 
   function copyContent() {
-    navigator.clipboard.writeText(content).then(() => {
+    // Strip answer citations from prose, preserving literal markers in code
+    // examples and leaving the user's original question untouched.
+    const copiedContent = isUser ? content : content
+      .split(/(```[\s\S]*?```|~~~[\s\S]*?~~~|`[^`\n]*`)/g)
+      .map((part, index) => index % 2 ? part : part.replace(/\[S\d+\](?:\([^\n)]*\))?/g, ""))
+      .join("")
+      .trim();
+    navigator.clipboard.writeText(copiedContent).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     });
