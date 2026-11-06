@@ -5,7 +5,7 @@ import json
 import re
 from datetime import UTC, datetime
 
-from sqlalchemy import func, select, tuple_
+from sqlalchemy import DateTime, String, case, cast, func, select, tuple_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import load_only
 
@@ -56,31 +56,40 @@ class WorkspaceAgent:
 
     async def retrieve_updates(self, query: DocumentUpdatesQuery) -> RetrievalResult:
         """List all ready uploads in the interval using metadata-only keyset pages."""
-        since = query.since.astimezone(UTC).replace(tzinfo=None)
-        until = query.until.astimezone(UTC).replace(tzinfo=None)
+        # Migrations use timestamptz; ORM-created legacy schemas used UTC timestamp.
+        # Normalize both without changing the session timezone or losing an offset.
+        uploaded_at = cast(case(
+            (cast(func.pg_typeof(Document.created_at), String) == "timestamp without time zone",
+             func.timezone("UTC", cast(Document.created_at, DateTime(timezone=False)))),
+            else_=Document.created_at,
+        ), DateTime(timezone=True))
+        since = query.since.astimezone(UTC)
+        until = query.until.astimezone(UTC)
         last = None
         evidence = []
         while True:
-            stmt = select(Document.id, Document.title, Document.created_at, Document.summary).where(
+            stmt = select(
+                Document.id, Document.title, uploaded_at.label("uploaded_at"), Document.summary,
+            ).where(
                 Document.workspace_id == self.workspace.id,
                 Document.status == "ready",
                 Document.deleted_at.is_(None),
-                Document.created_at >= since,
-                Document.created_at < until,
+                uploaded_at >= since,
+                uploaded_at < until,
             )
             if self.category_id is not None:
                 stmt = stmt.where(Document.category_id == self.category_id)
             if last is not None:
-                stmt = stmt.where(tuple_(Document.created_at, Document.id) < last)
+                stmt = stmt.where(tuple_(uploaded_at, Document.id) < last)
             docs = (
                 await self.session.execute(
-                    stmt.order_by(Document.created_at.desc(), Document.id.desc()).limit(100)
+                    stmt.order_by(uploaded_at.desc(), Document.id.desc()).limit(100)
                 )
             ).all()
             if not docs:
                 break
             for doc in docs:
-                uploaded = doc.created_at.replace(tzinfo=UTC).isoformat()
+                uploaded = doc.uploaded_at.astimezone(UTC).isoformat()
                 excerpt = f"标题：{doc.title}\n上传入库时间：{uploaded}"
                 if doc.summary:
                     excerpt += f"\n摘要：{doc.summary[:2000]}"
@@ -99,7 +108,7 @@ class WorkspaceAgent:
                         retrieved_at=datetime.now(UTC).isoformat(),
                     )
                 )
-            last = (docs[-1].created_at, docs[-1].id)
+            last = (docs[-1].uploaded_at, docs[-1].id)
         return RetrievalResult(evidence=evidence)
 
     async def retrieve(

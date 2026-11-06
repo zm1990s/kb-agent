@@ -17,4 +17,10 @@ if [ -d /app/codex_skills_builtin ] && [ "$(ls -A /app/codex_skills_builtin 2>/d
     chown -R appuser:appuser /app/codex_config/skills 2>/dev/null || true
 fi
 
-exec gosu appuser sh -c "python migrate.py && uvicorn app.main:app --host 0.0.0.0 --port 8000"
+gosu appuser python migrate.py
+set -- uvicorn app.main:app --host 0.0.0.0 --port 8000
+# 仅开发 compose 启用；生产镜像默认不监视源码。
+if [ "${UVICORN_RELOAD:-0}" = "1" ]; then
+    set -- "$@" --reload --reload-dir /app/app
+fi
+exec gosu appuser "$@"

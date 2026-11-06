@@ -7,6 +7,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
+from sqlalchemy import text
 
 from app.agents.base import AgentDescriptor, AgentRegistry, Evidence, RetrievalResult
 from app.agents.updates import document_updates_query, format_document_updates
@@ -85,8 +86,9 @@ def _document(ws, title, created_at, **kwargs):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("stream", [False, True])
+@pytest.mark.parametrize("timezone_column", [False, True])
 async def test_auto_overview_pages_all_spaces_and_persists_sources(
-    client, seed_user, db_session, monkeypatch, stream,
+    client, seed_user, db_session, monkeypatch, stream, timezone_column,
 ):
     user_id, headers = await seed_user("user")
     group = Group(id=uuid.uuid4(), name="Chat users")
@@ -117,6 +119,16 @@ async def test_auto_overview_pages_all_spaces_and_persists_sources(
         _document(private, "Secret", recent),
     ])
     await db_session.commit()
+    if timezone_column:
+        # Match the real migration schema, not just Base.metadata.create_all().
+        await db_session.execute(text(
+            "ALTER TABLE documents ALTER COLUMN created_at TYPE timestamptz "
+            "USING created_at AT TIME ZONE 'UTC'"
+        ))
+        await db_session.commit()
+    # Exercise a non-UTC database locale too; upload dates still represent UTC instants.
+    await db_session.execute(text("SET TIME ZONE 'Asia/Shanghai'"))
+    await db_session.commit()
     factory = AsyncMock(side_effect=AssertionError("overview must not require an AI engine"))
     monkeypatch.setattr(answer_service, "get_chat_engine", factory)
     response = await client.post(
@@ -144,7 +156,7 @@ async def test_auto_overview_pages_all_spaces_and_persists_sources(
     for source in body["sources"]:
         assert f'[{source["citation_id"]}]' in body["answer"]
         assert source["content_kind"] == "document_metadata"
-        assert source["uploaded_at"]
+        assert datetime.fromisoformat(source["uploaded_at"]) == recent.replace(tzinfo=UTC)
         assert "BODY MUST NOT" not in source["excerpt"]
     for excluded in ["Stale", "Processing", "Deleted", "Secret"]:
         assert excluded not in body["answer"]
