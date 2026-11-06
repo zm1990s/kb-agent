@@ -147,7 +147,7 @@ export default function ChatPage() {
       setWorkspaceId(s.workspaceId);
       if (Array.isArray(s.retrievalSources)) {
         setRetrievalSources(s.retrievalSources.filter((id) =>
-          ["workspace", "paloalto_kb", "paloalto_live"].includes(id)));
+          ["workspace", "paloalto_kb", "paloalto_live", "paloalto_docs"].includes(id)));
       }
       setConversationId(s.conversationId);
       setTurns(s.turns);
@@ -725,7 +725,7 @@ export default function ChatPage() {
           <div className="border-t border-gray-200 bg-white px-4 py-3">
             <fieldset disabled={busy} aria-label={t("retrieval_sources")} className="mb-3 flex flex-wrap items-center gap-2 text-xs disabled:opacity-60">
               <span className="text-gray-500">{t("retrieval_sources")}</span>
-              {(["workspace", "paloalto_kb", "paloalto_live"] as RetrievalSource[]).map((id) => {
+              {(["workspace", "paloalto_kb", "paloalto_live", "paloalto_docs"] as RetrievalSource[]).map((id) => {
                 const available = id === "workspace" || availableAgents.some((a) => a.id === id);
                 const selected = retrievalSources.includes(id);
                 return (

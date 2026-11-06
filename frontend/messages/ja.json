@@ -158,7 +158,8 @@
     "source_paloalto_live": "LIVEcommunity",
     "knowledge_only": "ソース未選択のため、既存の知識で回答します。",
     "external_search_hint": "外部検索は質問のキーワードを Palo Alto の公開検索サービスに送信します。",
-    "agents_load_failed": "外部検索機能を読み込めません。再読み込みしてください。"
+    "agents_load_failed": "外部検索機能を読み込めません。再読み込みしてください。",
+    "source_paloalto_docs": "Palo Alto Docs"
   },
   "messageBubble": {
     "me": "自分",
@@ -199,7 +200,8 @@
     "source_paloalto_live": "コミュニティ情報",
     "source_paloalto_kb": "公式 KB",
     "candidate_count": "検索候補 {count} 件",
-    "more_search_results": "他にも検索結果があります"
+    "more_search_results": "他にも検索結果があります",
+    "source_paloalto_docs": "公式ドキュメント"
   },
   "documents": {
     "workspace_label": "ワークスペース：",

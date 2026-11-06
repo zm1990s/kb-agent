@@ -158,7 +158,8 @@
     "source_paloalto_live": "LIVEcommunity",
     "knowledge_only": "No sources selected. Answers will use existing knowledge.",
     "external_search_hint": "External search sends question keywords to Palo Alto’s public search service.",
-    "agents_load_failed": "Unable to load external search capabilities. Refresh to retry."
+    "agents_load_failed": "Unable to load external search capabilities. Refresh to retry.",
+    "source_paloalto_docs": "Palo Alto Docs"
   },
   "messageBubble": {
     "me": "Me",
@@ -199,7 +200,8 @@
     "source_paloalto_live": "Community content",
     "source_paloalto_kb": "Official KB",
     "candidate_count": "{count} search candidates returned",
-    "more_search_results": "More search results available"
+    "more_search_results": "More search results available",
+    "source_paloalto_docs": "Official documentation"
   },
   "documents": {
     "workspace_label": "Workspace:",

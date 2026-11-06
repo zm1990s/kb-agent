@@ -158,7 +158,8 @@
     "source_paloalto_live": "LIVEcommunity",
     "knowledge_only": "未選擇檢索來源，將基於既有知識回答。",
     "external_search_hint": "外部檢索會將問題關鍵字傳送至 Palo Alto 公開搜尋服務。",
-    "agents_load_failed": "外部檢索功能載入失敗，請重新整理。"
+    "agents_load_failed": "外部檢索功能載入失敗，請重新整理。",
+    "source_paloalto_docs": "Palo Alto Docs"
   },
   "messageBubble": {
     "me": "我",
@@ -199,7 +200,8 @@
     "source_paloalto_live": "社群內容",
     "source_paloalto_kb": "官方 KB",
     "candidate_count": "傳回 {count} 個搜尋候選",
-    "more_search_results": "還有更多搜尋結果"
+    "more_search_results": "還有更多搜尋結果",
+    "source_paloalto_docs": "官方文件"
   },
   "documents": {
     "workspace_label": "空間：",

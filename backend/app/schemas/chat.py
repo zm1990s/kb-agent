@@ -6,7 +6,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-RetrievalSource = Literal["workspace", "paloalto_kb", "paloalto_live"]
+RetrievalSource = Literal["workspace", "paloalto_kb", "paloalto_live", "paloalto_docs"]
 
 
 class ChatRequest(BaseModel):
@@ -14,7 +14,7 @@ class ChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=4000)
     conversation_id: uuid.UUID | None = None
     retrieval_sources: list[RetrievalSource] = Field(
-        default_factory=lambda: ["workspace"], max_length=3,
+        default_factory=lambda: ["workspace"], max_length=4,
     )
     # Legacy IDs are validated for access but no longer filter retrieval scope.
     agent_ids: list[str] | None = Field(default=None, max_length=100)

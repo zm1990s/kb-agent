@@ -49,6 +49,7 @@ export default function MessageBubble({ role, content, sources, agentRuns, error
   function sourceLabel(source: SourceRef) {
     if (source.source_type === "paloalto_kb") return `Palo Alto KB · ${t("source_paloalto_kb")}`;
     if (source.source_type === "paloalto_live") return `LIVEcommunity · ${t("source_paloalto_live")}`;
+    if (source.source_type === "paloalto_docs") return `Palo Alto Docs · ${t("source_paloalto_docs")}`;
     return source.workspace_name ?? source.source_type ?? "";
   }
 

@@ -158,7 +158,8 @@
     "source_paloalto_live": "LIVEcommunity",
     "knowledge_only": "未选择检索来源，将基于已有知识回答。",
     "external_search_hint": "外部检索会将问题关键词发送至 Palo Alto 公开搜索服务。",
-    "agents_load_failed": "外部检索能力加载失败，请刷新重试。"
+    "agents_load_failed": "外部检索能力加载失败，请刷新重试。",
+    "source_paloalto_docs": "Palo Alto Docs"
   },
   "messageBubble": {
     "me": "我",
@@ -199,7 +200,8 @@
     "source_paloalto_live": "社区内容",
     "source_paloalto_kb": "官方 KB",
     "candidate_count": "返回 {count} 个搜索候选",
-    "more_search_results": "还有更多搜索结果"
+    "more_search_results": "还有更多搜索结果",
+    "source_paloalto_docs": "官方文档"
   },
   "documents": {
     "workspace_label": "空间：",

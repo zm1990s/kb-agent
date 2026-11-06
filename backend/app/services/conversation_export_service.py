@@ -71,7 +71,8 @@ def _source_description(source) -> str:
         label = f"{data['workspace_name']} · {label}"
     elif data.get("source_type"):
         origin = {"paloalto_kb": "Palo Alto KB (official)",
-                  "paloalto_live": "LIVEcommunity (community)"}.get(
+                  "paloalto_live": "LIVEcommunity (community)",
+                  "paloalto_docs": "Palo Alto Docs (official documentation)"}.get(
                       data["source_type"], data["source_type"],
                   )
         label = f"{origin} · {label}"

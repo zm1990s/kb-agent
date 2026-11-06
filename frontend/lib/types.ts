@@ -99,7 +99,7 @@ export interface SourceRef {
   document_count?: number;
 }
 
-export type RetrievalSource = "workspace" | "paloalto_kb" | "paloalto_live";
+export type RetrievalSource = "workspace" | "paloalto_kb" | "paloalto_live" | "paloalto_docs";
 
 export interface RetrievalAgent {
   id: string;

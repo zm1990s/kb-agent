@@ -1,4 +1,4 @@
-"""Opt-in agents for Palo Alto's public KB and LIVEcommunity search indexes.
+"""Opt-in agents for Palo Alto's public KB, LIVEcommunity and Docs indexes.
 
 Use the public guest search token published by the KB landing page. It is kept
 only in this request, never stored, logged, or sent to the LLM/browser. Searches
@@ -28,6 +28,8 @@ SOURCES = {
                    "Salesforce - Knowledge - Public", "Official public knowledge base"),
     "paloalto_live": ("LIVEcommunity", "live.paloaltonetworks.com",
                      "LIVEcommunity Public", "Public community discussions and articles"),
+    "paloalto_docs": ("Palo Alto Docs", "docs.paloaltonetworks.com",
+                     "PAN techDOCS", "Official product documentation and configuration guides"),
 }
 
 
@@ -35,7 +37,7 @@ def external_agents(source_ids: list[str]) -> list["PaloAltoAgent"]:
     if not get_settings().paloalto_search_enabled:
         return []
     # Shared request preparation: one keyword rewrite and one public token fetch
-    # even when both agents run concurrently. No workspace content is sent out.
+    # even when multiple agents run concurrently. No workspace content is sent out.
     search = PublicSearch()
     return [PaloAltoAgent(key, search) for key in SOURCES if key in source_ids]
 
@@ -58,6 +60,20 @@ def plain_text(html: str) -> str:
     for node in soup(["script", "style", "noscript", "nav", "footer", "head"]):
         node.decompose()
     return soup.get_text("\n", strip=True)
+
+
+def indexed_text(html: str, source_id: str) -> str:
+    if source_id == "paloalto_docs":
+        soup = BeautifulSoup(html, "html.parser")
+        # Product pages repeat other-version links in their navigation. Use the
+        # document body so those links cannot masquerade as configuration evidence.
+        article = (soup.select_one(".book-pdf-content") or soup.select_one("main .topic")
+                   or soup.select_one("article") or soup.select_one("main"))
+        if article is not None:
+            for node in article.select("aside, .toc, .toc-contents, .aside-right-content"):
+                node.decompose()
+            return plain_text(str(article))
+    return plain_text(html)
 
 
 def field_text(value: object) -> str | None:
@@ -182,13 +198,15 @@ class PaloAltoAgent:
                         except (httpx.HTTPError, ValueError):
                             pass
                     # KB search HTML often contains only its summary. Community
-                    # indexed HTML contains the message body and avoids scraping
+                    # and Docs indexed HTML contain the body and avoid scraping
                     # a site that can require a browser challenge.
                     elif row.get("hasHtmlVersion") and isinstance(row.get("uniqueId"), str):
                         try:
                             html = await request_bytes(client, "GET", SEARCH_ENDPOINT + "/html",
                                 headers=headers, params={"uniqueId": row["uniqueId"]})
-                            body = plain_text(html.decode("utf-8", errors="replace"))
+                            body = indexed_text(
+                                html.decode("utf-8", errors="replace"), self.descriptor.id,
+                            )
                             if len(body) > 80:
                                 text, locator = select_excerpt(body, question + " " + query)
                                 locator = locator.replace("content_text:", "indexed_text:")
@@ -204,7 +222,8 @@ class PaloAltoAgent:
                         locator=locator, content_kind=kind,
                         product=field_text(raw.get("panproduct")),
                         version=field_text(
-                            raw.get("panosversion") or raw.get("panreleaseinformation"),
+                            raw.get("panosversion") or (raw.get("panreleaseinformation")
+                            if self.descriptor.id != "paloalto_docs" else None),
                         ),
                         published_at=field_date(raw.get("sffirstpublisheddate")),
                         updated_at=field_date(raw.get("sflastmodifieddate") or raw.get("date")),

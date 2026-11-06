@@ -26,6 +26,7 @@ def public_search(monkeypatch):
     urls = {
         "paloalto_kb": "https://knowledgebase.paloaltonetworks.com/KCSArticleDetail?id=public-id",
         "paloalto_live": "https://live.paloaltonetworks.com/t5/general/topic/m-p/123#M1",
+        "paloalto_docs": "https://docs.paloaltonetworks.com/pan-os/11-1/admin/setup",
     }
     async def handle(request):
         requests.append(request)
@@ -33,7 +34,7 @@ def public_search(monkeypatch):
             return httpx.Response(200, text='PortalContext = {"searchToken":"public-guest"};')
         if request.url.path.endswith("/v2"):
             body = json.loads(request.content)
-            source = "paloalto_kb" if "Salesforce" in body["aq"] else "paloalto_live"
+            source = next(key for key, spec in paloalto.SOURCES.items() if spec[2] in body["aq"])
             rows = [] if responses["empty"] else [{
                 "title": "GlobalProtect certificate configuration", "clickUri": urls[source],
                 "excerpt": "Actual search excerpt", "hasHtmlVersion": True, "uniqueId": source,
@@ -63,17 +64,19 @@ def public_search(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_two_agents_share_query_and_guest_discovery_but_keep_sources_distinct(public_search):
+async def test_agents_share_query_and_guest_discovery_but_keep_sources_distinct(public_search):
     requests, _, _ = public_search
     engine = SimpleNamespace(complete=AsyncMock(return_value=EngineResult(
         text='{"query":"GlobalProtect certificates"}',
     )))
-    agents = paloalto.external_agents(["paloalto_kb", "paloalto_live"])
+    agents = paloalto.external_agents(list(paloalto.SOURCES))
     results = await asyncio.gather(*(a.retrieve("证书配置", [], engine) for a in agents))
     assert engine.complete.await_count == 1
     assert sum(str(r.url) == paloalto.KB_HOME for r in requests) == 1
-    assert [r.evidence[0].source_type for r in results] == ["paloalto_kb", "paloalto_live"]
-    assert [r.evidence[0].content_kind for r in results] == ["web_page", "indexed_web_page"]
+    assert [r.evidence[0].source_type for r in results] == list(paloalto.SOURCES)
+    assert [r.evidence[0].content_kind for r in results] == [
+        "web_page", "indexed_web_page", "indexed_web_page",
+    ]
     for result in results:
         assert result.truncated
         item = result.evidence[0]
@@ -90,7 +93,9 @@ async def test_two_agents_share_query_and_guest_discovery_but_keep_sources_disti
             assert query["q"] == "GlobalProtect certificates"
 
 
-@pytest.mark.parametrize("kind,status", [("paloalto_kb", 302), ("paloalto_live", 403)])
+@pytest.mark.parametrize("kind,status", [
+    ("paloalto_kb", 302), ("paloalto_live", 403), ("paloalto_docs", 403),
+])
 @pytest.mark.asyncio
 async def test_unavailable_body_falls_back_to_labeled_excerpt(public_search, kind, status):
     requests, responses, _ = public_search
@@ -153,7 +158,7 @@ async def test_opt_in_preserves_all_authorized_workspaces_and_disabled_sources_f
     ]))
     user = SimpleNamespace(id=uuid.uuid4())
     assert await chat._resolve_chat_scope(None, user, ChatRequest(
-        message="q", retrieval_sources=["workspace", "paloalto_kb"],
+        message="q", retrieval_sources=["workspace", *paloalto.SOURCES],
     )) == ids
     assert await chat._resolve_chat_scope(None, user, ChatRequest(
         message="q", retrieval_sources=["paloalto_kb"],
@@ -180,9 +185,10 @@ async def test_registry_does_not_enable_external_sources_by_default():
 
 
 @pytest.mark.parametrize("path", ["/chat", "/chat/stream"])
+@pytest.mark.parametrize("source_id", ["paloalto_kb", "paloalto_docs"])
 @pytest.mark.asyncio
 async def test_request_selection_reaches_sync_and_detached_generation_and_history(
-    client, seed_user, monkeypatch, path,
+    client, seed_user, monkeypatch, path, source_id,
 ):
     _, headers = await seed_user("admin")
     calls = []
@@ -191,15 +197,15 @@ async def test_request_selection_reaches_sync_and_detached_generation_and_histor
         return RetrievalResult(evidence=[Evidence(
             id="external:1", agent_id=self.descriptor.id, source_type=self.descriptor.source_type,
             title="Public article", excerpt="Verified excerpt", content_kind="external_excerpt",
-            url="https://knowledgebase.paloaltonetworks.com/KCSArticleDetail?id=example",
+            url=f"https://{paloalto.SOURCES[self.descriptor.id][1]}/example",
         )])
     monkeypatch.setattr(paloalto.PaloAltoAgent, "retrieve", retrieve)
     monkeypatch.setattr(answer_service, "get_chat_engine", AsyncMock(return_value=FakeEngine()))
     mock_prompts(monkeypatch)
     agents = (await client.get("/chat/agents", headers=headers)).json()
-    assert {a["id"] for a in agents} == {"paloalto_kb", "paloalto_live"}
+    assert {a["id"] for a in agents} == set(paloalto.SOURCES)
     response = await client.post(path, headers=headers, json={
-        "message": "GlobalProtect certificates", "retrieval_sources": ["paloalto_kb"],
+        "message": "GlobalProtect certificates", "retrieval_sources": [source_id],
     })
     assert response.status_code == 200
     if path.endswith("stream"):
@@ -209,12 +215,12 @@ async def test_request_selection_reaches_sync_and_detached_generation_and_histor
         )
     else:
         result = response.json()
-    assert calls == ["paloalto_kb"]
-    assert result["sources"][0]["source_type"] == "paloalto_kb"
+    assert calls == [source_id]
+    assert result["sources"][0]["source_type"] == source_id
     history = (await client.get(
         f'/conversations/{result["conversation_id"]}', headers=headers,
     )).json()
-    assert history["messages"][0]["retrieval"]["retrieval_sources"] == ["paloalto_kb"]
+    assert history["messages"][0]["retrieval"]["retrieval_sources"] == [source_id]
     assert history["messages"][-1]["sources"] == result["sources"]
 
 
@@ -275,3 +281,31 @@ async def test_mixed_sources_keep_local_upload_query_in_sql(monkeypatch):
     sql_query.assert_awaited_once()
     external.retrieve.assert_awaited_once()
     assert [s["id"] for s in result.sources] == ["upload", "external"]
+
+
+def test_docs_content_excludes_other_version_navigation():
+    html = ('<nav>PAN-OS 12.2</nav><main><div class="toc">PAN-OS 10.2</div>'
+            '<div class="book-pdf-content"><h1>Configure GlobalProtect</h1>'
+            '<p>PAN-OS 11.1 certificate instructions</p></div></main>')
+    body = paloalto.indexed_text(html, "paloalto_docs")
+    assert "11.1 certificate instructions" in body
+    assert "12.2" not in body and "10.2" not in body
+
+
+def test_docs_origin_in_export():
+    from app.services.conversation_export_service import _source_description
+    text = _source_description({
+        "title": "Configure GlobalProtect", "source_type": "paloalto_docs",
+        "citation_id": "S3", "version": "11.1",
+        "url": "https://docs.paloaltonetworks.com/pan-os/11-1/admin/setup",
+    })
+    assert "Palo Alto Docs (official documentation)" in text
+    assert "[S3]" in text and "11.1" in text and "https://docs.paloaltonetworks.com" in text
+
+
+@pytest.mark.asyncio
+async def test_docs_rejects_a_result_from_another_paloalto_site(public_search):
+    _, _, urls = public_search
+    urls["paloalto_docs"] = urls["paloalto_kb"]
+    result = await paloalto.PaloAltoAgent("paloalto_docs").retrieve("q", [], FakeEngine())
+    assert result.evidence == []

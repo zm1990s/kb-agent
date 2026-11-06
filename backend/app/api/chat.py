@@ -12,7 +12,7 @@ from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.agents.paloalto import external_agents
+from app.agents.paloalto import SOURCES, external_agents
 from app.core.db import SessionLocal, get_session
 from app.core.deps import get_current_user
 from app.models.auth import User
@@ -139,7 +139,7 @@ async def chat_agents(
     """Only advertise capabilities the current user is allowed to use."""
     await _require_module(session, current_user, "chat")
     return [
-        *[asdict(agent.descriptor) for agent in external_agents(["paloalto_kb", "paloalto_live"])],
+        *[asdict(agent.descriptor) for agent in external_agents(list(SOURCES))],
         *[{"id": f"workspace:{ws.id}", "name": ws.name,
          "description": ws.description or "", "source_type": "workspace",
          "workspace_id": str(ws.id)}
