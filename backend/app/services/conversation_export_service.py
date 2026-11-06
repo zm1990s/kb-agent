@@ -63,6 +63,26 @@ def build_export(
     return data, DOCX_MIME, f"{base}_{date_str}.docx"
 
 
+def _source_description(source) -> str:
+    """Keep citation identity and origin in all export formats, including old messages."""
+    data = source if isinstance(source, dict) else source.model_dump()
+    label = data.get("title", "")
+    if data.get("workspace_name"):
+        label = f"{data['workspace_name']} · {label}"
+    elif data.get("source_type"):
+        label = f"{data['source_type']} · {label}"
+    if data.get("citation_id"):
+        label = f"[{data['citation_id']}] {label}"
+    if data.get("version"):
+        label += f" ({data['version']})"
+    url = data.get("url") or ""
+    if url.startswith(("https://", "http://")):
+        label += f" — {url}"
+    elif data.get("doc_id"):
+        label += f" (document:{data['doc_id']})"
+    return label
+
+
 # ── Markdown ────────────────────────────────────────────────────────────────
 
 def _build_markdown(title: str, messages: list[MessagePublic], date_str: str) -> bytes:
@@ -75,7 +95,7 @@ def _build_markdown(title: str, messages: list[MessagePublic], date_str: str) ->
             sources: list = getattr(msg, "sources", []) or []
             if sources:
                 titles = " · ".join(
-                    s.get("title", "") if isinstance(s, dict) else getattr(s, "title", "")
+                    _source_description(s)
                     for s in sources
                 )
                 if titles:
@@ -310,7 +330,7 @@ def _build_docx(title: str, messages: list[MessagePublic], date_str: str) -> byt
         sources: list = getattr(msg, "sources", []) or []
         if sources and msg.role == "assistant":
             titles = " · ".join(
-                s.get("title", "") if isinstance(s, dict) else getattr(s, "title", "")
+                _source_description(s)
                 for s in sources
             )
             if titles:
@@ -612,7 +632,7 @@ def _build_pdf(title: str, messages: list[MessagePublic], date_str: str) -> byte
         sources: list = getattr(msg, "sources", []) or []
         if sources and msg.role == "assistant":
             src_titles = " · ".join(
-                s.get("title", "") if isinstance(s, dict) else getattr(s, "title", "")
+                _source_description(s)
                 for s in sources
             )
             if src_titles:

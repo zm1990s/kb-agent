@@ -29,7 +29,6 @@ from app.schemas.chat import (
 )
 from app.schemas.document import DocumentUploadAccepted
 from app.services.answer_service import (
-    AnswerResult,
     answer_question,
 )
 from app.services.chat_generation import (
@@ -58,7 +57,7 @@ from app.services.chat_service import (
 )
 from app.services.settings_service import get_max_upload_mb
 from app.services.usage_service import record_event
-from app.services.workspace_service import is_member, locate_workspace_by_query
+from app.services.workspace_service import is_member, list_my_workspaces
 
 logger = logging.getLogger(__name__)
 
@@ -130,6 +129,38 @@ def _module_for_source(source: str) -> str:
     return "chatplus" if source == "chatplus" else "chat"
 
 
+@router.get("/chat/agents")
+async def chat_agents(
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Only advertise capabilities the current user is allowed to use."""
+    await _require_module(session, current_user, "chat")
+    return [
+        {"id": f"workspace:{ws.id}", "name": ws.name,
+         "description": ws.description or "", "source_type": "workspace",
+         "workspace_id": str(ws.id)}
+        for ws, _ in await list_my_workspaces(session, user=current_user)
+    ]
+
+
+async def _resolve_chat_scope(
+    session: AsyncSession, user: User, body: ChatRequest,
+) -> uuid.UUID | list[uuid.UUID]:
+    # Authorization only: no document search before routing.
+    workspaces = await list_my_workspaces(session, user=user)
+    allowed = {f"workspace:{ws.id}": ws.id for ws, _ in workspaces}
+    if body.agent_ids is not None:
+        if any(agent_id not in allowed for agent_id in body.agent_ids):
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "检索能力不可用或未授权")
+        allowed = {key: value for key, value in allowed.items() if key in body.agent_ids}
+    if body.workspace_id is not None:
+        if body.workspace_id not in allowed.values():
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "无权访问该空间或空间能力未启用")
+        return body.workspace_id
+    return list(allowed.values())
+
+
 @router.post("/chat", response_model=ChatResponse)
 async def chat(
     body: ChatRequest,
@@ -139,22 +170,9 @@ async def chat(
 ) -> ChatResponse:
     # 聊天功能准入（chat 模块权限）+ 空间成员资格（越权校验 SECURITY #4）
     await _require_module(session, current_user, "chat")
-    # workspace_id=None 时自动定位；有明确空间时校验成员资格
-    if body.workspace_id is None:
-        target_ws: uuid.UUID | list[uuid.UUID] = await locate_workspace_by_query(
-            session, user=current_user, query=body.message
-        )
-    else:
-        if not await is_member(session, workspace_id=body.workspace_id, user_id=current_user.id):
-            raise HTTPException(status.HTTP_403_FORBIDDEN, "无权访问该空间")
-        target_ws = body.workspace_id
-
-    # 会话绑定单个空间（取第一个或指定值）。
-    # 自动定位无可访问空间时返回 []，须安全取值避免 [][0] IndexError（否则 500 且不记日志）。
-    if isinstance(target_ws, list):
-        conv_ws = target_ws[0] if target_ws else None
-    else:
-        conv_ws = target_ws
+    target_ws = await _resolve_chat_scope(session, current_user, body)
+    # Automatic conversations are not owned by an arbitrarily chosen workspace.
+    conv_ws = body.workspace_id
     conv = await get_or_create_conversation(
         session,
         conversation_id=body.conversation_id,
@@ -168,16 +186,14 @@ async def chat(
         session, conversation_id=conv.id, role="user", content=body.message
     )
 
-    if not target_ws:
-        result = AnswerResult(answer="", sources=[], error_key="no_docs")
-    else:
-        result = await answer_question(
-            session,
-            workspace_id=target_ws,
-            question=body.message,
-            history=history,
-            user_email=current_user.email,
-        )
+    result = await answer_question(
+        session,
+        workspace_id=target_ws,
+        question=body.message,
+        history=history,
+        user_email=current_user.email,
+        user_id=current_user.id,
+    )
 
     await add_message(
         session,
@@ -185,6 +201,7 @@ async def chat(
         role="assistant",
         content=result.answer,
         sources=result.sources,
+        retrieval={"error_key": result.error_key, "agent_runs": result.agent_runs},
     )
 
     logger.info(
@@ -196,7 +213,7 @@ async def chat(
         len(result.answer),
     )
 
-    # 自动定位可能命中多个空间，workspace_id 列只记首个；meta 保留完整归因
+    # 候选空间与实际运行的 Agent 分开记录。
     ws_all = [str(w) for w in target_ws] if isinstance(target_ws, list) else [str(target_ws)]
 
     async def _log_chat() -> None:
@@ -210,7 +227,10 @@ async def chat(
                     "conversation_id": str(conv.id),
                     "question": body.message,
                     "answer": result.answer,
-                    "workspaces": ws_all,
+                    "candidate_workspaces": ws_all,
+                    "agent_runs": result.agent_runs,
+                    "workspaces": [r["workspace_id"] for r in result.agent_runs
+                                   if r.get("workspace_id")],
                 },
             )
 
@@ -219,6 +239,8 @@ async def chat(
         answer=result.answer,
         sources=[SourceRef(**s) for s in result.sources],
         conversation_id=conv.id,
+        error_key=result.error_key,
+        agent_runs=result.agent_runs,
     )
 
 
@@ -233,21 +255,8 @@ async def chat_stream(
     对齐聊天+：切走菜单不再掐断生成，返回时可经 GET /chat/stream/{id} 重连续看。
     """
     await _require_module(session, current_user, "chat")
-    if body.workspace_id is None:
-        target_ws: uuid.UUID | list[uuid.UUID] = await locate_workspace_by_query(
-            session, user=current_user, query=body.message
-        )
-    else:
-        if not await is_member(session, workspace_id=body.workspace_id, user_id=current_user.id):
-            raise HTTPException(status.HTTP_403_FORBIDDEN, "无权访问该空间")
-        target_ws = body.workspace_id
-
-    # 自动定位无可访问空间时返回 []，须安全取值避免 [][0] IndexError（否则 500 且不记日志）。
-    if isinstance(target_ws, list):
-        conv_ws = target_ws[0] if target_ws else None
-    else:
-        conv_ws = target_ws
-    # 自动定位可能命中多个空间，workspace_id 列只记首个；meta 保留完整归因
+    target_ws = await _resolve_chat_scope(session, current_user, body)
+    conv_ws = body.workspace_id
     ws_all = [str(w) for w in target_ws] if isinstance(target_ws, list) else [str(target_ws)]
     is_new_conv = body.conversation_id is None
     conv = await get_or_create_conversation(

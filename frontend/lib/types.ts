@@ -76,9 +76,41 @@ export interface ProcessingTask {
 }
 
 export interface SourceRef {
-  doc_id: string;
+  doc_id?: string | null;
   title: string;
   download_url: string;
+  id?: string;
+  citation_id?: string;
+  source_type?: string;
+  agent_id?: string;
+  workspace_id?: string;
+  workspace_name?: string;
+  url?: string;
+  excerpt?: string;
+  locator?: string;
+  content_kind?: string;
+  product?: string;
+  version?: string;
+  published_at?: string;
+  updated_at?: string;
+  retrieved_at?: string;
+}
+
+export interface RetrievalAgent {
+  id: string;
+  name: string;
+  description: string;
+  source_type: string;
+  workspace_id?: string;
+}
+
+export interface AgentRun {
+  agent_id: string;
+  name: string;
+  workspace_id?: string;
+  status: string;
+  truncated?: boolean;
+  evidence_count?: number;
 }
 
 export interface ChatResponse {
@@ -100,6 +132,7 @@ export interface Message {
   role: "user" | "assistant";
   content: string;
   sources: SourceRef[];
+  retrieval?: { error_key?: string; agent_runs?: AgentRun[] };
   attachments?: { storage_key: string; filename: string; size?: number }[];
   output_files?: { filename: string; storage_key?: string; conversation_id?: string }[];
   created_at: string;

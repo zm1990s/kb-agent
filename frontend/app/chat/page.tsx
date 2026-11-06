@@ -9,6 +9,7 @@ import MessageBubble from "@/components/MessageBubble";
 import NavBar from "@/components/NavBar";
 import ThinkingBubble from "@/components/ThinkingBubble";
 import WorkspacePicker from "@/components/WorkspacePicker";
+import AgentPicker from "@/components/AgentPicker";
 import { api, ApiError } from "@/lib/api";
 import { getToken } from "@/lib/auth";
 import { useAuthGuard } from "@/lib/useAuthGuard";
@@ -16,6 +17,7 @@ import type {
   ConversationHistory,
   ConversationSummary,
   SourceRef,
+  AgentRun,
 } from "@/lib/types";
 
 interface Turn {
@@ -24,6 +26,7 @@ interface Turn {
   sources?: SourceRef[];
   error_key?: string;
   thinking?: string;
+  agent_runs?: AgentRun[];
 }
 
 interface DonePayload {
@@ -31,6 +34,7 @@ interface DonePayload {
   sources: SourceRef[];
   conversation_id: string;
   error_key?: string;
+  agent_runs?: AgentRun[];
 }
 
 interface StreamMetaPayload {
@@ -73,6 +77,7 @@ export default function ChatPage() {
   const t = useTranslations("chat");
   const ready = useAuthGuard("chat");
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
+  const [agentIds, setAgentIds] = useState<string[] | null>(null);
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [turns, setTurns] = useState<Turn[]>([]);
@@ -97,7 +102,9 @@ export default function ChatPage() {
   // 用 ref 累积 thinking，绕过闭包捕获旧 state 的问题
   const thinkingAccRef = useRef("");
   // 标记正在从 sessionStorage 恢复，避免 workspace 变更 effect 重置 turns
-  const restoringRef = useRef(false);
+  const restoredOnceRef = useRef(false);
+  const previousWorkspaceRef = useRef<string | null>(null);
+  const [storageRestored, setStorageRestored] = useState(false);
   // 保证「挂载后自动重连」只触发一次（同标签页返回场景）
   const mountReconnectDoneRef = useRef(false);
   // 重连模式：收到重连流首个 thinking/token 时先清空一次再累积（幂等重建）
@@ -107,23 +114,29 @@ export default function ChatPage() {
   // 首次 /chat/active 轮询是否已返回——interrupted 兜底须等它，避免误判
   const firstPollDoneRef = useRef(false);
 
-  // 从 sessionStorage 恢复（仅挂载时）
+  // Restore once before writing: React Strict Mode replays mount effects.
   useEffect(() => {
+    if (restoredOnceRef.current) return;
+    restoredOnceRef.current = true;
     try {
       const raw = sessionStorage.getItem(SESSION_KEY);
       if (!raw) return;
       const s = JSON.parse(raw) as {
-        workspaceId: string;
+        workspaceId: string | null;
+        agentIds?: string[] | null;
         conversationId: string | null;
         turns: Turn[];
       };
-      restoringRef.current = true;
+      previousWorkspaceRef.current = s.workspaceId;
       setWorkspaceId(s.workspaceId);
+      setAgentIds(s.agentIds ?? null);
       setConversationId(s.conversationId);
       setTurns(s.turns);
       // 注：不在此立即设 interrupted——先等 /chat/active 轮询确认该会话是否仍在后台生成，
       // 若在生成则自动重连续看；仅当确认无任务且最后一条是 user 时才提示重发。
-    } catch {}
+    } catch {} finally {
+      setStorageRestored(true);
+    }
   }, []);
 
   // unmount 时 abort（现在语义是"退订"，后台生成任务继续跑）
@@ -213,23 +226,22 @@ export default function ChatPage() {
   }, [workspaceId]);
 
   useEffect(() => {
-    // 恢复时只加载会话列表，不重置当前对话状态
-    if (restoringRef.current) {
-      restoringRef.current = false;
-      loadConversations();
-      return;
+    if (!storageRestored) return;
+    if (previousWorkspaceRef.current !== workspaceId) {
+      setConversationId(null);
+      setTurns([]);
+      previousWorkspaceRef.current = workspaceId;
     }
-    setConversationId(null);
-    setTurns([]);
     loadConversations();
-  }, [workspaceId, loadConversations]);
+  }, [workspaceId, loadConversations, storageRestored]);
 
   // 持久化到 sessionStorage（workspaceId=null 表示"自动"，也需持久化）
   useEffect(() => {
+    if (!storageRestored) return;
     try {
-      sessionStorage.setItem(SESSION_KEY, JSON.stringify({ workspaceId, conversationId, turns }));
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify({ workspaceId, agentIds, conversationId, turns }));
     } catch {}
-  }, [workspaceId, conversationId, turns]);
+  }, [workspaceId, agentIds, conversationId, turns, storageRestored]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
@@ -261,6 +273,8 @@ export default function ChatPage() {
           role: m.role,
           content: m.content,
           sources: m.sources,
+          error_key: m.retrieval?.error_key ?? undefined,
+          agent_runs: m.retrieval?.agent_runs,
         }))
       );
     } catch (err) {
@@ -362,7 +376,7 @@ export default function ChatPage() {
           if (last?.role === "assistant" && last.content === d.answer) return prev;
           return [
             ...prev,
-            { role: "assistant", content: d.answer, sources: d.sources, error_key: d.error_key, thinking: savedThinking },
+            { role: "assistant", content: d.answer, sources: d.sources, error_key: d.error_key, thinking: savedThinking, agent_runs: d.agent_runs },
           ];
         });
         setBusy(false);
@@ -462,6 +476,7 @@ export default function ChatPage() {
         "/chat/stream",
         {
           workspace_id: workspaceId,
+          agent_ids: workspaceId ? undefined : agentIds,
           message,
           conversation_id: conversationId,
         },
@@ -517,6 +532,7 @@ export default function ChatPage() {
   }
 
   async function download(source: SourceRef) {
+    if (!source.doc_id) return;
     try {
       const token = getToken();
       const res = await fetch(`/api/documents/${source.doc_id}/download`, {
@@ -543,6 +559,7 @@ export default function ChatPage() {
       <div className="flex items-center gap-3 border-b border-gray-200 bg-white px-4 py-2 shadow-sm">
         <span className="text-sm text-gray-500">{t("workspace_label")}</span>
         <WorkspacePicker value={workspaceId} onChange={setWorkspaceId} />
+        <AgentPicker value={agentIds} onChange={setAgentIds} disabled={!!workspaceId || busy} />
         {conversationId && (
           <button
             onClick={() => setExportOpen(true)}
@@ -629,6 +646,7 @@ export default function ChatPage() {
                   role={turn.role}
                   content={turn.content}
                   sources={turn.sources}
+                  agentRuns={turn.agent_runs}
                   errorKey={turn.error_key}
                   onDownload={download}
                   onEdit={turn.role === "user" && !busy ? (newContent) => handleEdit(i, newContent) : undefined}

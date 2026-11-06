@@ -57,6 +57,7 @@ class Message(Base):
     role: Mapped[str] = mapped_column(String, nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     sources: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    retrieval: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     created_at: Mapped[datetime] = mapped_column(
         server_default=func.now(), nullable=False
     )

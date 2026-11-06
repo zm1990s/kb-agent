@@ -3,24 +3,27 @@
 import { useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import Markdown from "@/components/Markdown";
-import type { SourceRef } from "@/lib/types";
+import type { AgentRun, SourceRef } from "@/lib/types";
 
 interface Props {
   role: "user" | "assistant";
   content: string;
   sources?: SourceRef[];
+  agentRuns?: AgentRun[];
   errorKey?: string;
   onDownload?: (s: SourceRef) => void;
   onEdit?: (newContent: string) => void;
   onResend?: () => void;
 }
 
-export default function MessageBubble({ role, content, sources, errorKey, onDownload, onEdit, onResend }: Props) {
+export default function MessageBubble({ role, content, sources, agentRuns, errorKey, onDownload, onEdit, onResend }: Props) {
   const t = useTranslations("messageBubble");
   const isUser = role === "user";
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(content);
   const [copied, setCopied] = useState(false);
+  const [selectedSource, setSelectedSource] = useState<string | null>(null);
+  const selected = sources?.find((s) => s.citation_id === selectedSource);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   function copyContent() {
@@ -113,7 +116,9 @@ export default function MessageBubble({ role, content, sources, errorKey, onDown
                 ? content
                 : errorKey
                   ? <span className="text-red-500">{t(errorKey as Parameters<typeof t>[0])}</span>
-                  : <Markdown content={content} />
+                  : <Markdown content={content}
+                      citationIds={sources?.flatMap((s) => s.citation_id ? [s.citation_id] : [])}
+                      onCitationClick={setSelectedSource} />
               }
             </div>
             {/* 右下角操作按钮 */}
@@ -169,17 +174,50 @@ export default function MessageBubble({ role, content, sources, errorKey, onDown
           <div className="flex flex-wrap gap-1.5">
             {sources.map((s) => (
               <button
-                key={s.doc_id}
-                onClick={() => onDownload?.(s)}
+                key={s.id ?? s.doc_id ?? s.url}
+                onClick={() => s.citation_id
+                  ? setSelectedSource(selectedSource === s.citation_id ? null : s.citation_id)
+                  : onDownload?.(s)}
                 className="flex items-center gap-1 rounded-full border border-gray-200 bg-white px-2.5 py-1 text-xs text-blue-600 hover:border-blue-300 hover:bg-blue-50 transition-colors"
-                title={t("download_original")}
+                title={s.citation_id ? t("view_evidence") : t("download_original")}
               >
                 <svg className="h-3 w-3" viewBox="0 0 16 16" fill="currentColor">
                   <path d="M9 2H4a1 1 0 00-1 1v10a1 1 0 001 1h8a1 1 0 001-1V6l-4-4zm1 4V3l3 3h-3z"/>
                 </svg>
-                {s.title}
+                {s.citation_id && `[${s.citation_id}] `}
+                {s.workspace_name ? `${s.workspace_name} · ` : ""}{s.title}
               </button>
             ))}
+          </div>
+        )}
+        {agentRuns && agentRuns.length > 0 && (
+          <details className="text-xs text-gray-500">
+            <summary className="cursor-pointer">{t("retrieval_scope")}</summary>
+            <ul className="mt-1 space-y-1">
+              {agentRuns.map((run) => <li key={run.agent_id}>
+                {run.name} · {run.status === "failed" ? t("agent_failed")
+                  : t("evidence_count", { count: run.evidence_count ?? 0 })}
+                {run.truncated && ` · ${t("index_truncated")}`}
+              </li>)}
+            </ul>
+          </details>
+        )}
+        {selected && (
+          <div className="w-full rounded-lg border border-blue-100 bg-blue-50 p-3 text-xs text-gray-700">
+            <div className="font-medium">[{selected.citation_id}] {selected.title}</div>
+            <div className="mt-1 text-gray-500">
+              {selected.workspace_name ?? selected.source_type}
+              {selected.version && ` · ${selected.version}`}
+              {selected.content_kind === "processed_text" && ` · ${t("processed_text")}`}
+              {selected.content_kind === "summary" && ` · ${t("summary")}`}
+            </div>
+            {selected.excerpt && <blockquote className="my-2 max-h-60 overflow-y-auto whitespace-pre-wrap border-l-2 border-blue-200 pl-3">{selected.excerpt}</blockquote>}
+            {selected.doc_id && <button type="button" onClick={() => onDownload?.(selected)}
+              className="text-blue-600 underline">{t("download_original")}</button>}
+            {selected.url && /^https?:\/\//i.test(selected.url) && (
+              <a href={selected.url} target="_blank" rel="noopener noreferrer"
+                className="text-blue-600 underline">{t("open_source")}</a>
+            )}
           </div>
         )}
       </div>

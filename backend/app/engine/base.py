@@ -57,7 +57,7 @@ class EngineProtocol(Protocol):
         """
         ...
 
-    async def complete_streaming(
+    def complete_streaming(
         self,
         prompt: str,
         *,

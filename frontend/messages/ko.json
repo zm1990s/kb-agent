@@ -140,7 +140,15 @@
     "exportModal_noPermission": "쓰기 권한 없음",
     "exportModal_saveFailed": "저장 실패, 다시 시도해 주세요",
     "exportModal_selectMessages": "메시지 선택",
-    "exportModal_loading": "로딩 중…"
+    "exportModal_loading": "로딩 중…",
+    "stage_routing_short": "선택",
+    "stage_routing": "관련 검색 에이전트 선택 중…",
+    "stage_agent_searching": "검색 중: {name}",
+    "stage_agent_failed": "{name} 검색을 완료하지 못했습니다",
+    "agent_capabilities": "검색 소스",
+    "agent_auto": "자동",
+    "agent_hint": "활성화한 소스 중 관련 에이전트만 선택합니다. 다른 작업 공간은 검색하지 않습니다.",
+    "agent_reset": "사용 가능한 모든 소스 활성화"
   },
   "messageBubble": {
     "me": "나",
@@ -152,7 +160,20 @@
     "engine_unavailable": "죄송합니다. AI 엔진을 일시적으로 사용할 수 없습니다. 잠시 후 다시 시도해 주세요.",
     "format_error": "죄송합니다. 응답 처리 중 형식 오류가 발생했습니다. 다시 질문해 주세요.",
     "no_answer": "죄송합니다. 유효한 답변을 가져올 수 없습니다. 다시 질문해 주세요.",
-    "no_docs": "이 워크스페이스에는 아직 분류된 문서가 없습니다."
+    "no_docs": "이 워크스페이스에는 아직 분류된 문서가 없습니다.",
+    "view_evidence": "근거 보기",
+    "processed_text": "처리된 본문",
+    "summary": "요약",
+    "open_source": "출처 열기",
+    "retrieval_scope": "이번 검색 범위",
+    "agent_failed": "검색 미완료",
+    "evidence_count": "근거 {count}개",
+    "index_truncated": "후보 수 한도에 도달하여 관련 문서가 누락될 수 있습니다",
+    "route_no_match": "관련 작업 공간이 없습니다. 작업 공간, 제품 또는 주제를 지정하세요.",
+    "routing_failed": "검색 대상을 선택하지 못했습니다. 다시 시도하거나 작업 공간을 지정하세요.",
+    "no_evidence": "충분한 근거를 찾지 못했습니다. 질문 또는 검색 범위를 조정하세요.",
+    "retrieval_failed": "검색을 완료하지 못했습니다. 다시 시도하세요.",
+    "citation_missing": "검증 가능한 인용이 없습니다. 질문을 조정한 후 다시 시도하세요."
   },
   "documents": {
     "workspace_label": "워크스페이스:",

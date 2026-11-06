@@ -15,7 +15,7 @@ pytestmark = pytest.mark.asyncio
 class _FakeEngine:
     """返回 Agent 式 JSON（answer + doc_numbers）。"""
 
-    def __init__(self, answer="基于文档的回答", doc_numbers=None):
+    def __init__(self, answer="基于文档的回答[S1]", doc_numbers=None):
         self._answer = answer
         self._phase1_payload = json.dumps({"doc_numbers": doc_numbers or []})
 
@@ -58,7 +58,7 @@ async def test_chat_empty_workspace_no_docs(client, seed_user):
     )
     assert resp.status_code == 200
     body = resp.json()
-    assert body["answer"] == answer_service.NO_DOCS_ANSWER
+    assert body["error_key"] == "no_evidence"
     assert body["sources"] == []
     assert "conversation_id" in body
 
@@ -78,7 +78,7 @@ async def test_chat_with_hit_returns_answer_and_sources(
     )
     assert resp.status_code == 200
     body = resp.json()
-    assert body["answer"] == "基于文档的回答"
+    assert body["answer"] == "基于文档的回答[S1]"
     assert len(body["sources"]) == 1
     assert body["sources"][0]["title"] == "防火墙"
 

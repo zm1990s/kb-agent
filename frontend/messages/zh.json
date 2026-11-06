@@ -140,7 +140,15 @@
     "exportModal_noPermission": "无写入权限",
     "exportModal_saveFailed": "保存失败，请重试",
     "exportModal_selectMessages": "选择消息",
-    "exportModal_loading": "加载中…"
+    "exportModal_loading": "加载中…",
+    "stage_routing_short": "选择空间",
+    "stage_routing": "正在选择相关检索能力…",
+    "stage_agent_searching": "正在检索：{name}",
+    "stage_agent_failed": "{name} 暂时无法完成检索",
+    "agent_capabilities": "检索能力",
+    "agent_auto": "自动",
+    "agent_hint": "只从勾选的能力中自动选择相关来源，不会搜索所有空间。",
+    "agent_reset": "恢复全部可用能力"
   },
   "messageBubble": {
     "me": "我",
@@ -152,7 +160,20 @@
     "engine_unavailable": "抱歉，AI 引擎暂时不可用，请稍后重试。",
     "format_error": "抱歉，处理回答时出现格式问题，请重新提问。",
     "no_answer": "抱歉，未能获取有效回答，请重新提问。",
-    "no_docs": "当前空间还没有已归类的文档，暂时无法回答。"
+    "no_docs": "当前空间还没有已归类的文档，暂时无法回答。",
+    "view_evidence": "查看证据",
+    "processed_text": "处理后的正文",
+    "summary": "摘要",
+    "open_source": "打开来源",
+    "retrieval_scope": "本轮检索范围",
+    "agent_failed": "检索未完成",
+    "evidence_count": "{count} 条证据",
+    "index_truncated": "候选文档超过上限，可能有遗漏",
+    "route_no_match": "未找到相关空间，请指定空间或补充产品、主题等信息。",
+    "routing_failed": "暂时无法选择检索空间，请重试或指定空间。",
+    "no_evidence": "所选空间没有找到足够的相关证据，请调整问题或检索范围。",
+    "retrieval_failed": "检索未完成，请重试。",
+    "citation_missing": "回答缺少可核验的引用，请调整问题后重试。"
   },
   "documents": {
     "workspace_label": "空间：",

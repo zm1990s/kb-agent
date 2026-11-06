@@ -140,7 +140,15 @@
     "exportModal_noPermission": "No write permission",
     "exportModal_saveFailed": "Save failed, please try again",
     "exportModal_selectMessages": "Select Messages",
-    "exportModal_loading": "Loading…"
+    "exportModal_loading": "Loading…",
+    "stage_routing_short": "Route",
+    "stage_routing": "Selecting relevant retrieval agents…",
+    "stage_agent_searching": "Searching: {name}",
+    "stage_agent_failed": "{name} could not complete retrieval",
+    "agent_capabilities": "Sources",
+    "agent_auto": "Auto",
+    "agent_hint": "Automatically choose relevant agents from the enabled sources. Other workspaces are not searched.",
+    "agent_reset": "Enable all available sources"
   },
   "messageBubble": {
     "me": "Me",
@@ -152,7 +160,20 @@
     "engine_unavailable": "Sorry, the AI engine is temporarily unavailable. Please try again later.",
     "format_error": "Sorry, there was a formatting issue with the response. Please try asking again.",
     "no_answer": "Sorry, no valid answer could be retrieved. Please try asking again.",
-    "no_docs": "There are no classified documents in this workspace yet."
+    "no_docs": "There are no classified documents in this workspace yet.",
+    "view_evidence": "View evidence",
+    "processed_text": "Processed text",
+    "summary": "Summary",
+    "open_source": "Open source",
+    "retrieval_scope": "Retrieval scope",
+    "agent_failed": "Retrieval incomplete",
+    "evidence_count": "{count} evidence items",
+    "index_truncated": "Candidate limit reached; relevant documents may be missing",
+    "route_no_match": "No relevant workspace found. Select a workspace or specify the product or topic.",
+    "routing_failed": "Could not route this question. Retry or select a workspace.",
+    "no_evidence": "No sufficient evidence found. Refine the question or selected sources.",
+    "retrieval_failed": "Retrieval could not complete. Please retry.",
+    "citation_missing": "The answer lacks verifiable citations. Refine the question and retry."
   },
   "documents": {
     "workspace_label": "Workspace:",

@@ -140,7 +140,15 @@
     "exportModal_noPermission": "書き込み権限がありません",
     "exportModal_saveFailed": "保存に失敗しました。再試行してください",
     "exportModal_selectMessages": "メッセージを選択",
-    "exportModal_loading": "読み込み中…"
+    "exportModal_loading": "読み込み中…",
+    "stage_routing_short": "選択",
+    "stage_routing": "関連する検索エージェントを選択中…",
+    "stage_agent_searching": "検索中：{name}",
+    "stage_agent_failed": "{name} の検索を完了できませんでした",
+    "agent_capabilities": "検索元",
+    "agent_auto": "自動",
+    "agent_hint": "有効な検索元から関連するエージェントを選択します。他のワークスペースは検索しません。",
+    "agent_reset": "利用可能な検索元をすべて有効にする"
   },
   "messageBubble": {
     "me": "自分",
@@ -152,7 +160,20 @@
     "engine_unavailable": "申し訳ありません。AIエンジンが一時的に利用できません。しばらくしてから再試行してください。",
     "format_error": "申し訳ありません。回答の処理中にフォーマットエラーが発生しました。再度質問してください。",
     "no_answer": "申し訳ありません。有効な回答を取得できませんでした。再度質問してください。",
-    "no_docs": "このワークスペースにはまだ分類済みのドキュメントがありません。"
+    "no_docs": "このワークスペースにはまだ分類済みのドキュメントがありません。",
+    "view_evidence": "根拠を表示",
+    "processed_text": "処理済み本文",
+    "summary": "要約",
+    "open_source": "参照元を開く",
+    "retrieval_scope": "今回の検索範囲",
+    "agent_failed": "検索未完了",
+    "evidence_count": "根拠 {count} 件",
+    "index_truncated": "候補数の上限に達しました。文書の見落としがある可能性があります",
+    "route_no_match": "関連するワークスペースが見つかりません。製品やテーマを指定してください。",
+    "routing_failed": "検索先を選択できませんでした。再試行するかワークスペースを指定してください。",
+    "no_evidence": "十分な根拠が見つかりません。質問や検索範囲を調整してください。",
+    "retrieval_failed": "検索を完了できませんでした。再試行してください。",
+    "citation_missing": "検証可能な引用がありません。質問を調整して再試行してください。"
   },
   "documents": {
     "workspace_label": "ワークスペース：",
