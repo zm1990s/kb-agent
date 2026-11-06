@@ -8,6 +8,7 @@ from typing import Literal
 
 from lxml import etree
 
+from app.agents.citations import strip_citations
 from app.schemas.chat import MessagePublic
 
 DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
@@ -64,7 +65,7 @@ def build_export(
 
 
 def _source_description(source) -> str:
-    """Keep citation identity and origin in all export formats, including old messages."""
+    """Keep source origin and links without UI citation markers in exports."""
     data = source if isinstance(source, dict) else source.model_dump()
     label = data.get("title", "")
     if data.get("workspace_name"):
@@ -76,8 +77,6 @@ def _source_description(source) -> str:
                       data["source_type"], data["source_type"],
                   )
         label = f"{origin} · {label}"
-    if data.get("citation_id"):
-        label = f"[{data['citation_id']}] {label}"
     if data.get("version"):
         label += f" ({data['version']})"
     url = data.get("url") or ""
@@ -91,11 +90,12 @@ def _source_description(source) -> str:
 # ── Markdown ────────────────────────────────────────────────────────────────
 
 def _answer_content(msg: MessagePublic) -> str:
+    content = strip_citations(msg.content)
     if msg.retrieval.get("warning") == "knowledge_fallback":
-        return "基于模型已有知识及对话上下文回答，未引用知识库文档。\n\n" + msg.content
+        return "基于模型已有知识及对话上下文回答，未引用知识库文档。\n\n" + content
     if msg.retrieval.get("warning") == "citation_degraded":
-        return "来源引用未通过校验（Unverified citations），请核对原文。\n\n" + msg.content
-    return msg.content
+        return "来源引用未通过校验（Unverified citations），请核对原文。\n\n" + content
+    return content
 
 
 def _build_markdown(title: str, messages: list[MessagePublic], date_str: str) -> bytes:

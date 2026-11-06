@@ -300,7 +300,7 @@ def test_docs_origin_in_export():
         "url": "https://docs.paloaltonetworks.com/pan-os/11-1/admin/setup",
     })
     assert "Palo Alto Docs (official documentation)" in text
-    assert "[S3]" in text and "11.1" in text and "https://docs.paloaltonetworks.com" in text
+    assert "[S3]" not in text and "11.1" in text and "https://docs.paloaltonetworks.com" in text
 
 
 @pytest.mark.asyncio

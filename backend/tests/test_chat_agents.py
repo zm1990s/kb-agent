@@ -282,12 +282,12 @@ async def test_registry_rechecks_revoked_access(db_session, seed_user):
     assert registry.agents == {}
 
 
-def test_export_keeps_citation_ids_and_external_links():
+def test_export_omits_citation_ids_and_keeps_external_links():
     from app.services.conversation_export_service import _source_description
     assert _source_description({"title": "Legacy doc"}) == "Legacy doc"
     text = _source_description({"title": "Setup", "citation_id": "S2", "source_type": "docs",
                                 "url": "https://example.com/docs", "version": "11.1"})
-    assert "[S2]" in text and "11.1" in text and "https://example.com/docs" in text
+    assert "[S2]" not in text and "11.1" in text and "https://example.com/docs" in text
 
 
 @pytest.mark.asyncio
