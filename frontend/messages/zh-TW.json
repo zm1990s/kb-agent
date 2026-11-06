@@ -151,7 +151,14 @@
     "agent_hint": "從勾選的能力中選擇相關來源；產品目錄和最近文件清單會查看全部已勾選空間。",
     "agent_reset": "恢復全部可用能力",
     "stage_upload_history": "正在查詢文件上傳記錄",
-    "stage_general_knowledge": "正在根據既有知識回答"
+    "stage_general_knowledge": "正在根據既有知識回答",
+    "retrieval_sources": "檢索來源",
+    "source_workspace": "空間文件",
+    "source_paloalto_kb": "Palo Alto KB",
+    "source_paloalto_live": "LIVEcommunity",
+    "knowledge_only": "未選擇檢索來源，將基於既有知識回答。",
+    "external_search_hint": "外部檢索會將問題關鍵字傳送至 Palo Alto 公開搜尋服務。",
+    "agents_load_failed": "外部檢索功能載入失敗，請重新整理。"
   },
   "messageBubble": {
     "me": "我",
@@ -182,7 +189,17 @@
     "citation_missing": "回答缺少可核驗的引用，請調整問題後重試。",
     "citation_degraded": "來源引用未能通過驗證，以下回答僅供參考，請核對原文。",
     "context_budget_exceeded": "查詢範圍或文件內容超出目前模型輸入預算，請縮小問題範圍或聯絡管理員調整預算。",
-    "knowledge_fallback": "根據模型既有知識及對話內容回答，未引用知識庫文件。"
+    "knowledge_fallback": "根據模型既有知識及對話內容回答，未引用知識庫文件。",
+    "indexed_web_page": "官網索引正文",
+    "external_excerpt": "官網索引片段",
+    "web_page": "網頁正文",
+    "indexed_at": "索引時間",
+    "retrieved_at": "檢索時間",
+    "updated_at": "更新時間",
+    "source_paloalto_live": "社群內容",
+    "source_paloalto_kb": "官方 KB",
+    "candidate_count": "傳回 {count} 個搜尋候選",
+    "more_search_results": "還有更多搜尋結果"
   },
   "documents": {
     "workspace_label": "空間：",

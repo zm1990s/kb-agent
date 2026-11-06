@@ -5,12 +5,14 @@ import json
 import logging
 import time
 import uuid
+from dataclasses import asdict
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFile, status
 from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.agents.paloalto import external_agents
 from app.core.db import SessionLocal, get_session
 from app.core.deps import get_current_user
 from app.models.auth import User
@@ -137,16 +139,21 @@ async def chat_agents(
     """Only advertise capabilities the current user is allowed to use."""
     await _require_module(session, current_user, "chat")
     return [
-        {"id": f"workspace:{ws.id}", "name": ws.name,
+        *[asdict(agent.descriptor) for agent in external_agents(["paloalto_kb", "paloalto_live"])],
+        *[{"id": f"workspace:{ws.id}", "name": ws.name,
          "description": ws.description or "", "source_type": "workspace",
          "workspace_id": str(ws.id)}
-        for ws, _ in await list_my_workspaces(session, user=current_user)
+        for ws, _ in await list_my_workspaces(session, user=current_user)]
     ]
 
 
 async def _resolve_chat_scope(
     session: AsyncSession, user: User, body: ChatRequest,
 ) -> uuid.UUID | list[uuid.UUID]:
+    requested_external = set(body.retrieval_sources) - {"workspace"}
+    available_external = {a.descriptor.id for a in external_agents(list(requested_external))}
+    if requested_external - available_external:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "外部检索能力未启用")
     # Authorization only: automatic mode includes every accessible workspace.
     workspaces = await list_my_workspaces(session, user=user)
     allowed = {f"workspace:{ws.id}": ws.id for ws, _ in workspaces}
@@ -157,8 +164,8 @@ async def _resolve_chat_scope(
     if body.workspace_id is not None:
         if body.workspace_id not in allowed.values():
             raise HTTPException(status.HTTP_403_FORBIDDEN, "无权访问该空间或空间能力未启用")
-        return body.workspace_id
-    return list(allowed.values())
+        return body.workspace_id if "workspace" in body.retrieval_sources else []
+    return list(allowed.values()) if "workspace" in body.retrieval_sources else []
 
 
 @router.post("/chat", response_model=ChatResponse)
@@ -183,7 +190,8 @@ async def chat(
     history = await recent_history(session, conversation_id=conv.id)
 
     await add_message(
-        session, conversation_id=conv.id, role="user", content=body.message
+        session, conversation_id=conv.id, role="user", content=body.message,
+        retrieval={"retrieval_sources": body.retrieval_sources},
     )
 
     result = await answer_question(
@@ -193,6 +201,7 @@ async def chat(
         history=history,
         user_email=current_user.email,
         user_id=current_user.id,
+        retrieval_sources=body.retrieval_sources,
     )
 
     await add_message(
@@ -270,7 +279,8 @@ async def chat_stream(
     )
     history = await recent_history(session, conversation_id=conv.id)
     await add_message(
-        session, conversation_id=conv.id, role="user", content=body.message
+        session, conversation_id=conv.id, role="user", content=body.message,
+        retrieval={"retrieval_sources": body.retrieval_sources},
     )
 
     # 空间为空 / 无归属空间也照常起任务：answer_question_streamed 内部产出 no_docs
@@ -285,6 +295,7 @@ async def chat_stream(
             conv_ws=conv_ws,
             ws_all=ws_all,
             user_email=current_user.email,
+            retrieval_sources=body.retrieval_sources,
         )
     except GenerationInProgress:
         raise HTTPException(status.HTTP_409_CONFLICT, "该会话正在生成中") from None

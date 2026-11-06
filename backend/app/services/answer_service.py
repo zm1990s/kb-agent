@@ -4,14 +4,15 @@ import asyncio
 import json
 import logging
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.agents.base import AgentRegistry, Evidence, RetrievalAgent
+from app.agents.base import AgentRegistry, Evidence, RetrievalAgent, RetrievalResult
 from app.agents.citations import has_invalid_citations, strip_citations, validate_citations
+from app.agents.paloalto import external_agents
 from app.agents.workspace import WorkspaceAgent
 from app.core.config import get_settings
 from app.engine.base import EngineError, get_chat_engine
@@ -71,12 +72,14 @@ class ThinkingChunk:
 async def build_registry(
     session: AsyncSession, workspace_id: uuid.UUID | list[uuid.UUID] | None,
     *, user_id: uuid.UUID | None = None, category_id: uuid.UUID | None = None,
+    retrieval_sources: list[str] | None = None,
 ) -> AgentRegistry:
     """Only create agents for authorized workspaces; recheck in detached jobs.
 
     API callers always supply user_id. Internal service callers can supply an
     already-authorized scope (also used by isolated service tests).
     """
+    sources = ["workspace"] if retrieval_sources is None else retrieval_sources
     ws_ids = workspace_id if isinstance(workspace_id, list) else [workspace_id]
     ids = {ws_id for ws_id in ws_ids if ws_id is not None}
     if user_id is not None:
@@ -87,12 +90,15 @@ async def build_registry(
             return AgentRegistry([])
         allowed = {ws.id for ws, _ in await list_my_workspaces(session, user=user)}
         ids &= allowed
-    if not ids:
-        return AgentRegistry([])
+    if "workspace" not in sources:
+        ids = set()
     workspaces = (await session.execute(
         select(Workspace).where(Workspace.id.in_(ids)).order_by(Workspace.id)
-    )).scalars().all()
-    return AgentRegistry([WorkspaceAgent(session, ws, category_id) for ws in workspaces])
+    )).scalars().all() if ids else []
+    return AgentRegistry([
+        *[WorkspaceAgent(session, ws, category_id) for ws in workspaces],
+        *external_agents(sources),
+    ])
 
 
 async def answer_question_streamed(
@@ -104,6 +110,7 @@ async def answer_question_streamed(
     history: list[tuple[str, str]] | None = None,
     user_email: str | None = None,
     user_id: uuid.UUID | None = None,
+    retrieval_sources: list[str] | None = None,
 ):
     from app.engine.base import TextChunk as EngineTextChunk
     from app.engine.base import ThinkingChunk as EngineThinkingChunk
@@ -116,13 +123,17 @@ async def answer_question_streamed(
     )
 
     history = history or []
-    yield Stage("indexing", "stage_full_index")
+    yield Stage("indexing", "stage_full_index" if retrieval_sources is None
+                or "workspace" in retrieval_sources else "preparing")
     registry = await build_registry(
         session, workspace_id, user_id=user_id, category_id=category_id,
+        retrieval_sources=retrieval_sources,
     )
     agents = registry.all_agents()
     temporal = document_updates_query(question)
-    if temporal is not None:
+    if temporal is not None and (
+        retrieval_sources is None or set(retrieval_sources) == {"workspace"}
+    ):
         yield Stage("indexing", "stage_upload_history")
         answer, sources, runs = await retrieve_document_updates(
             session, temporal, [a for a in agents if isinstance(a, WorkspaceAgent)],
@@ -147,6 +158,16 @@ async def answer_question_streamed(
     async def retrieve_job(job):
         kind, target = job
         if kind == "workspaces":
+            if temporal is not None:
+                _, sources, local_runs = await retrieve_document_updates(session, temporal, target)
+                evidence_fields = {f.name for f in fields(Evidence)}
+                items = [Evidence(**{k: v for k, v in source.items() if k in evidence_fields})
+                         for source in sources]
+                counts = {r["agent_id"]: r["document_count"] for r in local_runs}
+                return [(a, RetrievalResult(
+                    evidence=[e for e in items if e.agent_id == a.descriptor.id],
+                    indexed_count=counts.get(a.descriptor.id, 0),
+                )) for a in target]
             results = await retrieve_workspaces(target, session, question, history, engine)
             return list(zip(target, results, strict=True))
         try:
@@ -164,7 +185,8 @@ async def answer_question_streamed(
         descriptor = agent.descriptor
         result = results[descriptor.id]
         run = {"agent_id": descriptor.id, "name": descriptor.name,
-               "workspace_id": descriptor.workspace_id, "status": "done"}
+               "workspace_id": descriptor.workspace_id, "status": "done",
+               "source_type": descriptor.source_type}
         runs.append(run)
         if isinstance(result, Exception):
             budget_failed |= isinstance(result, ContextBudgetError)
@@ -208,9 +230,11 @@ async def answer_question_streamed(
         entries = [
             {"citation_id": f"S{n}", "title": item.title, "excerpt": item.excerpt,
              "workspace_name": item.workspace_name, "content_kind": item.content_kind,
+             "source_type": item.source_type,
              "url": item.url, "locator": item.locator,
              **{key: getattr(item, key) for key in (
-                 "product", "version", "published_at", "updated_at", "retrieved_at", "uploaded_at",
+                 "product", "version", "published_at", "updated_at",
+                 "indexed_at", "retrieved_at", "uploaded_at",
              ) if getattr(item, key) is not None}}
             for n, item in enumerate(evidence, 1)
         ]
@@ -223,7 +247,14 @@ async def answer_question_streamed(
             "不要自行生成链接或单独的来源列表。"
             "不要把历史对话中的引用编号用于本轮。证据不足则明确说明，不能猜测配置。"
             "核对产品、版本和日期；有冲突时明确列出。processed_text 是处理后的正文，"
-            "summary 是摘要，不可称为逐字原文。使用用户问题的语言。\n"
+            "summary 是摘要，不可称为逐字原文。external_excerpt 是官网搜索索引返回的片段，"
+            "不是实时全文；indexed_web_page 是搜索索引保存的正文，索引可能滞后；"
+            "web_page 是本轮抓取的网页正文。"
+            "paloalto_live 是社区讨论，不能称为官方已验证的解决方案；"
+            "paloalto_kb 是官方知识库。保持原文的适用场景和版本范围，"
+            "配置示例或社区假设不能改写成产品通用的强制要求。"
+            "步骤有缺失或矛盾时明确指出，不自行补成确定的操作指令。"
+            "只回答问题涉及的内容，遵循用户要求的篇幅。使用用户问题的语言。\n"
             "conversation 仅代表此前对话，允许回顾用户问过什么、整理已有讨论；"
             "历史中的助手说法没有独立核验，不可据此新增配置建议或事实性结论。\n"
             "本轮检索状态（failed 表示该来源未完成；truncated 表示候选有截断）："
@@ -310,11 +341,13 @@ async def answer_question(
     history: list[tuple[str, str]] | None = None,
     user_email: str | None = None,
     user_id: uuid.UUID | None = None,
+    retrieval_sources: list[str] | None = None,
 ) -> AnswerResult:
     result = AnswerResult(answer=NO_DOCS_ANSWER, error_key="no_docs")
     async for item in answer_question_streamed(
         session, workspace_id=workspace_id, question=question, category_id=category_id,
         history=history, user_email=user_email, user_id=user_id,
+        retrieval_sources=retrieval_sources,
     ):
         if isinstance(item, AnswerResult):
             result = item

@@ -151,7 +151,14 @@
     "agent_hint": "有効なエージェントから関連する情報源を選択します。製品カタログや最近の文書一覧は、有効なすべてのワークスペースを対象にします。",
     "agent_reset": "利用可能な検索元をすべて有効にする",
     "stage_upload_history": "文書のアップロード履歴を確認中",
-    "stage_general_knowledge": "既存の知識に基づいて回答中"
+    "stage_general_knowledge": "既存の知識に基づいて回答中",
+    "retrieval_sources": "検索ソース",
+    "source_workspace": "ワークスペース文書",
+    "source_paloalto_kb": "Palo Alto KB",
+    "source_paloalto_live": "LIVEcommunity",
+    "knowledge_only": "ソース未選択のため、既存の知識で回答します。",
+    "external_search_hint": "外部検索は質問のキーワードを Palo Alto の公開検索サービスに送信します。",
+    "agents_load_failed": "外部検索機能を読み込めません。再読み込みしてください。"
   },
   "messageBubble": {
     "me": "自分",
@@ -182,7 +189,17 @@
     "citation_missing": "検証可能な引用がありません。質問を調整して再試行してください。",
     "citation_degraded": "出典の引用を検証できませんでした。回答は参考情報として扱い、原文を確認してください。",
     "context_budget_exceeded": "検索範囲または文書がモデルの入力上限を超えています。範囲を絞るか、管理者に上限の調整を依頼してください。",
-    "knowledge_fallback": "モデルの既存知識と会話の文脈に基づく回答です。ナレッジベースの文書は引用していません。"
+    "knowledge_fallback": "モデルの既存知識と会話の文脈に基づく回答です。ナレッジベースの文書は引用していません。",
+    "indexed_web_page": "サイトの索引本文",
+    "external_excerpt": "検索索引の抜粋",
+    "web_page": "Web ページ本文",
+    "indexed_at": "索引日時",
+    "retrieved_at": "取得日時",
+    "updated_at": "更新日時",
+    "source_paloalto_live": "コミュニティ情報",
+    "source_paloalto_kb": "公式 KB",
+    "candidate_count": "検索候補 {count} 件",
+    "more_search_results": "他にも検索結果があります"
   },
   "documents": {
     "workspace_label": "ワークスペース：",

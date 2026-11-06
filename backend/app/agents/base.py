@@ -36,6 +36,7 @@ class Evidence:
     version: str | None = None
     published_at: str | None = None
     updated_at: str | None = None
+    indexed_at: str | None = None
     retrieved_at: str | None = None
     uploaded_at: str | None = None
     document_count: int | None = None

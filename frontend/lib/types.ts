@@ -93,10 +93,13 @@ export interface SourceRef {
   version?: string;
   published_at?: string;
   updated_at?: string;
+  indexed_at?: string;
   retrieved_at?: string;
   uploaded_at?: string;
   document_count?: number;
 }
+
+export type RetrievalSource = "workspace" | "paloalto_kb" | "paloalto_live";
 
 export interface RetrievalAgent {
   id: string;
@@ -107,6 +110,7 @@ export interface RetrievalAgent {
 }
 
 export interface AgentRun {
+  source_type?: string;
   agent_id: string;
   name: string;
   workspace_id?: string;
@@ -135,7 +139,7 @@ export interface Message {
   role: "user" | "assistant";
   content: string;
   sources: SourceRef[];
-  retrieval?: { error_key?: string; agent_runs?: AgentRun[]; warning?: string };
+  retrieval?: { error_key?: string; agent_runs?: AgentRun[]; warning?: string; retrieval_sources?: RetrievalSource[] };
   attachments?: { storage_key: string; filename: string; size?: number }[];
   output_files?: { filename: string; storage_key?: string; conversation_id?: string }[];
   created_at: string;

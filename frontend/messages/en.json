@@ -151,7 +151,14 @@
     "agent_hint": "Select relevant sources from enabled agents. Product catalogs and recent document lists cover all enabled workspaces.",
     "agent_reset": "Enable all available sources",
     "stage_upload_history": "Querying document upload history",
-    "stage_general_knowledge": "Answering from existing knowledge"
+    "stage_general_knowledge": "Answering from existing knowledge",
+    "retrieval_sources": "Search sources",
+    "source_workspace": "Workspace documents",
+    "source_paloalto_kb": "Palo Alto KB",
+    "source_paloalto_live": "LIVEcommunity",
+    "knowledge_only": "No sources selected. Answers will use existing knowledge.",
+    "external_search_hint": "External search sends question keywords to Palo Alto’s public search service.",
+    "agents_load_failed": "Unable to load external search capabilities. Refresh to retry."
   },
   "messageBubble": {
     "me": "Me",
@@ -182,7 +189,17 @@
     "citation_missing": "The answer lacks verifiable citations. Refine the question and retry.",
     "citation_degraded": "Source citations could not be verified. Treat this answer as unverified and check the original documents.",
     "context_budget_exceeded": "The query or document content exceeds the configured model input budget. Narrow the scope or ask an administrator to adjust the budget.",
-    "knowledge_fallback": "Based on the model’s existing knowledge and conversation context; no knowledge-base documents are cited."
+    "knowledge_fallback": "Based on the model’s existing knowledge and conversation context; no knowledge-base documents are cited.",
+    "indexed_web_page": "Indexed website text",
+    "external_excerpt": "Search index excerpt",
+    "web_page": "Web page text",
+    "indexed_at": "Indexed",
+    "retrieved_at": "Retrieved",
+    "updated_at": "Updated",
+    "source_paloalto_live": "Community content",
+    "source_paloalto_kb": "Official KB",
+    "candidate_count": "{count} search candidates returned",
+    "more_search_results": "More search results available"
   },
   "documents": {
     "workspace_label": "Workspace:",

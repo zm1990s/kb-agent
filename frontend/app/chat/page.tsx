@@ -17,6 +17,8 @@ import type {
   ConversationSummary,
   SourceRef,
   AgentRun,
+  RetrievalAgent,
+  RetrievalSource,
 } from "@/lib/types";
 
 interface Turn {
@@ -89,6 +91,9 @@ export default function ChatPage() {
   const t = useTranslations("chat");
   const ready = useAuthGuard("chat");
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
+  const [retrievalSources, setRetrievalSources] = useState<RetrievalSource[]>(["workspace"]);
+  const [availableAgents, setAvailableAgents] = useState<RetrievalAgent[]>([]);
+  const [agentsError, setAgentsError] = useState(false);
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [turns, setTurns] = useState<Turn[]>([]);
@@ -136,9 +141,14 @@ export default function ChatPage() {
         workspaceId: string | null;
         conversationId: string | null;
         turns: Turn[];
+        retrievalSources?: RetrievalSource[];
       };
       previousWorkspaceRef.current = s.workspaceId;
       setWorkspaceId(s.workspaceId);
+      if (Array.isArray(s.retrievalSources)) {
+        setRetrievalSources(s.retrievalSources.filter((id) =>
+          ["workspace", "paloalto_kb", "paloalto_live"].includes(id)));
+      }
       setConversationId(s.conversationId);
       setTurns(s.turns);
       // Earlier shortcut sends cached only the answer. Recover the saved user
@@ -156,6 +166,12 @@ export default function ChatPage() {
     } catch {} finally {
       setStorageRestored(true);
     }
+  }, []);
+
+  useEffect(() => {
+    api.get<RetrievalAgent[]>("/chat/agents")
+      .then(setAvailableAgents)
+      .catch(() => setAgentsError(true));
   }, []);
 
   // unmount 时 abort（现在语义是"退订"，后台生成任务继续跑）
@@ -258,9 +274,9 @@ export default function ChatPage() {
   useEffect(() => {
     if (!storageRestored) return;
     try {
-      sessionStorage.setItem(SESSION_KEY, JSON.stringify({ workspaceId, conversationId, turns }));
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify({ workspaceId, conversationId, turns, retrievalSources }));
     } catch {}
-  }, [workspaceId, conversationId, turns, storageRestored]);
+  }, [workspaceId, conversationId, turns, retrievalSources, storageRestored]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
@@ -288,6 +304,8 @@ export default function ChatPage() {
     try {
       const hist = await api.get<ConversationHistory>(`/conversations/${id}`);
       setTurns(historyTurns(hist));
+      const selection = hist.messages.findLast((message) => message.role === "user")?.retrieval?.retrieval_sources;
+      if (selection) setRetrievalSources(selection);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : t("load_failed"));
     }
@@ -496,6 +514,7 @@ export default function ChatPage() {
         "/chat/stream",
         {
           workspace_id: workspaceId,
+          retrieval_sources: retrievalSources,
           message,
           conversation_id: conversationId,
         },
@@ -569,11 +588,8 @@ export default function ChatPage() {
     <div className="flex h-screen flex-col bg-gray-50">
       <NavBar />
 
-      {/* Workspace toolbar */}
-      <div className="flex items-center gap-3 border-b border-gray-200 bg-white px-4 py-2 shadow-sm">
-        <span className="text-sm text-gray-500">{t("workspace_label")}</span>
-        <WorkspacePicker value={workspaceId} onChange={setWorkspaceId} />
-        {conversationId && (
+      {conversationId && (
+        <div className="flex justify-end border-b border-gray-200 bg-white px-4 py-2">
           <button
             onClick={() => setExportOpen(true)}
             className="ml-auto flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs text-gray-600 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 transition-colors"
@@ -583,8 +599,8 @@ export default function ChatPage() {
             </svg>
             {t("export")}
           </button>
-        )}
-      </div>
+        </div>
+      )}
       {exportOpen && conversationId && (
         <ExportConversationModal
           conversationId={conversationId}
@@ -595,6 +611,7 @@ export default function ChatPage() {
 
       <div className="flex flex-1 overflow-hidden">
         <ConversationSidebar
+          collapseOnSmallScreens
           conversations={conversations}
           activeId={conversationId}
           generatingIds={activeIds}
@@ -706,6 +723,30 @@ export default function ChatPage() {
 
           {/* Input area */}
           <div className="border-t border-gray-200 bg-white px-4 py-3">
+            <fieldset disabled={busy} aria-label={t("retrieval_sources")} className="mb-3 flex flex-wrap items-center gap-2 text-xs disabled:opacity-60">
+              <span className="text-gray-500">{t("retrieval_sources")}</span>
+              {(["workspace", "paloalto_kb", "paloalto_live"] as RetrievalSource[]).map((id) => {
+                const available = id === "workspace" || availableAgents.some((a) => a.id === id);
+                const selected = retrievalSources.includes(id);
+                return (
+                  <label key={id} className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 ${selected ? "border-blue-200 bg-blue-50 text-blue-700" : "border-gray-200 text-gray-600"} ${available ? "cursor-pointer" : "opacity-50"}`}>
+                    <input type="checkbox" checked={selected} disabled={!available && !selected}
+                      onChange={() => setRetrievalSources((previous) => selected
+                        ? previous.filter((value) => value !== id) : [...previous, id])}
+                      className="accent-blue-600" />
+                    {t(`source_${id}`)}
+                  </label>
+                );
+              })}
+              <div className="flex items-center gap-2 sm:ml-2">
+                <span className="text-gray-500">{t("workspace_label")}</span>
+                <WorkspacePicker value={workspaceId} onChange={setWorkspaceId}
+                  disabled={busy || !retrievalSources.includes("workspace")} ariaLabel={t("workspace_label")} />
+              </div>
+            </fieldset>
+            {agentsError && <p className="mb-2 text-xs text-amber-700">{t("agents_load_failed")}</p>}
+            {retrievalSources.length === 0 && <p className="mb-2 text-xs text-gray-500">{t("knowledge_only")}</p>}
+            {retrievalSources.some((id) => id !== "workspace") && <p className="mb-2 text-xs text-gray-500">{t("external_search_hint")}</p>}
             <form onSubmit={send}>
               <div className="flex items-end gap-3 rounded-xl border border-gray-300 bg-gray-50 px-4 py-3 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500 transition-all">
                 <textarea

@@ -6,11 +6,16 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+RetrievalSource = Literal["workspace", "paloalto_kb", "paloalto_live"]
+
 
 class ChatRequest(BaseModel):
     workspace_id: uuid.UUID | None = None  # None = 检索所有有权限的空间
     message: str = Field(min_length=1, max_length=4000)
     conversation_id: uuid.UUID | None = None
+    retrieval_sources: list[RetrievalSource] = Field(
+        default_factory=lambda: ["workspace"], max_length=3,
+    )
     # Legacy IDs are validated for access but no longer filter retrieval scope.
     agent_ids: list[str] | None = Field(default=None, max_length=100)
 
@@ -33,6 +38,7 @@ class SourceRef(BaseModel):
     version: str | None = None
     published_at: str | None = None
     updated_at: str | None = None
+    indexed_at: str | None = None
     retrieved_at: str | None = None
     uploaded_at: str | None = None
     document_count: int | None = None

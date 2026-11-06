@@ -27,6 +27,12 @@ export default function MessageBubble({ role, content, sources, agentRuns, error
   const selected = sources?.find((s) => s.citation_id === selectedSource);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  function sourceLabel(source: SourceRef) {
+    if (source.source_type === "paloalto_kb") return `Palo Alto KB · ${t("source_paloalto_kb")}`;
+    if (source.source_type === "paloalto_live") return `LIVEcommunity · ${t("source_paloalto_live")}`;
+    return source.workspace_name ?? source.source_type ?? "";
+  }
+
   function copyContent() {
     navigator.clipboard.writeText(content).then(() => {
       setCopied(true);
@@ -186,7 +192,7 @@ export default function MessageBubble({ role, content, sources, agentRuns, error
                   <path d="M9 2H4a1 1 0 00-1 1v10a1 1 0 001 1h8a1 1 0 001-1V6l-4-4zm1 4V3l3 3h-3z"/>
                 </svg>
                 {s.citation_id && `[${s.citation_id}] `}
-                {s.workspace_name ? `${s.workspace_name} · ` : ""}{s.title}
+                {sourceLabel(s) ? `${sourceLabel(s)} · ` : ""}{s.title}
               </button>
             ))}
           </div>
@@ -204,8 +210,8 @@ export default function MessageBubble({ role, content, sources, agentRuns, error
                 {run.name} · {run.status === "failed" ? t("agent_failed")
                   : t("evidence_count", { count: run.evidence_count ?? 0 })}
                 {run.status === "done" && run.indexed_count !== undefined
-                  && ` · ${t("indexed_count", { count: run.indexed_count })}`}
-                {run.truncated && ` · ${t("index_truncated")}`}
+                  && ` · ${t(run.source_type?.startsWith("paloalto_") ? "candidate_count" : "indexed_count", { count: run.indexed_count })}`}
+                {run.truncated && ` · ${t(run.source_type?.startsWith("paloalto_") ? "more_search_results" : "index_truncated")}`}
               </li>)}
             </ul>
           </details>
@@ -214,13 +220,20 @@ export default function MessageBubble({ role, content, sources, agentRuns, error
           <div className="w-full rounded-lg border border-blue-100 bg-blue-50 p-3 text-xs text-gray-700">
             <div className="font-medium">[{selected.citation_id}] {selected.title}</div>
             <div className="mt-1 text-gray-500">
-              {selected.workspace_name ?? selected.source_type}
+              {sourceLabel(selected)}
               {selected.version && ` · ${selected.version}`}
               {selected.content_kind === "processed_text" && ` · ${t("processed_text")}`}
               {selected.content_kind === "summary" && ` · ${t("summary")}`}
               {selected.content_kind === "document_metadata" && ` · ${t("document_metadata")}`}
               {selected.content_kind === "document_catalog" && ` · ${t("document_catalog")}`}
+              {selected.content_kind === "indexed_web_page" && ` · ${t("indexed_web_page")}`}
+              {selected.content_kind === "external_excerpt" && ` · ${t("external_excerpt")}`}
+              {selected.content_kind === "web_page" && ` · ${t("web_page")}`}
             </div>
+            {selected.product && <div className="mt-1">{selected.product}</div>}
+            {(["updated_at", "indexed_at", "retrieved_at"] as const).map((field) => selected[field] && (
+              <div key={field} className="mt-1 text-gray-500">{t(field)}: {selected[field]}</div>
+            ))}
             {selected.excerpt && <blockquote className="my-2 max-h-60 overflow-y-auto whitespace-pre-wrap border-l-2 border-blue-200 pl-3">{selected.excerpt}</blockquote>}
             {selected.doc_id && <button type="button" onClick={() => onDownload?.(selected)}
               className="text-blue-600 underline">{t("download_original")}</button>}

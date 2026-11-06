@@ -36,6 +36,9 @@ class Settings(BaseSettings):
     chat_prompt_budget_bytes: int = Field(
         180000, ge=16000, alias="CHAT_PROMPT_BUDGET_BYTES"
     )
+    # Public website search connectors; users opt in per request.
+    paloalto_search_enabled: bool = Field(True, alias="PALOALTO_SEARCH_ENABLED")
+    paloalto_search_top_k: int = Field(5, ge=1, le=10, alias="PALOALTO_SEARCH_TOP_K")
     # 子进程 stdout 单行缓冲上限（字节）。stream-json 每行一个 JSON 事件，
     # 大文件工具结果/整条消息快照可能超 asyncio 默认 64KB → LimitOverrunError。
     engine_stream_limit_bytes: int = Field(

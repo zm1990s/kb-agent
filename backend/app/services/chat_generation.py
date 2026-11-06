@@ -450,6 +450,7 @@ def start_chat_generation(
     conv_ws: uuid.UUID | None,
     ws_all: list[str],
     user_email: str | None = None,
+    retrieval_sources: list[str] | None = None,
 ) -> GenerationState:
     """启动一个普通对话 detached 生成任务；该会话已在跑则抛 GenerationInProgress。
 
@@ -466,7 +467,7 @@ def start_chat_generation(
         source="chat",
         forward_stage=True,
         event_workspace_id=conv_ws,
-        extra_meta={"candidate_workspaces": ws_all},
+        extra_meta={"candidate_workspaces": ws_all, "retrieval_sources": retrieval_sources},
         user_email=user_email,
     )
 
@@ -479,6 +480,7 @@ def start_chat_generation(
             history=history,
             user_email=st.user_email,
             user_id=st.user_id,
+            retrieval_sources=retrieval_sources,
         ):
             yield item
 
