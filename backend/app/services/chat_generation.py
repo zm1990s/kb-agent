@@ -264,6 +264,8 @@ async def _run_generation(
                             "stage": item.stage,
                             "message_key": item.message_key,
                             "message_params": item.message_params,
+                            "agent_runs": item.agent_runs if item.agent_runs is not None else
+                            (state.latest_stage or {}).get("agent_runs"),
                         })
         except asyncio.CancelledError:
             # 客户端点了停止：子进程已由生成器 finally 杀掉；落库已累积的部分答案

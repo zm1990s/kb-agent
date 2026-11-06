@@ -159,6 +159,18 @@
     "knowledge_only": "未选择检索来源，将基于已有知识回答。",
     "external_search_hint": "外部检索会将问题关键词发送至 Palo Alto 公开搜索服务。",
     "agents_load_failed": "外部检索能力加载失败，请刷新重试。",
+    "stage_agent_activity": "多个 Agent 正在检索来源…",
+    "agent_flow_title": "多 Agent 协作",
+    "agent_flow_subtitle": "独立检索 · 汇集证据 · 综合回答",
+    "agent_flow_running": "{count} 个 Agent 运行中",
+    "agent_flow_dispatch": "分发检索任务",
+    "agent_flow_searching": "正在检索",
+    "agent_flow_queued": "等待启动",
+    "agent_flow_failed": "检索未完成",
+    "agent_flow_empty": "未找到相关证据",
+    "agent_flow_evidence": "找到 {count} 条证据",
+    "agent_flow_merge": "等待检索结果汇集",
+    "agent_flow_synthesizing": "正在综合证据与回答",
     "source_paloalto_docs": "Palo Alto Docs"
   },
   "messageBubble": {

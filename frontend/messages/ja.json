@@ -159,6 +159,18 @@
     "knowledge_only": "ソース未選択のため、既存の知識で回答します。",
     "external_search_hint": "外部検索は質問のキーワードを Palo Alto の公開検索サービスに送信します。",
     "agents_load_failed": "外部検索機能を読み込めません。再読み込みしてください。",
+    "stage_agent_activity": "各 Agent が検索しています…",
+    "agent_flow_title": "Agent が連携中",
+    "agent_flow_subtitle": "情報源を検索 · 根拠を収集 · 回答を作成",
+    "agent_flow_running": "{count} 個の Agent が実行中",
+    "agent_flow_dispatch": "検索タスクを配信",
+    "agent_flow_searching": "検索中",
+    "agent_flow_queued": "待機中",
+    "agent_flow_failed": "検索に失敗",
+    "agent_flow_empty": "関連する根拠なし",
+    "agent_flow_evidence": "根拠 {count} 件",
+    "agent_flow_merge": "検索結果の集約を待機中",
+    "agent_flow_synthesizing": "根拠をもとに回答を作成中",
     "source_paloalto_docs": "Palo Alto Docs"
   },
   "messageBubble": {

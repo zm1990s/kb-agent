@@ -8,6 +8,7 @@ import Markdown from "@/components/Markdown";
 import MessageBubble from "@/components/MessageBubble";
 import NavBar from "@/components/NavBar";
 import ThinkingBubble from "@/components/ThinkingBubble";
+import AgentProgress from "@/components/AgentProgress";
 import WorkspacePicker from "@/components/WorkspacePicker";
 import { api, ApiError } from "@/lib/api";
 import { getToken } from "@/lib/auth";
@@ -101,6 +102,7 @@ export default function ChatPage() {
   const [busy, setBusy] = useState(false);
   const [stage, setStage] = useState<string | null>(null);
   const [stageKey, setStageKey] = useState<string | null>(null);
+  const [agentProgress, setAgentProgress] = useState<AgentRun[] | null>(null);
   const [streamingText, setStreamingText] = useState("");
   const [streamingThinking, setStreamingThinking] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -373,13 +375,15 @@ export default function ChatPage() {
           ];
         });
       } else if (event === "stage") {
-        const { stage: sk, message_key, message_params } = data as {
+        const { stage: sk, message_key, message_params, agent_runs } = data as {
           stage: string;
           message_key: string;
           message_params: Record<string, unknown>;
+          agent_runs?: AgentRun[] | null;
         };
         setStageKey(sk);
         setStage(t(message_key, message_params as Record<string, string>));
+        if (Array.isArray(agent_runs)) setAgentProgress(agent_runs);
       } else if (event === "thinking") {
         const text = (data as { text: string }).text;
         if (consumeReconnectFresh()) thinkingAccRef.current = "";
@@ -429,6 +433,10 @@ export default function ChatPage() {
 
   // 重连正在后台运行的生成流。attempt=0 为首次（切回会话 / 首发 409）；>0 为断流后自动重连（退避）。
   async function reconnectStream(convId: string, attempt = 0) {
+    if (attempt === 0) {
+      setAgentProgress(null);
+      setStageKey(null);
+    }
     setError(null);
     if (activeStartedAtById[convId] !== undefined) {
       setGenerationStartedAtMs(activeStartedAtById[convId]);
@@ -485,6 +493,16 @@ export default function ChatPage() {
 
   if (!ready) return null;
 
+  // Before the server confirms its authorized registry, show selected sources as
+  // queued. A server snapshot replaces these placeholders, including on reconnect.
+  const progressAgents: AgentRun[] = agentProgress ?? retrievalSources.flatMap((source) => {
+    const matching = availableAgents.filter((a) => a.source_type === source
+      && (source !== "workspace" || !workspaceId || a.workspace_id === workspaceId));
+    return matching.length ? matching.map((a) => ({
+      agent_id: a.id, name: a.name, source_type: a.source_type, status: "queued",
+    })) : [{ agent_id: source, name: t(`source_${source}`), source_type: source, status: "queued" }];
+  });
+
   async function sendMessage(message: string, options: { replaceFrom?: number; retry?: boolean } = {}) {
     message = message.trim();
     if (!message || busy) return;
@@ -500,6 +518,8 @@ export default function ChatPage() {
     setInterrupted(false);
     setGenerationStartedAtMs(Date.now());
     setBusy(true);
+    setAgentProgress(null);
+    setStageKey(null);
     setStage(t("preparing"));
 
     const ac = new AbortController();
@@ -694,6 +714,8 @@ export default function ChatPage() {
                   )}
                 </div>
               </div>
+            ) : busy && progressAgents.length > 0 ? (
+              <AgentProgress agents={progressAgents} stageKey={stageKey} elapsed={elapsed} />
             ) : busy ? (
               <div className="flex items-center gap-2">
                 <ThinkingBubble stage={stage} stageKey={stageKey} />
