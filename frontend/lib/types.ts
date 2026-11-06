@@ -113,6 +113,7 @@ export interface AgentRun {
   status: string;
   truncated?: boolean;
   evidence_count?: number;
+  indexed_count?: number;
 }
 
 export interface ChatResponse {

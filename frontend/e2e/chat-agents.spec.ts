@@ -1,11 +1,11 @@
 import { expect, test } from "@playwright/test";
 
 // Contract/UI test: no live backend or model calls.
-for (const catalog of [false, true]) {
-test(`source selection, ${catalog ? "product catalog" : "inline evidence"} and history restoration`, async ({ page }) => {
+for (const metadata of [false, true]) {
+test(`source selection, ${metadata ? "full index metadata" : "inline evidence"} and history restoration`, async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem("kb_token", `test.${btoa(JSON.stringify({ role: "admin" }))}.test`);
-    localStorage.setItem("locale", "en");
+    localStorage.setItem("locale", "zh");
   });
   const agents = [
     { id: "workspace:a", name: "Firewall", description: "PAN-OS configuration", workspace_id: "a", source_type: "workspace" },
@@ -14,15 +14,15 @@ test(`source selection, ${catalog ? "product catalog" : "inline evidence"} and h
   let submitted: Record<string, unknown> | undefined;
   const source = { id: "document:1", citation_id: "S1", doc_id: "doc-1", title: "GlobalProtect setup",
     workspace_name: "Firewall", source_type: "workspace", download_url: "",
-    excerpt: catalog ? "PAN-OS: 87 ready documents. Sample: GlobalProtect setup."
+    excerpt: metadata ? "Document index: PAN-OS deployment title and summary."
       : "Configure the portal before adding the gateway.",
-    content_kind: catalog ? "document_catalog" : "processed_text",
-    ...(catalog ? { product: "PAN-OS", document_count: 87 } : {}) };
-  const question = catalog ? "Which products have documents in the knowledge base?"
+    content_kind: metadata ? "document_metadata" : "processed_text",
+    ...(metadata ? { uploaded_at: "2020-01-01T00:00:00+00:00" } : {}) };
+  const question = metadata ? "Which products have documents in the knowledge base?"
     : "How do I configure GlobalProtect?";
-  const answer = (catalog ? "**PAN-OS**: 87 documents.[S1]" : "Configure the portal first.[S1]")
+  const answer = (metadata ? "**PAN-OS** deployment is documented.[S1]" : "Configure the portal first.[S1]")
     + "\n\n`[S1]` is a code example.";
-  const runs = [{ agent_id: "workspace:a", name: "Firewall", status: "done", evidence_count: 1 }];
+  const runs = [{ agent_id: "workspace:a", name: "Firewall", status: "done", evidence_count: 1, indexed_count: 233 }];
   await page.route("**/api/**", async (route) => {
     const path = new URL(route.request().url()).pathname;
     if (path === "/api/chat/stream" && route.request().method() === "POST") {
@@ -50,19 +50,17 @@ test(`source selection, ${catalog ? "product catalog" : "inline evidence"} and h
     await route.fulfill({ json: body });
   });
   await page.goto("/chat");
-  await page.getByText("Sources · Auto", { exact: true }).click();
-  await page.getByRole("checkbox", { name: "Finance Expense policies" }).uncheck();
-  await page.getByText("Sources · 1", { exact: true }).click();
+  await expect(page.getByRole("button", { name: /检索能力/ })).toHaveCount(0);
   await page.locator("textarea").fill(question);
   await page.locator('button[type="submit"]').click();
   const citation = page.getByRole("button", { name: "[S1]", exact: true });
   await expect(citation).toHaveCount(1);
-  expect(submitted?.agent_ids).toEqual(["workspace:a"]);
+  expect(submitted).not.toHaveProperty("agent_ids");
   await citation.click();
   await expect(page.getByText(source.excerpt, { exact: true })).toBeVisible();
-  await expect(page.getByText(catalog ? "Firewall · Document catalog" : "Firewall · Processed text", { exact: true })).toBeVisible();
-  await page.getByText("Retrieval scope", { exact: true }).click();
-  await expect(page.getByText("Firewall · 1 evidence items", { exact: true })).toBeVisible();
+  await expect(page.getByText(metadata ? "Firewall · 文档信息" : "Firewall · 处理后的正文", { exact: true })).toBeVisible();
+  await page.getByText("本轮检索范围", { exact: true }).click();
+  await expect(page.getByText("Firewall · 1 条证据 · 已扫描 233 篇文档索引", { exact: true })).toBeVisible();
   await page.reload();
   await expect(citation).toBeVisible();
   await citation.click();

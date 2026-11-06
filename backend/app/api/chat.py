@@ -147,13 +147,13 @@ async def chat_agents(
 async def _resolve_chat_scope(
     session: AsyncSession, user: User, body: ChatRequest,
 ) -> uuid.UUID | list[uuid.UUID]:
-    # Authorization only: no document search before routing.
+    # Authorization only: automatic mode includes every accessible workspace.
     workspaces = await list_my_workspaces(session, user=user)
     allowed = {f"workspace:{ws.id}": ws.id for ws, _ in workspaces}
     if body.agent_ids is not None:
         if any(agent_id not in allowed for agent_id in body.agent_ids):
             raise HTTPException(status.HTTP_403_FORBIDDEN, "检索能力不可用或未授权")
-        allowed = {key: value for key, value in allowed.items() if key in body.agent_ids}
+        # Legacy agent_ids are validated but no longer restrict the full-index scope.
     if body.workspace_id is not None:
         if body.workspace_id not in allowed.values():
             raise HTTPException(status.HTTP_403_FORBIDDEN, "无权访问该空间或空间能力未启用")

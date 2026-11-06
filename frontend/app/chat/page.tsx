@@ -9,7 +9,6 @@ import MessageBubble from "@/components/MessageBubble";
 import NavBar from "@/components/NavBar";
 import ThinkingBubble from "@/components/ThinkingBubble";
 import WorkspacePicker from "@/components/WorkspacePicker";
-import AgentPicker from "@/components/AgentPicker";
 import { api, ApiError } from "@/lib/api";
 import { getToken } from "@/lib/auth";
 import { useAuthGuard } from "@/lib/useAuthGuard";
@@ -77,7 +76,6 @@ export default function ChatPage() {
   const t = useTranslations("chat");
   const ready = useAuthGuard("chat");
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
-  const [agentIds, setAgentIds] = useState<string[] | null>(null);
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [turns, setTurns] = useState<Turn[]>([]);
@@ -123,13 +121,11 @@ export default function ChatPage() {
       if (!raw) return;
       const s = JSON.parse(raw) as {
         workspaceId: string | null;
-        agentIds?: string[] | null;
         conversationId: string | null;
         turns: Turn[];
       };
       previousWorkspaceRef.current = s.workspaceId;
       setWorkspaceId(s.workspaceId);
-      setAgentIds(s.agentIds ?? null);
       setConversationId(s.conversationId);
       setTurns(s.turns);
       // 注：不在此立即设 interrupted——先等 /chat/active 轮询确认该会话是否仍在后台生成，
@@ -239,9 +235,9 @@ export default function ChatPage() {
   useEffect(() => {
     if (!storageRestored) return;
     try {
-      sessionStorage.setItem(SESSION_KEY, JSON.stringify({ workspaceId, agentIds, conversationId, turns }));
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify({ workspaceId, conversationId, turns }));
     } catch {}
-  }, [workspaceId, agentIds, conversationId, turns, storageRestored]);
+  }, [workspaceId, conversationId, turns, storageRestored]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
@@ -476,7 +472,6 @@ export default function ChatPage() {
         "/chat/stream",
         {
           workspace_id: workspaceId,
-          agent_ids: workspaceId ? undefined : agentIds,
           message,
           conversation_id: conversationId,
         },
@@ -559,7 +554,6 @@ export default function ChatPage() {
       <div className="flex items-center gap-3 border-b border-gray-200 bg-white px-4 py-2 shadow-sm">
         <span className="text-sm text-gray-500">{t("workspace_label")}</span>
         <WorkspacePicker value={workspaceId} onChange={setWorkspaceId} />
-        <AgentPicker value={agentIds} onChange={setAgentIds} disabled={!!workspaceId || busy} />
         {conversationId && (
           <button
             onClick={() => setExportOpen(true)}

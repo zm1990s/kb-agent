@@ -1,4 +1,4 @@
-"""Route to scoped retrieval agents, then synthesize an answer from cited evidence."""
+"""Retrieve complete authorized workspace indexes, then synthesize cited answers."""
 
 import asyncio
 import json
@@ -11,9 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents.base import AgentRegistry, Evidence
-from app.agents.catalog import format_product_catalog, product_catalog_query
 from app.agents.citations import has_invalid_citations, validate_citations
-from app.agents.updates import document_updates_query, format_document_updates
 from app.agents.workspace import WorkspaceAgent
 from app.engine.base import EngineError, get_chat_engine
 from app.models.auth import User, Workspace
@@ -21,7 +19,6 @@ from app.models.auth import User, Workspace
 logger = logging.getLogger(__name__)
 NO_DOCS_ANSWER = "当前空间还没有已归类的文档，暂时无法回答。"
 AGENT_TIMEOUT_SECONDS = 90
-ROUTE_TIMEOUT_SECONDS = 45
 
 
 @dataclass
@@ -107,34 +104,17 @@ async def answer_question_streamed(
     )
 
     history = history or []
-    updates_query = document_updates_query(question)
-    catalog_query = product_catalog_query(question)
-    yield Stage("routing", "stage_routing")
+    yield Stage("indexing", "stage_full_index")
     registry = await build_registry(
         session, workspace_id, user_id=user_id, category_id=category_id,
     )
     if not registry.agents and not history:
         yield AnswerResult(answer=NO_DOCS_ANSWER, error_key="no_docs")
         return
-    engine = None
-    if updates_query is not None:
-        agents = registry.workspace_agents()
-    else:
-        engine = await get_chat_engine(session, extra_headers=render_task_headers(
-            await get_task_headers(session, TASK_HEADERS_CHAT_KEY), user_email=user_email,
-        ))
-        try:
-            async with asyncio.timeout(ROUTE_TIMEOUT_SECONDS):
-                plan = await registry.plan(question, history, engine)
-                agents = plan.agents
-                catalog_query = plan.mode == "product_catalog"
-        except (EngineError, TimeoutError, ValueError):
-            logger.exception("Chat routing failed")
-            yield AnswerResult(answer="", error_key="routing_failed")
-            return
-    if not agents and registry.agents:
-        yield AnswerResult(answer="", error_key="route_no_match")
-        return
+    engine = await get_chat_engine(session, extra_headers=render_task_headers(
+        await get_task_headers(session, TASK_HEADERS_CHAT_KEY), user_email=user_email,
+    ))
+    agents = registry.all_agents()
 
     evidence: list[Evidence] = []
     runs: list[dict] = []
@@ -148,19 +128,16 @@ async def answer_question_streamed(
         runs.append(run)
         yield Stage("indexing", "stage_agent_searching", {"name": descriptor.name})
         try:
-            async with asyncio.timeout(AGENT_TIMEOUT_SECONDS):
-                if updates_query is not None and isinstance(agent, WorkspaceAgent):
-                    result = await agent.retrieve_updates(updates_query)
-                elif catalog_query and isinstance(agent, WorkspaceAgent):
-                    if engine is None:
-                        raise ValueError("Product extraction requires an engine")
-                    result = await agent.retrieve_catalog(engine)
-                else:
-                    if engine is None:
-                        raise ValueError("Semantic retrieval requires an engine")
+            if isinstance(agent, WorkspaceAgent):
+                # Each index page has its own bounded model call; no whole-space
+                # deadline can silently cut off a large index after earlier pages.
+                result = await agent.retrieve(question, history, engine)
+            else:
+                async with asyncio.timeout(AGENT_TIMEOUT_SECONDS):
                     result = await agent.retrieve(question, history, engine)
             run.update(
                 status="done", evidence_count=len(result.evidence), truncated=result.truncated,
+                indexed_count=result.indexed_count,
             )
             for item in result.evidence:
                 if item.id not in seen:
@@ -171,16 +148,6 @@ async def answer_question_streamed(
             logger.exception("Retrieval agent failed agent=%s", descriptor.id)
             run["status"] = "failed"
             yield Stage("indexing", "stage_agent_failed", {"name": descriptor.name})
-    if updates_query is not None or catalog_query:
-        answer = (
-            format_document_updates(updates_query, evidence, runs)
-            if updates_query is not None else format_product_catalog(question, evidence, runs)
-        )
-        sources = [item.source(f"S{n}") for n, item in enumerate(evidence, 1)]
-        yield TokenChunk(answer)
-        yield Stage("done", "stage_done")
-        yield AnswerResult(answer=answer, sources=sources, agent_runs=runs)
-        return
     if not evidence and history and not any(r["status"] == "failed" for r in runs):
         # Preserve conversational recall, with explicit provenance instead of
         # presenting a previous assistant answer as newly retrieved knowledge.
@@ -198,8 +165,6 @@ async def answer_question_streamed(
         return
 
     yield Stage("thinking", "stage_thinking_phase2")
-    if engine is None:
-        raise ValueError("Answer synthesis requires an engine")
     catalog = json.dumps([
         {"citation_id": f"S{n}", **item.source(f"S{n}")}
         for n, item in enumerate(evidence, 1)

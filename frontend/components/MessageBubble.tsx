@@ -197,6 +197,8 @@ export default function MessageBubble({ role, content, sources, agentRuns, error
               {agentRuns.map((run) => <li key={run.agent_id}>
                 {run.name} · {run.status === "failed" ? t("agent_failed")
                   : t("evidence_count", { count: run.evidence_count ?? 0 })}
+                {run.status === "done" && run.indexed_count !== undefined
+                  && ` · ${t("indexed_count", { count: run.indexed_count })}`}
                 {run.truncated && ` · ${t("index_truncated")}`}
               </li>)}
             </ul>

@@ -53,35 +53,11 @@ def mock_prompts(monkeypatch):
     monkeypatch.setattr(settings_service, "get_task_headers", AsyncMock(return_value={}))
 
 
-@pytest.mark.asyncio
-async def test_router_only_reads_descriptors_and_history():
-    agents = [FakeAgent("firewall"), FakeAgent("finance")]
-    engine = FakeEngine({"agent_ids": ["firewall", "unauthorized", "firewall"]})
-    selected = await AgentRegistry(agents).route("那这个版本呢？", [("user", "PAN-OS")], engine)
-    assert selected == [agents[0]]
+def test_registry_returns_every_authorized_agent_without_name_filtering():
+    agents = [FakeAgent("unrelated " + str(i)) for i in range(8)]
+    assert AgentRegistry(agents).all_agents() == agents
+    assert AgentRegistry([]).all_agents() == []
     assert not any(agent.called for agent in agents)
-    assert "PAN-OS" in engine.prompts[0]
-    assert "配置说明" not in engine.prompts[0]
-
-
-@pytest.mark.asyncio
-async def test_no_route_does_not_fall_back_to_all_workspaces():
-    registry = AgentRegistry([FakeAgent("a"), FakeAgent("b")])
-    assert await registry.route("unknown", [], FakeEngine({"agent_ids": []})) == []
-    with pytest.raises(ValueError):
-        await registry.route("unknown", [], FakeEngine({"agent_ids": "all"}))
-
-
-@pytest.mark.asyncio
-async def test_routing_budget_and_single_agent():
-    agents = [FakeAgent(str(i)) for i in range(8)]
-    selected = await AgentRegistry(agents).route(
-        "compare", [], FakeEngine({"agent_ids": [str(i) for i in range(8)]}),
-    )
-    assert selected == agents[:3]
-    engine = FakeEngine()
-    assert await AgentRegistry(agents[:1]).route("q", [], engine) == agents[:1]
-    assert engine.prompts == []
 
 
 def test_excerpt_finds_relevant_content_after_old_prefix_limit():
@@ -109,7 +85,7 @@ def test_code_examples_are_not_citations():
 
 
 @pytest.mark.asyncio
-async def test_only_routed_agents_execute_and_synthesis_sees_evidence(monkeypatch):
+async def test_all_authorized_agents_execute_and_synthesis_sees_evidence(monkeypatch):
     agents = [FakeAgent("firewall"), FakeAgent("finance")]
     engine = FakeEngine({"agent_ids": ["firewall"]})
     monkeypatch.setattr(
@@ -118,9 +94,9 @@ async def test_only_routed_agents_execute_and_synthesis_sees_evidence(monkeypatc
     monkeypatch.setattr(answer_service, "get_chat_engine", AsyncMock(return_value=engine))
     mock_prompts(monkeypatch)
     result = await answer_service.answer_question(None, workspace_id=[], question="PAN-OS")
-    assert agents[0].called and not agents[1].called
+    assert agents[0].called and agents[1].called
     assert result.sources[0]["agent_id"] == "firewall"
-    assert "finance" not in engine.prompts[-1]
+    assert "finance" in engine.prompts[-1]
     assert result.agent_runs[0]["status"] == "done"
 
 
@@ -166,7 +142,9 @@ async def test_api_rejects_inaccessible_agent_ids(monkeypatch):
     with pytest.raises(HTTPException) as error:
         await chat._resolve_chat_scope(None, user, ChatRequest(message="q", agent_ids=["private"]))
     assert error.value.status_code == 403
-    assert await chat._resolve_chat_scope(None, user, ChatRequest(message="q", agent_ids=[])) == []
+    assert await chat._resolve_chat_scope(
+        None, user, ChatRequest(message="q", agent_ids=[]),
+    ) == [ws_id]
     assert await chat._resolve_chat_scope(None, user, ChatRequest(message="q")) == [ws_id]
 
 
@@ -211,7 +189,7 @@ async def test_workspace_body_query_is_scoped(db_session):
 
 
 @pytest.mark.asyncio
-async def test_auto_route_persists_actual_scope_and_citations(
+async def test_auto_full_index_persists_actual_scope_and_citations(
     client, seed_user, db_session, monkeypatch,
 ):
     from app.models.chat import Conversation
@@ -236,25 +214,26 @@ async def test_auto_route_persists_actual_scope_and_citations(
                 return EngineResult(text=json.dumps({"agent_ids": [f"workspace:{spaces[0]}"]}))
             return EngineResult(text='{"fetch_numbers": [1], "mode": "fetch"}')
 
-    engine = RoutedEngine()
+    engine = RoutedEngine(answer="配置说明。[S1][S2]")
     monkeypatch.setattr(answer_service, "get_chat_engine", AsyncMock(return_value=engine))
     response = await client.post("/chat", json={"message": "PAN-OS"}, headers=headers)
     assert response.status_code == 200
     body = response.json()
     assert body["error_key"] is None
-    assert body["sources"][0]["workspace_id"] == str(spaces[0])
-    assert all("Private expense details" not in prompt for prompt in engine.prompts)
+    assert {s["workspace_id"] for s in body["sources"]} == {str(ws) for ws in spaces}
+    assert any("Private expense details" in prompt for prompt in engine.prompts)
+    assert all("你是知识检索路由器" not in prompt for prompt in engine.prompts)
     conv = await db_session.get(Conversation, uuid.UUID(body["conversation_id"]))
     assert conv.workspace_id is None
     history = (await client.get(f"/conversations/{conv.id}", headers=headers)).json()
     saved = history["messages"][-1]
     assert saved["sources"] == body["sources"]
     assert saved["retrieval"]["agent_runs"] == body["agent_runs"]
-    assert len(saved["retrieval"]["agent_runs"]) == 1
+    assert len(saved["retrieval"]["agent_runs"]) == 2
 
 
 @pytest.mark.asyncio
-async def test_older_relevant_doc_survives_candidate_limit(db_session):
+async def test_older_relevant_doc_is_found_after_scanning_complete_index(db_session):
     from datetime import datetime
 
     from sqlalchemy import func
@@ -278,10 +257,17 @@ async def test_older_relevant_doc_survives_candidate_limit(db_session):
         created_at=datetime(2020, 1, 1), search_tsv=func.to_tsvector("simple", "GlobalProtect"),
     ))
     await db_session.commit()
+    class CompleteIndexEngine(FakeEngine):
+        async def complete(self, prompt, **kwargs):
+            catalog = json.loads(prompt.split("文档目录：\n")[1].split("\n只输出 JSON")[0])
+            return EngineResult(text=json.dumps({"doc_numbers": [
+                doc["number"] for doc in catalog if "GlobalProtect" in doc["title"]
+            ]}))
+
     result = await WorkspaceAgent(db_session, ws).retrieve(
-        "GlobalProtect", [], FakeEngine({"doc_numbers": [1]}),
+        "GlobalProtect", [], CompleteIndexEngine(),
     )
-    assert result.truncated
+    assert not result.truncated and result.indexed_count == 206
     assert result.evidence[0].doc_id == str(old_id)
 
 

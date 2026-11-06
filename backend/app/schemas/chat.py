@@ -8,10 +8,10 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class ChatRequest(BaseModel):
-    workspace_id: uuid.UUID | None = None  # None = 自动定位到最相关空间
+    workspace_id: uuid.UUID | None = None  # None = 检索所有有权限的空间
     message: str = Field(min_length=1, max_length=4000)
     conversation_id: uuid.UUID | None = None
-    # None = all authorized capabilities are eligible for routing; [] = none.
+    # Legacy IDs are validated for access but no longer filter retrieval scope.
     agent_ids: list[str] | None = Field(default=None, max_length=100)
 
 
