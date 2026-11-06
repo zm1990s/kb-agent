@@ -746,7 +746,6 @@ export default function ChatPage() {
             </div>
             {agentsError && <p className="mb-2 text-xs text-amber-700">{t("agents_load_failed")}</p>}
             {retrievalSources.length === 0 && <p className="mb-2 text-xs text-gray-500">{t("knowledge_only")}</p>}
-            {retrievalSources.some((id) => id !== "workspace") && <p className="mb-2 text-xs text-gray-500">{t("external_search_hint")}</p>}
             <form onSubmit={send}>
               <div className="flex items-end gap-3 rounded-xl border border-gray-300 bg-gray-50 px-4 py-3 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500 transition-all">
                 <textarea
