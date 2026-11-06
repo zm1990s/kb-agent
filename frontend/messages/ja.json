@@ -147,7 +147,7 @@
     "stage_agent_failed": "{name} の検索を完了できませんでした",
     "agent_capabilities": "検索元",
     "agent_auto": "自動",
-    "agent_hint": "有効なエージェントから関連する情報源を選択します。最近の文書一覧を求める場合は、有効なすべてのワークスペースを検索します。",
+    "agent_hint": "有効なエージェントから関連する情報源を選択します。製品カタログや最近の文書一覧は、有効なすべてのワークスペースを対象にします。",
     "agent_reset": "利用可能な検索元をすべて有効にする"
   },
   "messageBubble": {
@@ -165,6 +165,7 @@
     "processed_text": "処理済み本文",
     "summary": "要約",
     "document_metadata": "文書情報",
+    "document_catalog": "文書カタログ",
     "open_source": "参照元を開く",
     "retrieval_scope": "今回の検索範囲",
     "agent_failed": "検索未完了",

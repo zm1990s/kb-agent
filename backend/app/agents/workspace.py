@@ -16,6 +16,7 @@ from app.agents.base import (
     RetrievalResult,
     parse_object,
 )
+from app.agents.catalog import CATALOG_PAGE_SIZE, catalog_evidence, extract_products
 from app.agents.updates import DocumentUpdatesQuery
 from app.engine.base import EngineProtocol
 from app.models.auth import Workspace
@@ -110,6 +111,46 @@ class WorkspaceAgent:
                 )
             last = (docs[-1].uploaded_at, docs[-1].id)
         return RetrievalResult(evidence=evidence)
+
+    async def retrieve_catalog(self, engine: EngineProtocol) -> RetrievalResult:
+        """Scan bounded metadata pages; no relevance cap, body reads or global SQL."""
+        last = None
+        groups: dict[str, dict] = {}
+        while True:
+            stmt = select(
+                Document.id, Document.title, Document.tags, Document.summary,
+                Category.name.label("category"),
+            ).outerjoin(Category, (Category.id == Document.category_id) & (
+                Category.workspace_id == self.workspace.id
+            )).where(
+                Document.workspace_id == self.workspace.id,
+                Document.status == "ready", Document.deleted_at.is_(None),
+            )
+            if self.category_id is not None:
+                stmt = stmt.where(Document.category_id == self.category_id)
+            if last is not None:
+                stmt = stmt.where(Document.id > last)
+            rows = (await self.session.execute(
+                stmt.order_by(Document.id).limit(CATALOG_PAGE_SIZE)
+            )).all()
+            if not rows:
+                break
+            documents = [
+                {"number": n, "id": str(row.id), "title": row.title[:500],
+                 "category": (row.category or "")[:300],
+                 "tags": [tag[:120] for tag in (row.tags or [])[:30]],
+                 "summary": (row.summary or "")[:800]}
+                for n, row in enumerate(rows, 1)
+            ]
+            assigned = await extract_products(engine, documents)
+            for n, doc in enumerate(documents, 1):
+                names = assigned.get(n) or [None]
+                for product in names:
+                    key = "product:" + product.casefold() if product else "unspecified"
+                    group = groups.setdefault(key, {"product": product, "documents": []})
+                    group["documents"].append(doc)
+            last = rows[-1].id
+        return catalog_evidence(self.descriptor, groups)
 
     async def retrieve(
         self, question: str, history: list[tuple[str, str]], engine: EngineProtocol,

@@ -147,7 +147,7 @@
     "stage_agent_failed": "{name} 검색을 완료하지 못했습니다",
     "agent_capabilities": "검색 소스",
     "agent_auto": "자동",
-    "agent_hint": "활성화된 에이전트에서 관련 출처를 선택합니다. 최근 문서 목록을 요청하면 활성화된 모든 워크스페이스를 검색합니다.",
+    "agent_hint": "활성화된 에이전트에서 관련 출처를 선택합니다. 제품 카탈로그와 최근 문서 목록은 활성화된 모든 워크스페이스를 대상으로 합니다.",
     "agent_reset": "사용 가능한 모든 소스 활성화"
   },
   "messageBubble": {
@@ -165,6 +165,7 @@
     "processed_text": "처리된 본문",
     "summary": "요약",
     "document_metadata": "문서 정보",
+    "document_catalog": "문서 카탈로그",
     "open_source": "출처 열기",
     "retrieval_scope": "이번 검색 범위",
     "agent_failed": "검색 미완료",

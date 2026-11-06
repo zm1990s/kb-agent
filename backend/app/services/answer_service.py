@@ -11,6 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents.base import AgentRegistry, Evidence
+from app.agents.catalog import format_product_catalog, product_catalog_query
 from app.agents.citations import has_invalid_citations, validate_citations
 from app.agents.updates import document_updates_query, format_document_updates
 from app.agents.workspace import WorkspaceAgent
@@ -107,6 +108,7 @@ async def answer_question_streamed(
 
     history = history or []
     updates_query = document_updates_query(question)
+    catalog_query = product_catalog_query(question)
     yield Stage("routing", "stage_routing")
     registry = await build_registry(
         session, workspace_id, user_id=user_id, category_id=category_id,
@@ -123,7 +125,9 @@ async def answer_question_streamed(
         ))
         try:
             async with asyncio.timeout(ROUTE_TIMEOUT_SECONDS):
-                agents = await registry.route(question, history, engine)
+                plan = await registry.plan(question, history, engine)
+                agents = plan.agents
+                catalog_query = plan.mode == "product_catalog"
         except (EngineError, TimeoutError, ValueError):
             logger.exception("Chat routing failed")
             yield AnswerResult(answer="", error_key="routing_failed")
@@ -147,6 +151,10 @@ async def answer_question_streamed(
             async with asyncio.timeout(AGENT_TIMEOUT_SECONDS):
                 if updates_query is not None and isinstance(agent, WorkspaceAgent):
                     result = await agent.retrieve_updates(updates_query)
+                elif catalog_query and isinstance(agent, WorkspaceAgent):
+                    if engine is None:
+                        raise ValueError("Product extraction requires an engine")
+                    result = await agent.retrieve_catalog(engine)
                 else:
                     if engine is None:
                         raise ValueError("Semantic retrieval requires an engine")
@@ -163,8 +171,11 @@ async def answer_question_streamed(
             logger.exception("Retrieval agent failed agent=%s", descriptor.id)
             run["status"] = "failed"
             yield Stage("indexing", "stage_agent_failed", {"name": descriptor.name})
-    if updates_query is not None:
-        answer = format_document_updates(updates_query, evidence, runs)
+    if updates_query is not None or catalog_query:
+        answer = (
+            format_document_updates(updates_query, evidence, runs)
+            if updates_query is not None else format_product_catalog(question, evidence, runs)
+        )
         sources = [item.source(f"S{n}") for n, item in enumerate(evidence, 1)]
         yield TokenChunk(answer)
         yield Stage("done", "stage_done")

@@ -147,7 +147,7 @@
     "stage_agent_failed": "{name} could not complete retrieval",
     "agent_capabilities": "Sources",
     "agent_auto": "Auto",
-    "agent_hint": "Select relevant sources from enabled agents. Requests for recent document lists cover all enabled workspaces.",
+    "agent_hint": "Select relevant sources from enabled agents. Product catalogs and recent document lists cover all enabled workspaces.",
     "agent_reset": "Enable all available sources"
   },
   "messageBubble": {
@@ -165,6 +165,7 @@
     "processed_text": "Processed text",
     "summary": "Summary",
     "document_metadata": "Document metadata",
+    "document_catalog": "Document catalog",
     "open_source": "Open source",
     "retrieval_scope": "Retrieval scope",
     "agent_failed": "Retrieval incomplete",

@@ -1,7 +1,8 @@
 import { expect, test } from "@playwright/test";
 
 // Contract/UI test: no live backend or model calls.
-test("source selection, inline evidence and history restoration", async ({ page }) => {
+for (const catalog of [false, true]) {
+test(`source selection, ${catalog ? "product catalog" : "inline evidence"} and history restoration`, async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem("kb_token", `test.${btoa(JSON.stringify({ role: "admin" }))}.test`);
     localStorage.setItem("locale", "en");
@@ -13,8 +14,14 @@ test("source selection, inline evidence and history restoration", async ({ page 
   let submitted: Record<string, unknown> | undefined;
   const source = { id: "document:1", citation_id: "S1", doc_id: "doc-1", title: "GlobalProtect setup",
     workspace_name: "Firewall", source_type: "workspace", download_url: "",
-    excerpt: "Configure the portal before adding the gateway.", content_kind: "processed_text" };
-  const answer = "Configure the portal first.[S1]\n\n`[S1]` is a code example.";
+    excerpt: catalog ? "PAN-OS: 87 ready documents. Sample: GlobalProtect setup."
+      : "Configure the portal before adding the gateway.",
+    content_kind: catalog ? "document_catalog" : "processed_text",
+    ...(catalog ? { product: "PAN-OS", document_count: 87 } : {}) };
+  const question = catalog ? "Which products have documents in the knowledge base?"
+    : "How do I configure GlobalProtect?";
+  const answer = (catalog ? "**PAN-OS**: 87 documents.[S1]" : "Configure the portal first.[S1]")
+    + "\n\n`[S1]` is a code example.";
   const runs = [{ agent_id: "workspace:a", name: "Firewall", status: "done", evidence_count: 1 }];
   await page.route("**/api/**", async (route) => {
     const path = new URL(route.request().url()).pathname;
@@ -37,7 +44,7 @@ test("source selection, inline evidence and history restoration", async ({ page 
     if (path.includes("suggested-questions")) body = { questions: [] };
     if (path === "/api/auth/my-permissions") body = { chat: "admin" };
     if (path === "/api/conversations/conv-1") body = { conversation_id: "conv-1", messages: [
-      { role: "user", content: "How do I configure GlobalProtect?", sources: [] },
+      { role: "user", content: question, sources: [] },
       { role: "assistant", content: answer, sources: [source], retrieval: { agent_runs: runs } },
     ] };
     await route.fulfill({ json: body });
@@ -46,14 +53,14 @@ test("source selection, inline evidence and history restoration", async ({ page 
   await page.getByText("Sources · Auto", { exact: true }).click();
   await page.getByRole("checkbox", { name: "Finance Expense policies" }).uncheck();
   await page.getByText("Sources · 1", { exact: true }).click();
-  await page.locator("textarea").fill("How do I configure GlobalProtect?");
+  await page.locator("textarea").fill(question);
   await page.locator('button[type="submit"]').click();
   const citation = page.getByRole("button", { name: "[S1]", exact: true });
   await expect(citation).toHaveCount(1);
   expect(submitted?.agent_ids).toEqual(["workspace:a"]);
   await citation.click();
   await expect(page.getByText(source.excerpt, { exact: true })).toBeVisible();
-  await expect(page.getByText("Firewall · Processed text", { exact: true })).toBeVisible();
+  await expect(page.getByText(catalog ? "Firewall · Document catalog" : "Firewall · Processed text", { exact: true })).toBeVisible();
   await page.getByText("Retrieval scope", { exact: true }).click();
   await expect(page.getByText("Firewall · 1 evidence items", { exact: true })).toBeVisible();
   await page.reload();
@@ -62,3 +69,4 @@ test("source selection, inline evidence and history restoration", async ({ page 
   await expect(page.getByText(source.excerpt, { exact: true })).toBeVisible();
   await page.screenshot({ path: process.env.AGENT_SCREENSHOT || "test-results/chat-agents.png", fullPage: true });
 });
+}
