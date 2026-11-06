@@ -38,6 +38,17 @@ interface DonePayload {
   agent_runs?: AgentRun[];
 }
 
+function historyTurns(history: ConversationHistory): Turn[] {
+  return history.messages.map((m) => ({
+    role: m.role,
+    content: m.content,
+    sources: m.sources,
+    error_key: m.retrieval?.error_key ?? undefined,
+    agent_runs: m.retrieval?.agent_runs,
+    warning: m.retrieval?.warning,
+  }));
+}
+
 interface StreamMetaPayload {
   conversation_id: string;
   started_at?: number;
@@ -130,6 +141,16 @@ export default function ChatPage() {
       setWorkspaceId(s.workspaceId);
       setConversationId(s.conversationId);
       setTurns(s.turns);
+      // Earlier shortcut sends cached only the answer. Recover the saved user
+      // question without overwriting any navigation or messages added meanwhile.
+      if (s.conversationId && s.turns[0]?.role === "assistant") {
+        api.get<ConversationHistory>(`/conversations/${s.conversationId}`)
+          .then((history) => {
+            if (history.messages[0]?.role !== "user") return;
+            setTurns((current) => current === s.turns ? historyTurns(history) : current);
+          })
+          .catch(() => { /* Keep cached answers if history is temporarily unavailable. */ });
+      }
       // 注：不在此立即设 interrupted——先等 /chat/active 轮询确认该会话是否仍在后台生成，
       // 若在生成则自动重连续看；仅当确认无任务且最后一条是 user 时才提示重发。
     } catch {} finally {
@@ -266,16 +287,7 @@ export default function ChatPage() {
   async function reloadHistory(id: string) {
     try {
       const hist = await api.get<ConversationHistory>(`/conversations/${id}`);
-      setTurns(
-        hist.messages.map((m) => ({
-          role: m.role,
-          content: m.content,
-          sources: m.sources,
-          error_key: m.retrieval?.error_key ?? undefined,
-          agent_runs: m.retrieval?.agent_runs,
-          warning: m.retrieval?.warning,
-        }))
-      );
+      setTurns(historyTurns(hist));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : t("load_failed"));
     }
@@ -455,8 +467,17 @@ export default function ChatPage() {
 
   if (!ready) return null;
 
-  async function sendMessage(message: string) {
+  async function sendMessage(message: string, options: { replaceFrom?: number; retry?: boolean } = {}) {
+    message = message.trim();
     if (!message || busy) return;
+    // Every entry point records its question before sending. Retrying keeps the
+    // existing user turn; editing replaces that turn and the responses after it.
+    if (!options.retry) {
+      setTurns((previous) => [
+        ...(options.replaceFrom === undefined ? previous : previous.slice(0, options.replaceFrom)),
+        { role: "user", content: message },
+      ]);
+    }
     setError(null);
     setInterrupted(false);
     setGenerationStartedAtMs(Date.now());
@@ -508,18 +529,13 @@ export default function ChatPage() {
   async function send(e: React.FormEvent) {
     e.preventDefault();
     const message = input.trim();
-    if (!message) return;
+    if (!message || busy) return;
     setInput("");
-    setTurns((t) => [...t, { role: "user", content: message }]);
     await sendMessage(message);
   }
 
   async function handleEdit(turnIndex: number, newContent: string) {
-    // Truncate turns up to and including the edited user message, then re-send
-    const newTurns = turns.slice(0, turnIndex);
-    newTurns.push({ role: "user", content: newContent });
-    setTurns(newTurns);
-    await sendMessage(newContent);
+    await sendMessage(newContent, { replaceFrom: turnIndex });
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -648,7 +664,7 @@ export default function ChatPage() {
                   warning={turn.warning}
                   onDownload={download}
                   onEdit={turn.role === "user" && !busy ? (newContent) => handleEdit(i, newContent) : undefined}
-                  onResend={interrupted && !busy && turn.role === "user" && i === turns.length - 1 ? () => sendMessage(turn.content) : undefined}
+                  onResend={interrupted && !busy && turn.role === "user" && i === turns.length - 1 ? () => sendMessage(turn.content, { retry: true }) : undefined}
                 />
               </div>
             ))}
