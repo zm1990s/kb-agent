@@ -147,7 +147,7 @@
     "stage_agent_failed": "{name} 暫時無法完成檢索",
     "agent_capabilities": "檢索能力",
     "agent_auto": "自動",
-    "agent_hint": "只從勾選的能力中自動選擇相關來源，不會搜尋所有空間。",
+    "agent_hint": "從勾選的能力中選擇相關來源；明確要求最近文件清單時檢索全部已勾選空間。",
     "agent_reset": "恢復全部可用能力"
   },
   "messageBubble": {
@@ -164,6 +164,7 @@
     "view_evidence": "查看證據",
     "processed_text": "處理後的正文",
     "summary": "摘要",
+    "document_metadata": "文件資訊",
     "open_source": "開啟來源",
     "retrieval_scope": "本輪檢索範圍",
     "agent_failed": "檢索未完成",

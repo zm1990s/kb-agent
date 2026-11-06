@@ -210,6 +210,7 @@ export default function MessageBubble({ role, content, sources, agentRuns, error
               {selected.version && ` · ${selected.version}`}
               {selected.content_kind === "processed_text" && ` · ${t("processed_text")}`}
               {selected.content_kind === "summary" && ` · ${t("summary")}`}
+              {selected.content_kind === "document_metadata" && ` · ${t("document_metadata")}`}
             </div>
             {selected.excerpt && <blockquote className="my-2 max-h-60 overflow-y-auto whitespace-pre-wrap border-l-2 border-blue-200 pl-3">{selected.excerpt}</blockquote>}
             {selected.doc_id && <button type="button" onClick={() => onDownload?.(selected)}

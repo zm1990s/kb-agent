@@ -40,6 +40,7 @@ class Evidence:
     published_at: str | None = None
     updated_at: str | None = None
     retrieved_at: str | None = None
+    uploaded_at: str | None = None
 
     def source(self, citation_id: str) -> dict:
         return {**asdict(self), "citation_id": citation_id, "download_url": ""}
@@ -83,11 +84,21 @@ class AgentRegistry:
         if len(self.agents) != len(agents):
             raise ValueError("Duplicate agent ID")
 
+    def workspace_agents(self) -> list[RetrievalAgent]:
+        return [agent for agent in self.agents.values()
+                if agent.descriptor.source_type == "workspace"]
+
     async def route(
         self, question: str, history: list[tuple[str, str]], engine: EngineProtocol,
     ) -> list[RetrievalAgent]:
         if not self.agents:
             return []
+        from app.agents.updates import document_updates_query
+
+        if document_updates_query(question) is not None:
+            # Explicit update overviews cover every eligible local workspace;
+            # topical questions still retain their normal routing budget.
+            return self.workspace_agents()
         if len(self.agents) == 1:
             return list(self.agents.values())
         prompt = (

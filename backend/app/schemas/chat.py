@@ -34,6 +34,7 @@ class SourceRef(BaseModel):
     published_at: str | None = None
     updated_at: str | None = None
     retrieved_at: str | None = None
+    uploaded_at: str | None = None
 
 
 class ChatResponse(BaseModel):

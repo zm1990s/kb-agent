@@ -147,7 +147,7 @@
     "stage_agent_failed": "{name} 暂时无法完成检索",
     "agent_capabilities": "检索能力",
     "agent_auto": "自动",
-    "agent_hint": "只从勾选的能力中自动选择相关来源，不会搜索所有空间。",
+    "agent_hint": "从勾选的能力中选择相关来源；明确请求最近文档清单时检索全部已勾选空间。",
     "agent_reset": "恢复全部可用能力"
   },
   "messageBubble": {
@@ -164,6 +164,7 @@
     "view_evidence": "查看证据",
     "processed_text": "处理后的正文",
     "summary": "摘要",
+    "document_metadata": "文档信息",
     "open_source": "打开来源",
     "retrieval_scope": "本轮检索范围",
     "agent_failed": "检索未完成",

@@ -94,6 +94,7 @@ export interface SourceRef {
   published_at?: string;
   updated_at?: string;
   retrieved_at?: string;
+  uploaded_at?: string;
 }
 
 export interface RetrievalAgent {

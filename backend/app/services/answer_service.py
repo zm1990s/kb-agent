@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents.base import AgentRegistry, Evidence
 from app.agents.citations import has_invalid_citations, validate_citations
+from app.agents.updates import document_updates_query, format_document_updates
 from app.agents.workspace import WorkspaceAgent
 from app.engine.base import EngineError, get_chat_engine
 from app.models.auth import User, Workspace
@@ -105,6 +106,7 @@ async def answer_question_streamed(
     )
 
     history = history or []
+    updates_query = document_updates_query(question)
     yield Stage("routing", "stage_routing")
     registry = await build_registry(
         session, workspace_id, user_id=user_id, category_id=category_id,
@@ -112,16 +114,20 @@ async def answer_question_streamed(
     if not registry.agents and not history:
         yield AnswerResult(answer=NO_DOCS_ANSWER, error_key="no_docs")
         return
-    engine = await get_chat_engine(session, extra_headers=render_task_headers(
-        await get_task_headers(session, TASK_HEADERS_CHAT_KEY), user_email=user_email,
-    ))
-    try:
-        async with asyncio.timeout(ROUTE_TIMEOUT_SECONDS):
-            agents = await registry.route(question, history, engine)
-    except (EngineError, TimeoutError, ValueError):
-        logger.exception("Chat routing failed")
-        yield AnswerResult(answer="", error_key="routing_failed")
-        return
+    engine = None
+    if updates_query is not None:
+        agents = registry.workspace_agents()
+    else:
+        engine = await get_chat_engine(session, extra_headers=render_task_headers(
+            await get_task_headers(session, TASK_HEADERS_CHAT_KEY), user_email=user_email,
+        ))
+        try:
+            async with asyncio.timeout(ROUTE_TIMEOUT_SECONDS):
+                agents = await registry.route(question, history, engine)
+        except (EngineError, TimeoutError, ValueError):
+            logger.exception("Chat routing failed")
+            yield AnswerResult(answer="", error_key="routing_failed")
+            return
     if not agents and registry.agents:
         yield AnswerResult(answer="", error_key="route_no_match")
         return
@@ -139,7 +145,12 @@ async def answer_question_streamed(
         yield Stage("indexing", "stage_agent_searching", {"name": descriptor.name})
         try:
             async with asyncio.timeout(AGENT_TIMEOUT_SECONDS):
-                result = await agent.retrieve(question, history, engine)
+                if updates_query is not None and isinstance(agent, WorkspaceAgent):
+                    result = await agent.retrieve_updates(updates_query)
+                else:
+                    if engine is None:
+                        raise ValueError("Semantic retrieval requires an engine")
+                    result = await agent.retrieve(question, history, engine)
             run.update(
                 status="done", evidence_count=len(result.evidence), truncated=result.truncated,
             )
@@ -152,6 +163,13 @@ async def answer_question_streamed(
             logger.exception("Retrieval agent failed agent=%s", descriptor.id)
             run["status"] = "failed"
             yield Stage("indexing", "stage_agent_failed", {"name": descriptor.name})
+    if updates_query is not None:
+        answer = format_document_updates(updates_query, evidence, runs)
+        sources = [item.source(f"S{n}") for n, item in enumerate(evidence, 1)]
+        yield TokenChunk(answer)
+        yield Stage("done", "stage_done")
+        yield AnswerResult(answer=answer, sources=sources, agent_runs=runs)
+        return
     if not evidence and history and not any(r["status"] == "failed" for r in runs):
         # Preserve conversational recall, with explicit provenance instead of
         # presenting a previous assistant answer as newly retrieved knowledge.
@@ -169,6 +187,8 @@ async def answer_question_streamed(
         return
 
     yield Stage("thinking", "stage_thinking_phase2")
+    if engine is None:
+        raise ValueError("Answer synthesis requires an engine")
     catalog = json.dumps([
         {"citation_id": f"S{n}", **item.source(f"S{n}")}
         for n, item in enumerate(evidence, 1)
