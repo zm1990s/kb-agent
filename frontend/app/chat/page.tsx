@@ -588,19 +588,6 @@ export default function ChatPage() {
     <div className="flex h-screen flex-col bg-gray-50">
       <NavBar />
 
-      {conversationId && (
-        <div className="flex justify-end border-b border-gray-200 bg-white px-4 py-2">
-          <button
-            onClick={() => setExportOpen(true)}
-            className="ml-auto flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs text-gray-600 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 transition-colors"
-          >
-            <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
-            </svg>
-            {t("export")}
-          </button>
-        </div>
-      )}
       {exportOpen && conversationId && (
         <ExportConversationModal
           conversationId={conversationId}
@@ -723,27 +710,40 @@ export default function ChatPage() {
 
           {/* Input area */}
           <div className="border-t border-gray-200 bg-white px-4 py-3">
-            <fieldset disabled={busy} aria-label={t("retrieval_sources")} className="mb-3 flex flex-wrap items-center gap-2 text-xs disabled:opacity-60">
-              <span className="text-gray-500">{t("retrieval_sources")}</span>
-              {(["workspace", "paloalto_kb", "paloalto_live", "paloalto_docs"] as RetrievalSource[]).map((id) => {
-                const available = id === "workspace" || availableAgents.some((a) => a.id === id);
-                const selected = retrievalSources.includes(id);
-                return (
-                  <label key={id} className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 ${selected ? "border-blue-200 bg-blue-50 text-blue-700" : "border-gray-200 text-gray-600"} ${available ? "cursor-pointer" : "opacity-50"}`}>
-                    <input type="checkbox" checked={selected} disabled={!available && !selected}
-                      onChange={() => setRetrievalSources((previous) => selected
-                        ? previous.filter((value) => value !== id) : [...previous, id])}
-                      className="accent-blue-600" />
-                    {t(`source_${id}`)}
-                  </label>
-                );
-              })}
-              <div className="flex items-center gap-2 sm:ml-2">
-                <span className="text-gray-500">{t("workspace_label")}</span>
-                <WorkspacePicker value={workspaceId} onChange={setWorkspaceId}
-                  disabled={busy || !retrievalSources.includes("workspace")} ariaLabel={t("workspace_label")} />
-              </div>
-            </fieldset>
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <fieldset disabled={busy} aria-label={t("retrieval_sources")} className="flex min-w-0 flex-[1_1_40rem] flex-wrap items-center gap-2 text-xs disabled:opacity-60">
+                <span className="text-gray-500">{t("retrieval_sources")}</span>
+                {(["workspace", "paloalto_kb", "paloalto_live", "paloalto_docs"] as RetrievalSource[]).map((id) => {
+                  const available = id === "workspace" || availableAgents.some((a) => a.id === id);
+                  const selected = retrievalSources.includes(id);
+                  return (
+                    <label key={id} className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 ${selected ? "border-blue-200 bg-blue-50 text-blue-700" : "border-gray-200 text-gray-600"} ${available ? "cursor-pointer" : "opacity-50"}`}>
+                      <input type="checkbox" checked={selected} disabled={!available && !selected}
+                        onChange={() => setRetrievalSources((previous) => selected
+                          ? previous.filter((value) => value !== id) : [...previous, id])}
+                        className="accent-blue-600" />
+                      {t(`source_${id}`)}
+                    </label>
+                  );
+                })}
+                <div className="flex items-center gap-2 sm:ml-2">
+                  <span className="text-gray-500">{t("workspace_label")}</span>
+                  <WorkspacePicker value={workspaceId} onChange={setWorkspaceId}
+                    disabled={busy || !retrievalSources.includes("workspace")} ariaLabel={t("workspace_label")} />
+                </div>
+              </fieldset>
+              {conversationId && (
+                <button
+                  onClick={() => setExportOpen(true)}
+                  className="ml-auto flex shrink-0 items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs text-gray-600 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 transition-colors"
+                >
+                  <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
+                  </svg>
+                  {t("export")}
+                </button>
+              )}
+            </div>
             {agentsError && <p className="mb-2 text-xs text-amber-700">{t("agents_load_failed")}</p>}
             {retrievalSources.length === 0 && <p className="mb-2 text-xs text-gray-500">{t("knowledge_only")}</p>}
             {retrievalSources.some((id) => id !== "workspace") && <p className="mb-2 text-xs text-gray-500">{t("external_search_hint")}</p>}
