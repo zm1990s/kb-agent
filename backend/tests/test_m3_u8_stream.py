@@ -7,7 +7,7 @@ import pytest
 
 from app.engine.base import EngineResult, TextChunk
 from app.models.document import Document
-from app.services import answer_service, chat_generation
+from app.services import answer_service
 
 pytestmark = pytest.mark.asyncio
 
@@ -94,14 +94,6 @@ async def test_stream_emits_stages_then_done(client, seed_user, db_session, monk
     stage_ids = [d["stage"] for e, d in events if e == "stage"]
     assert "indexing" in stage_ids
     assert "thinking" in stage_ids
-    snapshots = [d["agent_runs"] for e, d in events if e == "stage" and d.get("agent_runs")]
-    assert snapshots[0][0]["status"] == "queued"
-    assert any(r[0]["status"] == "running" for r in snapshots)
-    assert snapshots[-1][0]["status"] == "done"
-    assert snapshots[-1][0]["evidence_count"] == 1
-    # A reconnect receives only latest_stage, so synthesis stages retain the snapshot.
-    state = chat_generation._registry[uuid.UUID(done_data["conversation_id"])]
-    assert state.latest_stage["agent_runs"] == snapshots[-1]
 
 
 async def test_stream_non_member_403(client, seed_user):

@@ -57,7 +57,6 @@ class Stage:
     stage: str
     message_key: str
     message_params: dict = field(default_factory=dict)
-    agent_runs: list[dict] | None = None
 
 
 @dataclass
@@ -131,29 +130,15 @@ async def answer_question_streamed(
         retrieval_sources=retrieval_sources,
     )
     agents = registry.all_agents()
-    progress = {
-        a.descriptor.id: {"agent_id": a.descriptor.id, "name": a.descriptor.name,
-                          "source_type": a.descriptor.source_type,
-                          "workspace_id": a.descriptor.workspace_id, "status": "queued"}
-        for a in agents
-    }
-
-    def progress_stage():
-        return Stage("indexing", "stage_agent_activity",
-                     agent_runs=[dict(run) for run in progress.values()])
-
-    yield progress_stage()
     temporal = document_updates_query(question)
     if temporal is not None and (
         retrieval_sources is None or set(retrieval_sources) == {"workspace"}
     ):
-        for run in progress.values():
-            run["status"] = "running"
-        yield Stage("indexing", "stage_upload_history", agent_runs=list(progress.values()))
+        yield Stage("indexing", "stage_upload_history")
         answer, sources, runs = await retrieve_document_updates(
             session, temporal, [a for a in agents if isinstance(a, WorkspaceAgent)],
         )
-        yield Stage("done", "stage_done", agent_runs=runs)
+        yield Stage("done", "stage_done")
         yield AnswerResult(answer=answer, sources=sources, agent_runs=runs)
         return
     engine = await get_chat_engine(session, extra_headers=render_task_headers(
@@ -167,6 +152,9 @@ async def answer_question_streamed(
         [("workspaces", local)] if local else []
     )
     jobs.extend(("external", agent) for agent in agents if not isinstance(agent, WorkspaceAgent))
+    for agent in agents:
+        yield Stage("indexing", "stage_agent_searching", {"name": agent.descriptor.name})
+
     async def retrieve_job(job):
         kind, target = job
         if kind == "workspaces":
@@ -190,38 +178,7 @@ async def answer_question_streamed(
             logger.exception("External retrieval agent failed agent=%s", target.descriptor.id)
             return [(target, exc)]
 
-    updates: asyncio.Queue[Stage | None] = asyncio.Queue()
-
-    async def tracked_job(job):
-        kind, target = job
-        targets = target if kind == "workspaces" else [target]
-        for agent in targets:
-            progress[agent.descriptor.id]["status"] = "running"
-        updates.put_nowait(progress_stage())
-        group = await retrieve_job(job)
-        for agent, result in group:
-            run = progress[agent.descriptor.id]
-            run["status"] = "failed" if isinstance(result, Exception) else "done"
-            if not isinstance(result, Exception):
-                run.update(evidence_count=len(result.evidence), indexed_count=result.indexed_count)
-        updates.put_nowait(progress_stage())
-        return group
-
-    async def collect():
-        try:
-            return await bounded_map(jobs, tracked_job)
-        finally:
-            updates.put_nowait(None)
-
-    worker = asyncio.create_task(collect())
-    try:
-        while (update := await updates.get()) is not None:
-            yield update
-        completed = await worker
-    finally:
-        if not worker.done():
-            worker.cancel()
-        await asyncio.gather(worker, return_exceptions=True)
+    completed = await bounded_map(jobs, retrieve_job)
     results = {agent.descriptor.id: result for group in completed for agent, result in group}
     budget_failed = False
     for agent in agents:

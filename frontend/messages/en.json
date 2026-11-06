@@ -159,18 +159,6 @@
     "knowledge_only": "No sources selected. Answers will use existing knowledge.",
     "external_search_hint": "External search sends question keywords to Palo Alto’s public search service.",
     "agents_load_failed": "Unable to load external search capabilities. Refresh to retry.",
-    "stage_agent_activity": "Retrieval agents are searching…",
-    "agent_flow_title": "Agents at work",
-    "agent_flow_subtitle": "Search sources · Gather evidence · Compose an answer",
-    "agent_flow_running": "{count} agents running",
-    "agent_flow_dispatch": "Dispatch query",
-    "agent_flow_searching": "Searching",
-    "agent_flow_queued": "Queued",
-    "agent_flow_failed": "Search failed",
-    "agent_flow_empty": "No relevant evidence",
-    "agent_flow_evidence": "{count} evidence items",
-    "agent_flow_merge": "Waiting to combine results",
-    "agent_flow_synthesizing": "Composing the answer",
     "source_paloalto_docs": "Palo Alto Docs"
   },
   "messageBubble": {
