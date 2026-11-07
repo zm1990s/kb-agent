@@ -824,7 +824,7 @@ async def list_conversation_files(
     storage = get_storage()
     workdir = await storage.resolve_dir(f"chatplus/conv_{conversation_id}")
     files: list[dict] = []
-    for entry in sorted(workdir.rglob("*")):
+    for entry in sorted(workdir.rglob("*", follow_symlinks=False)):
         if not entry.is_file():
             continue
         rel = entry.relative_to(workdir).as_posix()
@@ -934,7 +934,7 @@ async def save_conversation_file_to_library(
     role = await get_ws_role(
         session, workspace_id=body.workspace_id, user_id=current_user.id
     )
-    if role not in ("owner", "editor"):
+    if role not in ("owner", "editor") and not current_user.is_admin:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "需要空间管理员或编辑权限")
 
     # 防穿越：规范化后不得为绝对路径 / 含 .. / 空 / 目录（保留子目录 relpath）
