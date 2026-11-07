@@ -90,6 +90,12 @@ async def build_registry(
             return AgentRegistry([])
         allowed = {ws.id for ws, _ in await list_my_workspaces(session, user=user)}
         ids &= allowed
+    else:
+        import logging as _logging
+        _logging.getLogger(__name__).warning(
+            "build_registry called without user_id; skipping detached permission re-check. "
+            "Ensure caller has already authorized the workspace scope."
+        )
     if "workspace" not in sources:
         ids = set()
     workspaces = (await session.execute(
