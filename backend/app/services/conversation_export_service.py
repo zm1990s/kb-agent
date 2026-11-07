@@ -8,6 +8,7 @@ from typing import Literal
 
 from lxml import etree
 
+from app.agents.citations import strip_citations
 from app.schemas.chat import MessagePublic
 
 DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
@@ -63,7 +64,39 @@ def build_export(
     return data, DOCX_MIME, f"{base}_{date_str}.docx"
 
 
+def _source_description(source) -> str:
+    """Keep source origin and links without UI citation markers in exports."""
+    data = source if isinstance(source, dict) else source.model_dump()
+    label = data.get("title", "")
+    if data.get("workspace_name"):
+        label = f"{data['workspace_name']} · {label}"
+    elif data.get("source_type"):
+        origin = {"paloalto_kb": "Palo Alto KB (official)",
+                  "paloalto_live": "LIVEcommunity (community)",
+                  "paloalto_docs": "Palo Alto Docs (official documentation)"}.get(
+                      data["source_type"], data["source_type"],
+                  )
+        label = f"{origin} · {label}"
+    if data.get("version"):
+        label += f" ({data['version']})"
+    url = data.get("url") or ""
+    if url.startswith(("https://", "http://")):
+        label += f" — {url}"
+    elif data.get("doc_id"):
+        label += f" (document:{data['doc_id']})"
+    return label
+
+
 # ── Markdown ────────────────────────────────────────────────────────────────
+
+def _answer_content(msg: MessagePublic) -> str:
+    content = strip_citations(msg.content)
+    if msg.retrieval.get("warning") == "knowledge_fallback":
+        return "基于模型已有知识及对话上下文回答，未引用知识库文档。\n\n" + content
+    if msg.retrieval.get("warning") == "citation_degraded":
+        return "来源引用未通过校验（Unverified citations），请核对原文。\n\n" + content
+    return content
+
 
 def _build_markdown(title: str, messages: list[MessagePublic], date_str: str) -> bytes:
     lines: list[str] = [f"# {title}", "", f"*导出时间：{date_str}*", ""]
@@ -71,11 +104,11 @@ def _build_markdown(title: str, messages: list[MessagePublic], date_str: str) ->
         if msg.role == "user":
             lines += ["---", "", "**提问**", "", msg.content, ""]
         else:
-            lines += ["**回答**", "", msg.content, ""]
+            lines += ["**回答**", "", _answer_content(msg), ""]
             sources: list = getattr(msg, "sources", []) or []
             if sources:
                 titles = " · ".join(
-                    s.get("title", "") if isinstance(s, dict) else getattr(s, "title", "")
+                    _source_description(s)
                     for s in sources
                 )
                 if titles:
@@ -304,13 +337,13 @@ def _build_docx(title: str, messages: list[MessagePublic], date_str: str) -> byt
             for line in msg.content.splitlines():
                 d.add_paragraph(line)
         else:
-            _render_markdown_to_doc(d, msg.content)
+            _render_markdown_to_doc(d, _answer_content(msg))
 
         # 来源
         sources: list = getattr(msg, "sources", []) or []
         if sources and msg.role == "assistant":
             titles = " · ".join(
-                s.get("title", "") if isinstance(s, dict) else getattr(s, "title", "")
+                _source_description(s)
                 for s in sources
             )
             if titles:
@@ -517,7 +550,7 @@ def _build_pdf(title: str, messages: list[MessagePublic], date_str: str) -> byte
                 if line.strip():
                     flow.append(Paragraph(_pdf_esc(line), body_st))
         else:
-            lines = msg.content.splitlines()
+            lines = _answer_content(msg).splitlines()
             i = 0
             in_code = False
             code_lines: list[str] = []
@@ -612,7 +645,7 @@ def _build_pdf(title: str, messages: list[MessagePublic], date_str: str) -> byte
         sources: list = getattr(msg, "sources", []) or []
         if sources and msg.role == "assistant":
             src_titles = " · ".join(
-                s.get("title", "") if isinstance(s, dict) else getattr(s, "title", "")
+                _source_description(s)
                 for s in sources
             )
             if src_titles:

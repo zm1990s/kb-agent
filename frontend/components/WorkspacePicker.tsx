@@ -7,12 +7,14 @@ import type { Workspace } from "@/lib/types";
 
 interface Props {
   value: string | null;
+  disabled?: boolean;
+  ariaLabel?: string;
   onChange: (id: string | null) => void;
   onWorkspaceChange?: (ws: Workspace) => void;
 }
 
 // 空间下拉选择器。加载当前用户可见空间；无空间时提示。
-export default function WorkspacePicker({ value, onChange, onWorkspaceChange }: Props) {
+export default function WorkspacePicker({ value, onChange, onWorkspaceChange, disabled, ariaLabel }: Props) {
   const t = useTranslations("workspacePicker");
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [loading, setLoading] = useState(true);
@@ -45,6 +47,8 @@ export default function WorkspacePicker({ value, onChange, onWorkspaceChange }: 
   return (
     <select
       value={value ?? ""}
+      disabled={disabled}
+      aria-label={ariaLabel}
       onChange={(e) => {
         onChange(e.target.value || null);
         const ws = e.target.value ? workspaces.find((w) => w.id === e.target.value) : undefined;

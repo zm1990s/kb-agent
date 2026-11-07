@@ -3,17 +3,66 @@
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
+interface MarkdownNode {
+  type: string;
+  value?: string;
+  url?: string;
+  children?: MarkdownNode[];
+}
+
+// Transform only prose text nodes; code, existing links and images stay intact.
+function citationPlugin(ids: Set<string>) {
+  return () => (tree: MarkdownNode) => {
+    function walk(node: MarkdownNode) {
+      if (!node.children || ["link", "code", "inlineCode", "image"].includes(node.type)) return;
+      node.children = node.children.flatMap((child) => {
+        if (child.type !== "text" || !child.value) { walk(child); return [child]; }
+        const text = child.value;
+        const result: MarkdownNode[] = [];
+        let start = 0;
+        for (const match of text.matchAll(/\[(S\d+)\]/g)) {
+          if (!ids.has(match[1])) continue;
+          const index = match.index!;
+          result.push({ type: "text", value: text.slice(start, index) });
+          result.push({ type: "link", url: `#kb-source-${match[1]}`,
+            children: [{ type: "text", value: match[0] }] });
+          start = index + match[0].length;
+        }
+        result.push({ type: "text", value: text.slice(start) });
+        return result;
+      });
+    }
+    walk(tree);
+  };
+}
+
 // LLM 产物的 Markdown 渲染。react-markdown 默认不解析裸 HTML，
 // 且未启用 rehype-raw，故不会执行 <script> 等 —— 天然防存储型 XSS（SECURITY #6）。
-export default function Markdown({ content }: { content: string }) {
+export default function Markdown({ content, citationIds = [], onCitationClick, citationTargetId, activeCitationId }: {
+  content: string;
+  citationIds?: string[];
+  onCitationClick?: (id: string) => void;
+  citationTargetId?: string;
+  activeCitationId?: string;
+}) {
   // 兜底：LLM 有时输出字面量 \n 而非真实换行，导致 Markdown 解析失败
   const normalized = content.replace(/\\n/g, "\n").replace(/\\t/g, "\t");
   return (
     <div className="max-w-none break-words text-sm leading-relaxed text-gray-900">
       <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
+        remarkPlugins={[remarkGfm, citationPlugin(new Set(citationIds))]}
         components={{
           a: ({ href, ...props }) => {
+            if (href?.startsWith("#kb-source-") && onCitationClick) {
+              const id = href.slice("#kb-source-".length);
+              if (citationIds.includes(id)) return (
+                <button type="button" onClick={() => onCitationClick(id)}
+                  aria-expanded={activeCitationId === id} aria-controls={citationTargetId}
+                  className="mx-0.5 text-xs font-semibold text-blue-600 underline">
+                  {props.children}
+                </button>
+              );
+            }
             const safe = href && /^(https?:\/\/|mailto:|\/)/i.test(href) ? href : undefined;
             return (
               <a

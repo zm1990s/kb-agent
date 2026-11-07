@@ -12,7 +12,7 @@ import uuid
 from datetime import UTC, datetime, timedelta
 
 import bcrypt
-from jose import JWTError, jwt
+import jwt as _pyjwt
 
 from app.core.config import get_settings
 
@@ -53,7 +53,7 @@ def create_access_token(*, user_id: uuid.UUID, role: str, expire_min: int | None
         "iat": now,
         "exp": now + timedelta(minutes=minutes),
     }
-    return jwt.encode(payload, settings.jwt_secret, algorithm=ALGORITHM)
+    return _pyjwt.encode(payload, settings.jwt_secret, algorithm=ALGORITHM)
 
 
 REFRESH_EXPIRE_DAYS = 30
@@ -74,8 +74,8 @@ def decode_access_token(token: str) -> dict:
     settings = get_settings()
     try:
         # 显式限定算法，杜绝 alg=none / 算法混淆
-        payload = jwt.decode(token, settings.jwt_secret, algorithms=[ALGORITHM])
-    except JWTError as exc:
+        payload = _pyjwt.decode(token, settings.jwt_secret, algorithms=[ALGORITHM])
+    except _pyjwt.PyJWTError as exc:
         raise TokenError(str(exc)) from exc
     if "sub" not in payload:
         raise TokenError("token 缺少 sub")

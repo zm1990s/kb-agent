@@ -1,4 +1,4 @@
-"""M3-U3/U7：Agent 式索引问答。Claude 基于全空间索引作答并选相关文档。"""
+"""Workspace Agent selects evidence; final synthesis cites only that evidence."""
 
 import json
 import uuid
@@ -9,7 +9,7 @@ from app.engine.base import EngineResult, TextChunk
 from app.models.auth import Workspace
 from app.models.document import Document
 from app.services import answer_service
-from app.services.answer_service import NO_DOCS_ANSWER, answer_question
+from app.services.answer_service import answer_question
 
 pytestmark = pytest.mark.asyncio
 
@@ -52,7 +52,7 @@ async def _ready_doc(session, ws_id, *, title, summary="摘要", tags=None):
     return doc
 
 
-async def test_answer_feeds_full_index_and_selects_docs(db_session, monkeypatch):
+async def test_answer_synthesis_only_receives_selected_evidence(db_session, monkeypatch):
     ws = Workspace(id=uuid.uuid4(), name="ws")
     db_session.add(ws)
     await db_session.commit()
@@ -60,20 +60,21 @@ async def test_answer_feeds_full_index_and_selects_docs(db_session, monkeypatch)
     await _ready_doc(db_session, ws.id, title="报销流程")
 
     # Claude 选中第 1 篇（索引按 created_at 倒序，[1] 为最新创建的“报销流程”）
-    fake = _FakeEngine(answer="防火墙这样配置……", doc_numbers=[1])
+    fake = _FakeEngine(answer="报销说明。[S1]", doc_numbers=[1])
     async def _engine(*a, **k): return fake
     monkeypatch.setattr(answer_service, "get_chat_engine", _engine)
 
     res = await answer_question(db_session, workspace_id=ws.id, question="防火墙怎么配")
     assert fake.called
-    # 全空间索引都进了 prompt（两篇标题都在）
-    assert "防火墙配置指南" in fake.last_prompt
+    # 汇总阶段只收到选中的证据，不再接收全空间目录。
+    assert "防火墙配置指南" not in fake.last_prompt
     assert "报销流程" in fake.last_prompt
-    assert res.answer == "防火墙这样配置……"
+    assert res.answer == "报销说明。[S1]"
     # 编号 1 映射为一个可下载来源（编号→真实文档由服务端控制）
     assert len(res.sources) == 1
     assert res.sources[0]["title"] == "报销流程"
-    assert "download" in res.sources[0]["download_url"]
+    assert res.sources[0]["citation_id"] == "S1"
+    assert res.sources[0]["workspace_id"] == str(ws.id)
 
 
 async def test_answer_no_docs_selected_returns_no_sources(db_session, monkeypatch):
@@ -82,13 +83,14 @@ async def test_answer_no_docs_selected_returns_no_sources(db_session, monkeypatc
     await db_session.commit()
     await _ready_doc(db_session, ws.id, title="报销流程")
 
-    fake = _FakeEngine(answer="没有找到防火墙相关文档。", doc_numbers=[])
+    fake = _FakeEngine(answer="防火墙通过安全策略控制流量。", doc_numbers=[])
     async def _engine(*a, **k): return fake
     monkeypatch.setattr(answer_service, "get_chat_engine", _engine)
 
     res = await answer_question(db_session, workspace_id=ws.id, question="防火墙")
-    assert res.answer == "没有找到防火墙相关文档。"
+    assert res.error_key is None and res.warning == "knowledge_fallback"
     assert res.sources == []
+    assert res.answer == "防火墙通过安全策略控制流量。"
 
 
 async def test_answer_empty_workspace_no_history(db_session, monkeypatch):
@@ -101,9 +103,11 @@ async def test_answer_empty_workspace_no_history(db_session, monkeypatch):
     monkeypatch.setattr(answer_service, "get_chat_engine", _engine)
 
     res = await answer_question(db_session, workspace_id=ws.id, question="任意问题")
-    # 空间无文档且无历史：不调用引擎，直接提示
-    assert res.answer == NO_DOCS_ANSWER
-    assert fake.called is False
+    # 空间无文档且无历史：跳过选文，基于模型知识回答
+    assert res.error_key is None and res.warning == "knowledge_fallback"
+    assert fake.called is False  # No selection or citation-repair call.
+    assert res.answer == "这是答案"
+    assert "已有通用知识" in fake.last_prompt
 
 
 async def test_answer_hallucinated_doc_number_ignored(db_session, monkeypatch):

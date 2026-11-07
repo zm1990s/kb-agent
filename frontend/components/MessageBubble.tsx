@@ -1,30 +1,67 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import Markdown from "@/components/Markdown";
-import type { SourceRef } from "@/lib/types";
+import type { AgentRun, SourceRef } from "@/lib/types";
 
 interface Props {
   role: "user" | "assistant";
   content: string;
   sources?: SourceRef[];
+  agentRuns?: AgentRun[];
   errorKey?: string;
+  warning?: string;
   onDownload?: (s: SourceRef) => void;
   onEdit?: (newContent: string) => void;
   onResend?: () => void;
 }
 
-export default function MessageBubble({ role, content, sources, errorKey, onDownload, onEdit, onResend }: Props) {
+export default function MessageBubble({ role, content, sources, agentRuns, errorKey, warning, onDownload, onEdit, onResend }: Props) {
   const t = useTranslations("messageBubble");
   const isUser = role === "user";
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(content);
   const [copied, setCopied] = useState(false);
+  const [selectedSource, setSelectedSource] = useState<{ id: string } | null>(null);
+  const selected = sources?.find((s) => s.citation_id === selectedSource?.id);
+  const evidenceId = useId();
+  const evidenceRef = useRef<HTMLDivElement>(null);
+  const excerptRef = useRef<HTMLQuoteElement>(null);
+
+  useEffect(() => {
+    const panel = evidenceRef.current;
+    if (!selectedSource || !panel) return;
+    if (excerptRef.current) excerptRef.current.scrollTop = 0;
+    panel.focus({ preventScroll: true });
+    panel.scrollIntoView({
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth",
+      block: "start",
+    });
+  }, [selectedSource]);
+
+  function openSource(id: string) {
+    // A new selection also scrolls when the same citation is clicked again.
+    setSelectedSource({ id });
+  }
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  function sourceLabel(source: SourceRef) {
+    if (source.source_type === "paloalto_kb") return `Palo Alto KB · ${t("source_paloalto_kb")}`;
+    if (source.source_type === "paloalto_live") return `LIVEcommunity · ${t("source_paloalto_live")}`;
+    if (source.source_type === "paloalto_docs") return `Palo Alto Docs · ${t("source_paloalto_docs")}`;
+    return source.workspace_name ?? source.source_type ?? "";
+  }
+
   function copyContent() {
-    navigator.clipboard.writeText(content).then(() => {
+    // Strip answer citations from prose, preserving literal markers in code
+    // examples and leaving the user's original question untouched.
+    const copiedContent = isUser ? content : content
+      .split(/(```[\s\S]*?```|~~~[\s\S]*?~~~|`[^`\n]*`)/g)
+      .map((part, index) => index % 2 ? part : part.replace(/\[S\d+\](?:\([^\n)]*\))?/g, ""))
+      .join("")
+      .trim();
+    navigator.clipboard.writeText(copiedContent).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     });
@@ -113,7 +150,10 @@ export default function MessageBubble({ role, content, sources, errorKey, onDown
                 ? content
                 : errorKey
                   ? <span className="text-red-500">{t(errorKey as Parameters<typeof t>[0])}</span>
-                  : <Markdown content={content} />
+                  : <Markdown content={content}
+                      citationIds={sources?.flatMap((s) => s.citation_id ? [s.citation_id] : [])}
+                      onCitationClick={openSource}
+                      citationTargetId={evidenceId} activeCitationId={selectedSource?.id} />
               }
             </div>
             {/* 右下角操作按钮 */}
@@ -169,17 +209,70 @@ export default function MessageBubble({ role, content, sources, errorKey, onDown
           <div className="flex flex-wrap gap-1.5">
             {sources.map((s) => (
               <button
-                key={s.doc_id}
-                onClick={() => onDownload?.(s)}
+                key={s.id ?? s.doc_id ?? s.url}
+                onClick={() => s.citation_id
+                  ? setSelectedSource(selectedSource?.id === s.citation_id ? null : { id: s.citation_id })
+                  : onDownload?.(s)}
                 className="flex items-center gap-1 rounded-full border border-gray-200 bg-white px-2.5 py-1 text-xs text-blue-600 hover:border-blue-300 hover:bg-blue-50 transition-colors"
-                title={t("download_original")}
+                aria-expanded={s.citation_id ? selectedSource?.id === s.citation_id : undefined}
+                aria-controls={s.citation_id ? evidenceId : undefined}
+                title={s.citation_id ? t("view_evidence") : t("download_original")}
               >
                 <svg className="h-3 w-3" viewBox="0 0 16 16" fill="currentColor">
                   <path d="M9 2H4a1 1 0 00-1 1v10a1 1 0 001 1h8a1 1 0 001-1V6l-4-4zm1 4V3l3 3h-3z"/>
                 </svg>
-                {s.title}
+                {s.citation_id && `[${s.citation_id}] `}
+                {sourceLabel(s) ? `${sourceLabel(s)} · ` : ""}{s.title}
               </button>
             ))}
+          </div>
+        )}
+        {!isUser && warning && (
+          <p role="status" className="text-xs text-amber-700">
+            {t(warning as Parameters<typeof t>[0])}
+          </p>
+        )}
+        {agentRuns && agentRuns.length > 0 && (
+          <details className="text-xs text-gray-500">
+            <summary className="cursor-pointer">{t("retrieval_scope")}</summary>
+            <ul className="mt-1 space-y-1">
+              {agentRuns.map((run) => <li key={run.agent_id}>
+                {run.name} · {run.status === "failed" ? t("agent_failed")
+                  : t("evidence_count", { count: run.evidence_count ?? 0 })}
+                {run.status === "done" && run.indexed_count !== undefined
+                  && ` · ${t(run.source_type?.startsWith("paloalto_") ? "candidate_count" : "indexed_count", { count: run.indexed_count })}`}
+                {run.truncated && ` · ${t(run.source_type?.startsWith("paloalto_") ? "more_search_results" : "index_truncated")}`}
+              </li>)}
+            </ul>
+          </details>
+        )}
+        {selected && (
+          <div ref={evidenceRef} id={evidenceId} role="region" tabIndex={-1}
+            aria-label={`[${selected.citation_id}] ${selected.title}`}
+            className="w-full scroll-mt-4 rounded-lg border border-blue-100 bg-blue-50 p-3 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-300">
+            <div className="font-medium">[{selected.citation_id}] {selected.title}</div>
+            <div className="mt-1 text-gray-500">
+              {sourceLabel(selected)}
+              {selected.version && ` · ${selected.version}`}
+              {selected.content_kind === "processed_text" && ` · ${t("processed_text")}`}
+              {selected.content_kind === "summary" && ` · ${t("summary")}`}
+              {selected.content_kind === "document_metadata" && ` · ${t("document_metadata")}`}
+              {selected.content_kind === "document_catalog" && ` · ${t("document_catalog")}`}
+              {selected.content_kind === "indexed_web_page" && ` · ${t("indexed_web_page")}`}
+              {selected.content_kind === "external_excerpt" && ` · ${t("external_excerpt")}`}
+              {selected.content_kind === "web_page" && ` · ${t("web_page")}`}
+            </div>
+            {selected.product && <div className="mt-1">{selected.product}</div>}
+            {(["updated_at", "indexed_at", "retrieved_at"] as const).map((field) => selected[field] && (
+              <div key={field} className="mt-1 text-gray-500">{t(field)}: {selected[field]}</div>
+            ))}
+            {selected.excerpt && <blockquote ref={excerptRef} className="my-2 max-h-60 overflow-y-auto whitespace-pre-wrap border-l-2 border-blue-200 pl-3">{selected.excerpt}</blockquote>}
+            {selected.doc_id && <button type="button" onClick={() => onDownload?.(selected)}
+              className="text-blue-600 underline">{t("download_original")}</button>}
+            {selected.url && /^https?:\/\//i.test(selected.url) && (
+              <a href={selected.url} target="_blank" rel="noopener noreferrer"
+                className="text-blue-600 underline">{t("open_source")}</a>
+            )}
           </div>
         )}
       </div>

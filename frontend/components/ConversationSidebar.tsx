@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useTranslations } from "next-intl";
 import { api } from "@/lib/api";
 import { useDialog } from "@/components/DialogProvider";
@@ -15,6 +15,13 @@ interface Props {
   onUpdated?: (conv: ConversationSummary) => void;
   onDeleted?: (id: string) => void;
   onScheduledTasks?: () => void;
+  collapseOnSmallScreens?: boolean;
+}
+
+function subscribeSmallScreen(onChange: () => void) {
+  const media = window.matchMedia("(max-width: 639px)");
+  media.addEventListener("change", onChange);
+  return () => media.removeEventListener("change", onChange);
 }
 
 export default function ConversationSidebar({
@@ -26,10 +33,13 @@ export default function ConversationSidebar({
   onUpdated,
   onDeleted,
   onScheduledTasks,
+  collapseOnSmallScreens = false,
 }: Props) {
   const t = useTranslations("sidebar");
   const { showConfirm } = useDialog();
-  const [collapsed, setCollapsed] = useState(false);
+  const smallScreen = useSyncExternalStore(subscribeSmallScreen,
+    () => window.matchMedia("(max-width: 639px)").matches, () => false);
+  const [collapsed, setCollapsed] = useState<boolean | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
   const editRef = useRef<HTMLInputElement>(null);
@@ -84,7 +94,7 @@ export default function ConversationSidebar({
     }
   }
 
-  if (collapsed) {
+  if (collapsed ?? (collapseOnSmallScreens && smallScreen)) {
     return (
       <div className="relative w-0 shrink-0">
         <button
