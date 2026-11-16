@@ -213,10 +213,10 @@ docker compose exec backend claude auth login
 
 ### 开发模式
 
-源码 bind-mount 进容器，改动立即生效（前端 HMR）：
+源码 bind-mount 进容器，前端 HMR、后端 Uvicorn 自动重载：
 
 ```bash
-make dev    # 构建并启动（首次较慢）
+make dev    # 构建并启动（首次较慢）；启动后源码改动自动生效
 make down   # 停止并移除容器
 ```
 

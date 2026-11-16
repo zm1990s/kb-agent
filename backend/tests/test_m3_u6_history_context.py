@@ -20,12 +20,12 @@ class _CapturingEngine:
 
     async def complete(self, prompt, *, files=None, system=None):
         # Phase 1：返回空 JSON（走 answer 分支）
-        return EngineResult(text="{}")
+        return EngineResult(text='{"doc_numbers": [1]}')
 
     async def complete_streaming(self, prompt, *, system=None, files=None):
         # Phase 2：记录 prompt，yield 答案
         self.last_prompt = prompt
-        yield TextChunk(text="答案")
+        yield TextChunk(text="答案[S1]")
 
 
 async def _ready_doc(session, ws_id, *, title="防火墙", content="firewall policy"):
@@ -66,14 +66,14 @@ async def test_history_is_passed_to_engine(client, seed_user, db_session, monkey
         "/chat", json={"workspace_id": ws_id, "message": "firewall"}, headers=admin
     )
     conv_id = r1.json()["conversation_id"]
-    assert r1.json()["answer"] == "答案"  # 命中，引擎被调用
+    assert r1.json()["answer"] == "答案[S1]"  # 命中，引擎被调用
     # 第二轮：同会话，历史应含第一轮的问答
     r2 = await client.post(
         "/chat",
         json={"workspace_id": ws_id, "message": "firewall", "conversation_id": conv_id},
         headers=admin,
     )
-    assert r2.json()["answer"] == "答案"
+    assert r2.json()["answer"] == "答案[S1]"
     assert cap.last_prompt is not None
     assert "对话历史" in cap.last_prompt
     # 第一轮的提问与答案应出现在第二轮的 prompt 历史里
@@ -81,7 +81,7 @@ async def test_history_is_passed_to_engine(client, seed_user, db_session, monkey
 
 
 async def test_no_hit_with_history_still_answers(db_session, monkeypatch):
-    """无命中但有历史（追问/元问题）：仍调 engine 依历史作答，不 dead-end。"""
+    """无文档时可以回顾历史并使用通用知识，不伪装为知识库引用。"""
     from app.services.answer_service import answer_question
 
     cap = _CapturingEngine()
@@ -96,7 +96,8 @@ async def test_no_hit_with_history_still_answers(db_session, monkeypatch):
     )
     assert cap.last_prompt is not None  # 引擎被调用了
     assert res.answer == "答案"
-    assert res.sources == []  # 无命中 → 无来源
+    assert res.sources == [] and res.warning == "knowledge_fallback"
+    assert "介绍防火墙" in cap.last_prompt
 
 
 async def test_create_and_list_conversations(client, seed_user):

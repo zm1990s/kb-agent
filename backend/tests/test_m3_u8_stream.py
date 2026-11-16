@@ -13,7 +13,7 @@ pytestmark = pytest.mark.asyncio
 
 
 class _FakeEngine:
-    def __init__(self, answer="流式答案", doc_numbers=None):
+    def __init__(self, answer="流式答案[S1]", doc_numbers=None):
         self._answer = answer
         self._payload = json.dumps({"doc_numbers": doc_numbers or []})
 
@@ -86,7 +86,7 @@ async def test_stream_emits_stages_then_done(client, seed_user, db_session, monk
     assert kinds[-1] == "done"
 
     done_data = events[-1][1]
-    assert done_data["answer"] == "流式答案"
+    assert done_data["answer"] == "流式答案[S1]"
     assert len(done_data["sources"]) == 1
     assert "conversation_id" in done_data
 

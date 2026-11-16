@@ -45,6 +45,7 @@ services:
       - AWS_REGION
       - OPENAI_API_KEY
       - LOG_DIR=/app/logs
+      - UVICORN_RELOAD=1
     expose:
       - "8000"
     volumes:

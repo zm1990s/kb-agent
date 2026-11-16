@@ -3,6 +3,7 @@
 import { useTranslations } from "next-intl";
 
 const STEPS = [
+  { key: "routing", labelKey: "stage_routing_short" },
   { key: "indexing", labelKey: "stage_indexing" },
   { key: "thinking", labelKey: "stage_thinking" },
   { key: "parsing",  labelKey: "stage_parsing"  },

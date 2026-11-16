@@ -49,7 +49,8 @@ async def db_engine():
     engine = create_async_engine(os.environ["DATABASE_URL"])
     try:
         async with engine.begin() as conn:
-            await conn.exec_driver_sql('CREATE EXTENSION IF NOT EXISTS "uuid-ossp"')
+            # ORM models generate UUIDs in Python; no uuid-ossp extension is
+            # required for this schema (production migrations install their own).
             await conn.run_sync(Base.metadata.drop_all)
             await conn.run_sync(Base.metadata.create_all)
     except Exception as exc:  # noqa: BLE001
@@ -64,7 +65,7 @@ async def db_engine():
 
 
 @pytest_asyncio.fixture
-async def client(db_engine):
+async def client(db_engine, monkeypatch):
     """基于建好表的 DB 的 httpx 异步客户端。
 
     覆盖 get_session 依赖，让应用与测试共用同一 engine（同一事件循环），
@@ -78,6 +79,15 @@ async def client(db_engine):
     test_sessionmaker = async_sessionmaker(
         bind=db_engine, class_=AsyncSession, expire_on_commit=False
     )
+    # Detached Chat jobs must use this test's engine and event loop too.
+    from unittest.mock import AsyncMock
+
+    import app.api.chat as chat_api
+    import app.services.chat_generation as generation
+
+    monkeypatch.setattr(chat_api, "SessionLocal", test_sessionmaker)
+    monkeypatch.setattr(generation, "SessionLocal", test_sessionmaker)
+    monkeypatch.setattr(generation, "generate_conversation_title", AsyncMock(return_value=None))
 
     async def _override_get_session():
         async with test_sessionmaker() as session:

@@ -75,6 +75,8 @@ class GenerationState:
     stream_blocks: list[list] = field(default_factory=list)
     # 终态事件（done / output_files / title），供晚到的重连按序补发
     terminal_events: list[tuple[str, dict]] = field(default_factory=list)
+    latest_stage: dict | None = None
+    retrieval: dict = field(default_factory=dict)
     task: asyncio.Task | None = None
     cancel_requested: bool = False
     started_at: float = field(default_factory=time.monotonic)
@@ -131,6 +133,8 @@ def list_active_details(user_id: uuid.UUID, source: str = "chatplus") -> list[di
 
 def _broadcast(state: GenerationState, event: str, data: dict) -> None:
     """把事件推给所有订阅者（无界队列 + put_nowait，慢订阅者不拖垮生成）。"""
+    if event == "stage":
+        state.latest_stage = data
     # 累积 thinking / token 为有序块（同类合并），供重连按序补发
     if event in ("thinking", "token"):
         text = data["text"]
@@ -159,6 +163,8 @@ def subscribe(
 
     queue: asyncio.Queue = asyncio.Queue()
     catchup: list[tuple[str, dict]] = []
+    if state.latest_stage is not None:
+        catchup.append(("stage", state.latest_stage))
     for kind, text in state.stream_blocks:
         catchup.append((kind, {"text": text}))
     catchup.extend(state.terminal_events)
@@ -221,6 +227,7 @@ async def _persist_and_finalize(
         content=answer,
         sources=sources,
         output_files=output_files,
+        retrieval=state.retrieval,
     )
 
 
@@ -252,7 +259,7 @@ async def _run_generation(
                     output_files = item.files
                 elif isinstance(item, Stage):
                     if state.forward_stage:
-                        # 仅实时广播、不进 stream_blocks（不参与 catchup 补发）
+                        # 保存最新阶段供重连补发，不混入正文 stream_blocks
                         _broadcast(state, "stage", {
                             "stage": item.stage,
                             "message_key": item.message_key,
@@ -290,11 +297,16 @@ async def _run_generation(
             if final is None:
                 final = AnswerResult(answer="", sources=[], error_key="no_answer")
             state.status = "done"
+            state.retrieval = {"error_key": final.error_key, "agent_runs": final.agent_runs,
+                               "warning": final.warning}
             done_payload: dict = {
                 "answer": final.answer,
                 "sources": final.sources,
                 "conversation_id": str(state.conversation_id),
+                "agent_runs": final.agent_runs,
             }
+            if final.warning:
+                done_payload["warning"] = final.warning
             if final.error_key:
                 done_payload["error_key"] = final.error_key
             state.terminal_events.append(("done", done_payload))
@@ -323,6 +335,9 @@ async def _run_generation(
                     "question": question,
                     "answer": final.answer,
                     **state.extra_meta,
+                    "agent_runs": final.agent_runs,
+                    "workspaces": [r["workspace_id"] for r in final.agent_runs
+                                   if r.get("workspace_id")],
                 },
             )
 
@@ -348,7 +363,9 @@ async def _run_generation(
                 _schedule_removal(state.conversation_id)
 
 
-def _spawn(state: GenerationState, question: str, stream_factory: "StreamFactory") -> GenerationState:
+def _spawn(
+    state: GenerationState, question: str, stream_factory: "StreamFactory",
+) -> GenerationState:
     """登记 state 并起 detached 任务；调用方已确保 conversation 未在跑。"""
     _registry[state.conversation_id] = state
     task = asyncio.create_task(
@@ -433,6 +450,7 @@ def start_chat_generation(
     conv_ws: uuid.UUID | None,
     ws_all: list[str],
     user_email: str | None = None,
+    retrieval_sources: list[str] | None = None,
 ) -> GenerationState:
     """启动一个普通对话 detached 生成任务；该会话已在跑则抛 GenerationInProgress。
 
@@ -449,7 +467,7 @@ def start_chat_generation(
         source="chat",
         forward_stage=True,
         event_workspace_id=conv_ws,
-        extra_meta={"workspaces": ws_all},
+        extra_meta={"candidate_workspaces": ws_all, "retrieval_sources": retrieval_sources},
         user_email=user_email,
     )
 
@@ -461,6 +479,8 @@ def start_chat_generation(
             question=question,
             history=history,
             user_email=st.user_email,
+            user_id=st.user_id,
+            retrieval_sources=retrieval_sources,
         ):
             yield item
 

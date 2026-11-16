@@ -54,6 +54,7 @@ async def add_message(
     sources: list | None = None,
     attachments: list | None = None,
     output_files: list | None = None,
+    retrieval: dict | None = None,
 ) -> Message:
     msg = Message(
         id=uuid.uuid4(),
@@ -63,6 +64,7 @@ async def add_message(
         sources=sources or [],
         attachments=attachments or [],
         output_files=output_files or [],
+        retrieval=retrieval or {},
     )
     session.add(msg)
     await session.commit()
@@ -234,5 +236,8 @@ async def generate_conversation_title(
                 await session.commit()
                 return title
     except Exception:
-        logger.exception("generate_conversation_title failed engine=%s conversation=%s", _engine_backend, conversation_id)
+        logger.exception(
+            "generate_conversation_title failed engine=%s conversation=%s",
+            _engine_backend, conversation_id,
+        )
     return None
