@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import FolderTree, { buildTree } from "@/components/FolderTree";
 import Markdown from "@/components/Markdown";
@@ -35,6 +35,9 @@ export default function DocumentsPage() {
   const { showConfirm, showPrompt } = useDialog();
   const ready = useAuthGuard("documents");
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const highlightId = searchParams.get("highlight");
+  const wsFromUrl = searchParams.get("workspace");
   const globalAdmin = isAdmin();
   // workspace 内的写权限：全局 admin，或空间 owner/editor
   const [wsRole, setWsRole] = useState<string | null>(null);
@@ -44,8 +47,8 @@ export default function DocumentsPage() {
     ready: t("status_ready"),
     failed: t("status_failed"),
   };
-  // 记住上次选择的空间（跨页面/刷新）：懒初始化直接读 localStorage（本页为 client 组件）。
-  // WorkspacePicker 会在缓存 ID 失效（不在用户可见空间列表）时自动回落到 null。
+  // 记住上次选择的空间（跨页面/刷新）：初始只读 localStorage（SSR 安全），
+  // mount 后若 URL 携带 workspace 参数则通过 useEffect 覆盖。
   const [workspaceId, setWorkspaceIdState] = useState<string | null>(() => {
     try {
       return localStorage.getItem(WS_STORAGE_KEY);
@@ -53,6 +56,10 @@ export default function DocumentsPage() {
       return null;
     }
   });
+  // 高亮行的 ref map（document ID → <tr> 元素）
+  const rowRefs = useRef<Map<string, HTMLTableRowElement>>(new Map());
+  // 高亮状态：在加载完文档后激活，3 秒后清除
+  const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const setWorkspaceId = useCallback((id: string | null) => {
     setWorkspaceIdState(id);
     try {
@@ -153,6 +160,27 @@ export default function DocumentsPage() {
     const t = setInterval(loadDocs, 3000);
     return () => clearInterval(t);
   }, [docs, loadDocs]);
+
+  // mount 后从 URL workspace 参数切换空间（避免 SSR hydration mismatch）
+  useEffect(() => {
+    if (wsFromUrl) setWorkspaceId(wsFromUrl);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // 从 case-entry 跳转过来时：文档加载完后定位并高亮目标行
+  useEffect(() => {
+    if (!highlightId || docs.length === 0) return;
+    const target = docs.find((d) => d.id === highlightId);
+    if (!target) return;
+    setHighlightedId(highlightId);
+    // 等下一帧 DOM 更新后滚动
+    requestAnimationFrame(() => {
+      const el = rowRefs.current.get(highlightId);
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+    const timer = setTimeout(() => setHighlightedId(null), 3000);
+    return () => clearTimeout(timer);
+  }, [docs, highlightId]);
 
   if (!ready) return null;
 
@@ -731,7 +759,13 @@ export default function DocumentsPage() {
                 {shownDocs.map((d) => (
                   <tr
                     key={d.id}
-                    className="border-t align-top"
+                    ref={(el) => {
+                      if (el) rowRefs.current.set(d.id, el);
+                      else rowRefs.current.delete(d.id);
+                    }}
+                    className={`border-t align-top transition-colors duration-700 ${
+                      highlightedId === d.id ? "bg-yellow-50 ring-1 ring-inset ring-yellow-300" : ""
+                    }`}
                     draggable={admin}
                     onDragStart={(e) =>
                       e.dataTransfer.setData(
