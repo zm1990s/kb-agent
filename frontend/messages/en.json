@@ -224,6 +224,7 @@
     "col_status": "Status",
     "col_summary": "Summary",
     "col_created": "Created",
+    "col_uploader": "Uploaded By",
     "col_title": "Title",
     "col_actions": "Actions",
     "no_folder": "(No folder)",

@@ -224,6 +224,7 @@
     "col_status": "상태",
     "col_summary": "요약",
     "col_created": "생성일",
+    "col_uploader": "업로드한 사람",
     "col_title": "제목",
     "col_actions": "작업",
     "no_folder": "(폴더 없음)",

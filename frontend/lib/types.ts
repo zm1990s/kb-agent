@@ -47,6 +47,8 @@ export interface DocumentPublic {
   created_at: string;
   deleted_at?: string | null;
   content_text: string | null;
+  uploaded_by?: string | null;
+  uploaded_by_email?: string | null;
 }
 
 export interface Folder {

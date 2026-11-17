@@ -224,6 +224,7 @@
     "col_status": "ステータス",
     "col_summary": "概要",
     "col_created": "作成日",
+    "col_uploader": "アップロード者",
     "col_title": "タイトル",
     "col_actions": "操作",
     "no_folder": "（フォルダなし）",

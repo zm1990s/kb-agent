@@ -47,6 +47,8 @@ class DocumentPublic(BaseModel):
     created_at: datetime
     deleted_at: datetime | None = None
     content_text: str | None = None
+    uploaded_by: uuid.UUID | None = None
+    uploaded_by_email: str | None = None
 
 
 class DocumentListItem(BaseModel):
@@ -66,6 +68,8 @@ class DocumentListItem(BaseModel):
     status: str
     created_at: datetime
     deleted_at: datetime | None = None
+    uploaded_by: uuid.UUID | None = None
+    uploaded_by_email: str | None = None
 
 
 class FolderCreate(BaseModel):

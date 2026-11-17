@@ -104,6 +104,7 @@ export default function DocumentsPage() {
     status: true,
     summary: true,
     created: false,
+    uploader: true,
   });
 
   const loadTrash = useCallback(async () => {
@@ -199,6 +200,7 @@ export default function DocumentsPage() {
       d.summary ?? "",
       (d.tags ?? []).join(" "),
       categoryName(d.category_id),
+      d.uploaded_by_email ?? "",
     ]
       .join(" ")
       .toLowerCase();
@@ -213,6 +215,7 @@ export default function DocumentsPage() {
     { key: "status", label: t("col_status") },
     { key: "summary", label: t("col_summary") },
     { key: "created", label: t("col_created") },
+    { key: "uploader", label: t("col_uploader") },
   ];
 
   async function createFolder(parentId: string | null) {
@@ -745,6 +748,7 @@ export default function DocumentsPage() {
                   {cols.status && <th className="px-4 py-2">{t("col_status")}</th>}
                   {cols.summary && <th className="px-4 py-2">{t("col_summary")}</th>}
                   {cols.created && <th className="px-4 py-2">{t("col_created")}</th>}
+                  {cols.uploader && <th className="px-4 py-2">{t("col_uploader")}</th>}
                   <th className="px-4 py-2">{t("col_actions")}</th>
                 </tr>
               </thead>
@@ -877,6 +881,11 @@ export default function DocumentsPage() {
                     {cols.created && (
                       <td className="whitespace-nowrap px-4 py-2 text-xs text-gray-500">
                         {new Date(d.created_at).toLocaleString()}
+                      </td>
+                    )}
+                    {cols.uploader && (
+                      <td className="whitespace-nowrap px-4 py-2 text-xs text-gray-500">
+                        {d.uploaded_by_email ?? "—"}
                       </td>
                     )}
                     <td className="whitespace-nowrap px-4 py-2">
