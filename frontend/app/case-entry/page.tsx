@@ -150,7 +150,10 @@ export default function CaseEntryPage() {
         {savedId && (
           <div className="mt-3 flex items-center gap-3 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">
             <span>{t("saved")}</span>
-            <Link href="/documents" className="font-medium underline hover:text-green-800">
+            <Link
+              href={`/documents?highlight=${savedId}${selectedWsId ? `&workspace=${selectedWsId}` : ""}`}
+              className="font-medium underline hover:text-green-800"
+            >
               {t("goDocuments")}
             </Link>
           </div>
