@@ -44,7 +44,8 @@
     "lang_label": "语言",
     "chatPlus": "聊天+",
     "skills": "Skill 库",
-    "caseEntry": "KB 录入"
+    "caseEntry": "KB 录入",
+    "resources": "资源"
   },
   "login": {
     "title": "KB-Agent",
@@ -532,6 +533,33 @@
     "sso_client_remove_error": "删除失败，请重试",
     "cancel": "取消"
   },
+  "resources": {
+    "title": "资源",
+    "addResource": "添加资源",
+    "cancel": "取消",
+    "typeUrl": "URL 链接",
+    "typeHtml": "HTML 文件",
+    "titlePlaceholder": "资源名称",
+    "descPlaceholder": "描述（可选）",
+    "urlPlaceholder": "https://...",
+    "htmlHint": "仅支持 .html 文件，最大 5 MB",
+    "save": "保存",
+    "saving": "保存中…",
+    "open": "打开",
+    "delete": "删除",
+    "deleteConfirm": "确认删除该资源？",
+    "loading": "加载中…",
+    "empty": "暂无资源，管理员可点击「添加资源」创建",
+    "errNoTitle": "请输入资源名称",
+    "errNoUrl": "请输入 URL",
+    "errNoFile": "请选择 HTML 文件",
+    "saveFailed": "保存失败",
+    "deleteFailed": "删除失败",
+    "openFailed": "打开失败",
+    "popupBlocked": "弹窗被浏览器拦截，请允许弹出窗口后重试",
+    "edit": "编辑",
+    "replaceFileLabel": "替换文件（可选，不选则保留原文件）"
+  },
   "caseEntry": {
     "title": "KB 录入",
     "titlePlaceholder": "请输入标题",
@@ -701,7 +729,8 @@
     "engine_timeout_saved": "引擎超时配置已保存",
     "module_chatplus": "聊天+",
     "module_cases": "KB 录入",
-    "module_skills": "Skill 库"
+    "module_skills": "Skill 库",
+    "module_resources": "资源"
   },
   "verifyEmail": {
     "verifying": "正在验证，请稍候…",

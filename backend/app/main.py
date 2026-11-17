@@ -21,6 +21,7 @@ from app.api import (
     documents,
     folders,
     icons,
+    resources,
     scheduled_tasks,
     settings,
     skills,
@@ -139,6 +140,7 @@ app.include_router(whatsnew.router)
 app.include_router(skills.router)
 app.include_router(icons.router)
 app.include_router(cases.router)
+app.include_router(resources.router)
 app.include_router(scheduled_tasks.router)
 
 

@@ -76,6 +76,7 @@ class PermissionSet(BaseModel):
         "stats",
         "whatsnew",
         "skills",
+        "resources",
     ]
     level: Literal["none", "read", "write"]
 

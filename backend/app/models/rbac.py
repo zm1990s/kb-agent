@@ -21,6 +21,7 @@ MODULES = (
     "stats",
     "whatsnew",
     "skills",
+    "resources",
 )
 LEVELS = ("none", "read", "write")
 RULE_FIELDS = ("email_domain", "email", "role")

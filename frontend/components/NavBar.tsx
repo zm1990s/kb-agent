@@ -44,6 +44,7 @@ export default function NavBar() {
     { href: "/chat-plus", label: t("chatPlus"), module: "chatplus" },
     { href: "/skills", label: t("skills"), module: "skills" },
     { href: "/documents", label: t("documents"), module: "documents" },
+    { href: "/resources", label: t("resources"), module: "resources" },
     { href: "/case-entry", label: t("caseEntry"), module: "cases" },
     { href: "/stats", label: t("stats"), module: "stats" },
     { href: "/settings", label: t("settings"), module: "settings" },
