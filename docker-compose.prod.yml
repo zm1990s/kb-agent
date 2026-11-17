@@ -50,7 +50,7 @@ services:
     expose:
       - "8000"
     volumes:
-      - ./data/documents:/app/storage
+      - ./data/documents:/app/local_storage
       - ./data/logs:/app/logs
       - ./infra:/app/infra:ro
       - ./data/codex:/app/codex_config
