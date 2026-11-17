@@ -51,7 +51,7 @@ services:
     volumes:
       - ./backend:/app
       - ./infra:/app/infra:ro
-      - ./data/documents:/app/local_storage
+      - ./data/documents:/app/storage
       - ./data/logs:/app/logs
       - ./data/codex:/app/codex_config
       - ./data/kimi:/app/kimi_config
