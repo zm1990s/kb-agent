@@ -10,6 +10,7 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.auth import User
 from app.models.document import Document, ProcessingTask
 from app.storage.base import generate_storage_key, get_storage
 
@@ -219,3 +220,15 @@ async def create_reprocess_task(
     await session.commit()
     await session.refresh(task)
     return task
+
+
+async def get_uploader_emails(
+    session: AsyncSession, user_ids: set[uuid.UUID]
+) -> dict[uuid.UUID, str]:
+    """批量查询上传人邮箱，避免 N+1。返回 {user_id: email} 映射。"""
+    if not user_ids:
+        return {}
+    result = await session.execute(
+        select(User.id, User.email).where(User.id.in_(user_ids))
+    )
+    return {row.id: row.email for row in result}

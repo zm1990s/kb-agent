@@ -42,6 +42,7 @@ from app.services.case_service import export_case
 from app.services.document_service import (
     create_reprocess_task,
     delete_document,
+    get_uploader_emails,
     list_document_tasks,
     list_documents,
     list_trashed_documents,
@@ -188,7 +189,15 @@ async def list_ws_documents(
         limit=size,
         offset=(max(page, 1) - 1) * size,
     )
-    return [DocumentPublic.model_validate(d) for d in docs]
+    emails = await get_uploader_emails(
+        session, {d.uploaded_by for d in docs if d.uploaded_by}
+    )
+    return [
+        DocumentPublic.model_validate(d).model_copy(
+            update={"uploaded_by_email": emails.get(d.uploaded_by)}
+        )
+        for d in docs
+    ]
 
 
 @router.get("/documents/{document_id}", response_model=DocumentPublic)
@@ -198,7 +207,12 @@ async def get_document_detail(
     session: AsyncSession = Depends(get_session),
 ) -> DocumentPublic:
     doc = await _get_doc_for_member(session, document_id, current_user)
-    return DocumentPublic.model_validate(doc)
+    emails = await get_uploader_emails(
+        session, {doc.uploaded_by} if doc.uploaded_by else set()
+    )
+    return DocumentPublic.model_validate(doc).model_copy(
+        update={"uploaded_by_email": emails.get(doc.uploaded_by)}
+    )
 
 
 @router.delete("/documents/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -230,7 +244,15 @@ async def list_trash(
         limit=size,
         offset=(max(page, 1) - 1) * size,
     )
-    return [DocumentPublic.model_validate(d) for d in docs]
+    emails = await get_uploader_emails(
+        session, {d.uploaded_by for d in docs if d.uploaded_by}
+    )
+    return [
+        DocumentPublic.model_validate(d).model_copy(
+            update={"uploaded_by_email": emails.get(d.uploaded_by)}
+        )
+        for d in docs
+    ]
 
 
 @router.post(
