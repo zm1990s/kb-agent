@@ -44,7 +44,8 @@
     "lang_label": "言語",
     "chatPlus": "チャット+",
     "skills": "スキル",
-    "caseEntry": "KB 入力"
+    "caseEntry": "KB 入力",
+    "resources": "リソース"
   },
   "login": {
     "title": "KB-Agent",
@@ -581,6 +582,33 @@
     "sso_client_remove_error": "削除に失敗しました。再度お試しください",
     "cancel": "キャンセル"
   },
+  "resources": {
+    "title": "リソース",
+    "addResource": "リソースを追加",
+    "cancel": "キャンセル",
+    "typeUrl": "URL リンク",
+    "typeHtml": "HTML ファイル",
+    "titlePlaceholder": "リソース名",
+    "descPlaceholder": "説明（任意）",
+    "urlPlaceholder": "https://...",
+    "htmlHint": ".html ファイルのみ、最大 5 MB",
+    "save": "保存",
+    "saving": "保存中…",
+    "open": "開く",
+    "delete": "削除",
+    "deleteConfirm": "このリソースを削除しますか？",
+    "loading": "読み込み中…",
+    "empty": "リソースがありません。管理者が追加できます",
+    "errNoTitle": "リソース名を入力してください",
+    "errNoUrl": "URL を入力してください",
+    "errNoFile": "HTML ファイルを選択してください",
+    "saveFailed": "保存に失敗しました",
+    "deleteFailed": "削除に失敗しました",
+    "openFailed": "開けませんでした",
+    "popupBlocked": "ポップアップがブロックされました。許可してから再試行してください",
+    "edit": "編集",
+    "replaceFileLabel": "ファイルを置き換え（選択しない場合は既存ファイルを保持）"
+  },
   "caseEntry": {
     "title": "KB 入力",
     "titlePlaceholder": "タイトルを入力",
@@ -750,7 +778,8 @@
     "engine_timeout_saved": "エンジンタイムアウトを保存しました",
     "module_chatplus": "チャット+",
     "module_cases": "KB 入力",
-    "module_skills": "スキル"
+    "module_skills": "スキル",
+    "module_resources": "リソース"
   },
   "verifyEmail": {
     "verifying": "確認中、しばらくお待ちください…",

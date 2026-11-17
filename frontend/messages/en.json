@@ -44,7 +44,8 @@
     "lang_label": "Language",
     "chatPlus": "Chat+",
     "skills": "Skills",
-    "caseEntry": "KB Entry"
+    "caseEntry": "KB Entry",
+    "resources": "Resources"
   },
   "login": {
     "title": "KB-Agent",
@@ -581,6 +582,33 @@
     "sso_client_remove_error": "Failed to remove, please try again",
     "cancel": "Cancel"
   },
+  "resources": {
+    "title": "Resources",
+    "addResource": "Add Resource",
+    "cancel": "Cancel",
+    "typeUrl": "URL Link",
+    "typeHtml": "HTML File",
+    "titlePlaceholder": "Resource name",
+    "descPlaceholder": "Description (optional)",
+    "urlPlaceholder": "https://...",
+    "htmlHint": ".html files only, max 5 MB",
+    "save": "Save",
+    "saving": "Saving…",
+    "open": "Open",
+    "delete": "Delete",
+    "deleteConfirm": "Delete this resource?",
+    "loading": "Loading…",
+    "empty": "No resources yet. Admins can click \"Add Resource\" to create one.",
+    "errNoTitle": "Please enter a resource name",
+    "errNoUrl": "Please enter a URL",
+    "errNoFile": "Please select an HTML file",
+    "saveFailed": "Save failed",
+    "deleteFailed": "Delete failed",
+    "openFailed": "Failed to open resource",
+    "popupBlocked": "Popup blocked — please allow popups and try again",
+    "edit": "Edit",
+    "replaceFileLabel": "Replace file (optional — keep existing if not selected)"
+  },
   "caseEntry": {
     "title": "KB Entry",
     "titlePlaceholder": "Enter a title",
@@ -750,7 +778,8 @@
     "engine_timeout_saved": "Engine timeout saved",
     "module_chatplus": "Chat+",
     "module_cases": "KB Entry",
-    "module_skills": "Skills"
+    "module_skills": "Skills",
+    "module_resources": "Resources"
   },
   "verifyEmail": {
     "verifying": "Verifying, please wait…",

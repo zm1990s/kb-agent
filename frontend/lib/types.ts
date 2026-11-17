@@ -1,5 +1,17 @@
 // 与后端 schema 对应的前端类型。
 
+export interface Resource {
+  id: string;
+  title: string;
+  description: string | null;
+  type: "url" | "html";
+  url: string | null;
+  created_by: string | null;
+  created_by_email: string | null;
+  created_at: string;
+}
+
+
 export interface UserPublic {
   id: string;
   email: string;

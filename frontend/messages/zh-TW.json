@@ -44,7 +44,8 @@
     "lang_label": "語言",
     "chatPlus": "對話+",
     "skills": "Skill 庫",
-    "caseEntry": "KB 錄入"
+    "caseEntry": "KB 錄入",
+    "resources": "資源"
   },
   "login": {
     "title": "KB-Agent",
@@ -581,6 +582,33 @@
     "sso_client_remove_error": "刪除失敗，請重試",
     "cancel": "取消"
   },
+  "resources": {
+    "title": "資源",
+    "addResource": "新增資源",
+    "cancel": "取消",
+    "typeUrl": "URL 連結",
+    "typeHtml": "HTML 檔案",
+    "titlePlaceholder": "資源名稱",
+    "descPlaceholder": "描述（選填）",
+    "urlPlaceholder": "https://...",
+    "htmlHint": "僅支援 .html 檔案，最大 5 MB",
+    "save": "儲存",
+    "saving": "儲存中…",
+    "open": "開啟",
+    "delete": "刪除",
+    "deleteConfirm": "確認刪除此資源？",
+    "loading": "載入中…",
+    "empty": "尚無資源，管理員可點擊「新增資源」建立",
+    "errNoTitle": "請輸入資源名稱",
+    "errNoUrl": "請輸入 URL",
+    "errNoFile": "請選擇 HTML 檔案",
+    "saveFailed": "儲存失敗",
+    "deleteFailed": "刪除失敗",
+    "openFailed": "開啟失敗",
+    "popupBlocked": "彈出視窗被封鎖，請允許後重試",
+    "edit": "編輯",
+    "replaceFileLabel": "替換檔案（選填，不選則保留原檔案）"
+  },
   "caseEntry": {
     "title": "KB 錄入",
     "titlePlaceholder": "請輸入標題",
@@ -750,7 +778,8 @@
     "engine_timeout_saved": "引擎逾時設定已儲存",
     "module_chatplus": "對話+",
     "module_cases": "KB 錄入",
-    "module_skills": "Skill 庫"
+    "module_skills": "Skill 庫",
+    "module_resources": "資源"
   },
   "verifyEmail": {
     "verifying": "正在驗證，請稍候…",

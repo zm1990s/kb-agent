@@ -36,6 +36,7 @@ const MODULE_KEYS = [
   "cases",
   "skills",
   "documents",
+  "resources",
   "workspaces",
   "users",
   "settings",
